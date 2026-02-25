@@ -1,0 +1,48 @@
+# Local notebooks
+mi_inv.ipynb
+alg_gen.ipynb
+
+# Data
+financial_data_clean.xlsx
+financial_data.xlsx
+
+# Jupyter
+.ipynb_checkpoints/
+*.nbconvert.ipynb
+
+# Python caches / tooling
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+
+# Build artifacts
+build/
+dist/
+*.egg-info/
+
+# Env / secrets
+.env
+.env.*
+*.env
+
+# Editors / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Temporary Office files
+~$*.xlsx

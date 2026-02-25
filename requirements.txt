@@ -1,0 +1,10 @@
+jupyter
+numpy
+pandas
+matplotlib
+yfinance
+tqdm
+scikit-learn
+networkx
+python-louvain
+openpyxl
