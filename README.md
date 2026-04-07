@@ -1,69 +1,102 @@
 # ML_finance
 
-Proyecto de análisis financiero en Jupyter centrado en un único cuaderno reproducible.
+`ML_finance` evoluciona desde un repositorio de exploración en Jupyter hacia un sistema local para:
 
-## Archivo principal (se sube al repo)
+- importar exportaciones oficiales de DEGIRO,
+- reconstruir y seguir el histórico de la cartera,
+- enriquecer posiciones con datos de mercado,
+- generar informes periódicos,
+- exponer una interfaz simple en Streamlit,
+- y servir como proyecto público enseñable sin exponer datos personales.
 
-- `analisis_financiero_cartera.ipynb`
+## Estado actual
 
-## Que contiene el cuaderno
+La base del proyecto ya está preparada:
 
-El notebook recorre un flujo completo de análisis y construccion de cartera:
+- estructura de carpetas reorganizada,
+- documentación de roadmap y arquitectura,
+- zona `legacy` para notebooks antiguos,
+- separación entre datos públicos de ejemplo y datos privados locales,
+- y primer esqueleto para agentes y dashboard.
 
-1. Selección de empresas por sector y descarga de precios con `yfinance`.
-2. Cálculo de retornos y exportacion inicial de datos (`financial_data.xlsx`).
-3. Limpieza de datos:
-   - filtrado de valores NaN por día y por empresa,
-   - revisión de duplicados,
-   - limpieza de días con retorno 0,
-   - generacion del dataset limpio (`financial_data_clean.xlsx`).
-4. Análisis por sector:
-   - matrices de correlación por sector,
-   - correlación entre sectores (retornos medios),
-   - PCA sobre matriz de distancias.
-5. Análisis global entre empresas:
-   - matriz de correlacion global,
-   - K-means,
-   - selección del número de clusters con silhouette score.
-6. Grafo de correlaciones y detección de comunidades (NetworkX + Louvain).
-7. Algoritmo genético para optimización de cartera (in-sample).
-8. Evaluación train/test de la cartera construida.
+Las siguientes fases son implementar el modelo de datos local y el importador de exportaciones DEGIRO.
 
-## Archivos generados por el cuaderno (no se suben)
+## Estructura del repositorio
 
-- `financial_data.xlsx`
-- `financial_data_clean.xlsx`
+```text
+ML_finance/
+|- .github/
+|  |- ISSUE_TEMPLATE/
+|  `- pull_request_template.md
+|- docs/
+|  |- architecture.md
+|  |- decisions.md
+|  `- roadmap.md
+|- notebooks/
+|  |- old/
+|  `- README.md
+|- scripts/
+|  `- README.md
+|- src/
+|  |- agents/
+|  |- analytics/
+|  |- data/
+|  |- degiro_exports/
+|  |- market_data/
+|  `- portfolio/
+|- tests/
+|  `- README.md
+|- .env.example
+|- .gitattributes
+|- .gitignore
+|- README.md
+`- requirements.txt
+```
 
-Tambien se excluyen notebooks locales:
+## Convención público / privado
 
-- `alg_gen.ipynb`
-- `mi_inv.ipynb`
+El repositorio sigue una separación simple:
 
-## Requisitos
+- `src/degiro_exports/example/`: ejemplos saneados y compartibles.
+- `src/degiro_exports/local/`: exportaciones reales del broker, ignoradas por Git.
+- `src/data/sample/`: datasets sintéticos o anonimizados para demo pública.
+- `src/data/local/`: base local, cachés, informes y artefactos privados, ignorados por Git.
+
+Esto permite tener un repositorio público útil y, a la vez, trabajar con tu cartera real sin subir datos sensibles.
+
+## Puesta en marcha
 
 Python 3.10+ recomendado.
-
-Instalación rapida:
 
 ```powershell
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
 pip install -r requirements.txt
+Copy-Item .env.example .env
 ```
 
-Para abrir y ejecutar el cuaderno:
+Después:
+
+1. Coloca exportaciones reales en `src/degiro_exports/local/` cuando el importador exista.
+2. Usa `src/degiro_exports/example/` y `src/data/sample/` para demos públicas.
+3. Consulta el plan en `docs/roadmap.md`.
+
+## Dashboard
+
+La primera interfaz será una app de Streamlit. El punto de entrada previsto es:
 
 ```powershell
-jupyter lab
+streamlit run src/portfolio/dashboard.py
 ```
 
-## Contenido del repo publico
+Ahora mismo solo hay un esqueleto mínimo; la funcionalidad llegará después del modelo de datos y del importador.
 
-```text
-ML_finance/
-|- analisis_financiero_cartera.ipynb
-|- requirements.txt
-|- .gitignore
-|- .gitattributes
-|- README.md
-```
+## Documentación clave
+
+- `docs/roadmap.md`: fases, backlog y traducción del plan a tareas de GitHub.
+- `docs/architecture.md`: flujo de datos, componentes y límites del sistema.
+- `docs/decisions.md`: decisiones ya cerradas y su justificación.
+
+## Legacy
+
+Los notebooks anteriores siguen disponibles en `notebooks/old/`. Se conservan como referencia histórica, pero ya no definen la arquitectura principal del proyecto.

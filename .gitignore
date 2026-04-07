@@ -1,8 +1,16 @@
 # Local notebooks
 mi_inv.ipynb
 alg_gen.ipynb
+notebooks/old/mi_inv.ipynb
 
-# Data
+# Local project data
+src/degiro_exports/local/
+src/data/local/
+*.duckdb
+*.duckdb-wal
+*.duckdb-shm
+
+# Legacy data
 financial_data_clean.xlsx
 financial_data.xlsx
 
@@ -36,6 +44,7 @@ dist/
 .env
 .env.*
 *.env
+.streamlit/secrets.toml
 
 # Editors / OS
 .vscode/

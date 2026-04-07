@@ -8,3 +8,8 @@ scikit-learn
 networkx
 python-louvain
 openpyxl
+duckdb
+pyarrow
+python-dotenv
+streamlit
+pytest
