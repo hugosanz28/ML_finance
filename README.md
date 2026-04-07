@@ -97,6 +97,8 @@ Ahora mismo solo hay un esqueleto mínimo; la funcionalidad llegará después de
 - `docs/architecture.md`: flujo de datos, componentes y límites del sistema.
 - `docs/decisions.md`: decisiones ya cerradas y su justificación.
 
+- `docs/data_model.md`: esquema inicial de DuckDB, claves y relaciones entre tablas.
+
 ## Legacy
 
 Los notebooks anteriores siguen disponibles en `notebooks/old/`. Se conservan como referencia histórica, pero ya no definen la arquitectura principal del proyecto.

@@ -12,3 +12,7 @@ Estructura prevista dentro de `local/`:
 - `curated/`
 - `reports/`
 - `legacy/`
+
+DDL versionado:
+
+- `sql/001_initial_schema.sql`: esquema inicial de DuckDB para el proyecto.
