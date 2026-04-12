@@ -1,10 +1,10 @@
-from pathlib import Path
-
 import duckdb
 import pytest
 
+from src.config import default_repo_root
 
-SCHEMA_PATH = Path("src/data/sql/001_initial_schema.sql")
+
+SCHEMA_PATH = default_repo_root() / "src" / "data" / "sql" / "001_initial_schema.sql"
 
 
 def apply_schema(connection: duckdb.DuckDBPyConnection) -> None:

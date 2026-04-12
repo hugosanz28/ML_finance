@@ -2,6 +2,7 @@
 mi_inv.ipynb
 alg_gen.ipynb
 notebooks/old/mi_inv.ipynb
+pruebas.ipynb
 
 # Local project data
 src/degiro_exports/local/
@@ -24,6 +25,8 @@ __pycache__/
 *.pyo
 *.pyd
 .pytest_cache/
+.pytest_tmp/
+.test_tmp/
 .mypy_cache/
 .ruff_cache/
 .coverage
