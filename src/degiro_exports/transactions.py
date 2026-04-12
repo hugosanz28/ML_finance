@@ -469,7 +469,7 @@ def _parse_decimal(raw_value: str) -> Decimal | None:
     if not text:
         return None
 
-    normalized = text.replace(".", "").replace(",", ".") if "," in text else text
+    normalized = _normalize_decimal_text(text)
     try:
         return Decimal(normalized)
     except InvalidOperation as exc:
@@ -574,3 +574,15 @@ def _display_source_path(source_path: Path, *, source_root: str | Path | None) -
     if resolved_path.is_relative_to(resolved_root):
         return str(resolved_path.relative_to(resolved_root))
     return str(resolved_path)
+
+
+def _normalize_decimal_text(text: str) -> str:
+    if "," in text:
+        return text.replace(".", "").replace(",", ".")
+
+    if text.count(".") == 1:
+        whole, fractional = text.split(".")
+        if whole.lstrip("-").isdigit() and fractional.isdigit() and len(fractional) == 3:
+            return whole + fractional
+
+    return text
