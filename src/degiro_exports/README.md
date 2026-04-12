@@ -6,6 +6,11 @@ Este directorio contiene la materia prima del proyecto.
 - `local/`: exportaciones reales del usuario. Esta carpeta está ignorada por Git.
 - `local/incoming/`: aterrizaje inicial de CSV reales descargados desde DEGIRO.
 
+Estado actual:
+
+- ya existen parsers para transacciones, movimientos de efectivo y snapshot de cartera,
+- y su salida normalizada se guarda bajo `src/data/local/normalized/degiro/`.
+
 Tipos de exportación esperados:
 
 - transacciones,

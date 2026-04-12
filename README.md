@@ -11,15 +11,18 @@
 
 ## Estado actual
 
-La base del proyecto ya está preparada:
+El proyecto ya tiene una primera base funcional:
 
 - estructura de carpetas reorganizada,
 - documentación de roadmap y arquitectura,
 - zona `legacy` para notebooks antiguos,
 - separación entre datos públicos de ejemplo y datos privados locales,
+- esquema inicial en DuckDB,
+- parsers para transacciones, movimientos de efectivo y snapshot de cartera DEGIRO,
+- refresh de market data diario con `yfinance`,
 - y primer esqueleto para agentes y dashboard.
 
-Las siguientes fases son implementar el modelo de datos local y el importador de exportaciones DEGIRO.
+El siguiente bloque importante es reconstruir posiciones por fecha y calcular métricas agregadas de cartera.
 
 ## Estructura del repositorio
 
@@ -77,9 +80,10 @@ Copy-Item .env.example .env
 
 Después:
 
-1. Coloca exportaciones reales en `src/degiro_exports/local/` cuando el importador exista.
+1. Coloca exportaciones reales en `src/degiro_exports/local/incoming/`.
 2. Usa `src/degiro_exports/example/` y `src/data/sample/` para demos públicas.
-3. Consulta el plan en `docs/roadmap.md`.
+3. Si quieres refrescar precios de mercado, ejecuta `.\.venv\Scripts\python.exe scripts\refresh_market_data.py`.
+4. Consulta el plan en `docs/roadmap.md`.
 
 ## Dashboard
 
@@ -96,8 +100,8 @@ Ahora mismo solo hay un esqueleto mínimo; la funcionalidad llegará después de
 - `docs/roadmap.md`: fases, backlog y traducción del plan a tareas de GitHub.
 - `docs/architecture.md`: flujo de datos, componentes y límites del sistema.
 - `docs/decisions.md`: decisiones ya cerradas y su justificación.
-
 - `docs/data_model.md`: esquema inicial de DuckDB, claves y relaciones entre tablas.
+- `docs/market_data_refresh.md`: flujo real de refresh de precios y overrides manuales.
 
 ## Legacy
 
