@@ -21,6 +21,8 @@ El proyecto ya tiene una primera base funcional:
 - parsers para transacciones, movimientos de efectivo y snapshot de cartera DEGIRO,
 - reconstruccion diaria de posiciones con reconciliacion opcional contra snapshots del broker,
 - metricas agregadas de cartera con valor, pesos, rentabilidad basica y drawdown,
+- informe mensual en Markdown para revision manual y agentes,
+- historico de informes y metadatos persistidos en DuckDB,
 - refresh de market data diario con `yfinance`,
 - y primer esqueleto para agentes y dashboard.
 
@@ -90,6 +92,7 @@ Después:
 4. Consulta el plan en `docs/roadmap.md`.
 5. Si quieres ver el flujo del historico de posiciones, consulta `docs/position_history.md`.
 6. Si quieres ver la capa de valoracion agregada, consulta `docs/portfolio_metrics.md`.
+7. Si quieres generar el informe mensual para revision y agentes, consulta `docs/monthly_report.md`.
 
 ## Dashboard
 
@@ -110,6 +113,7 @@ Ahora mismo solo hay un esqueleto mínimo; la funcionalidad llegará después de
 - `docs/market_data_refresh.md`: flujo real de refresh de precios y overrides manuales.
 - `docs/position_history.md`: reconstruccion diaria de cantidades y contraste con snapshots del broker.
 - `docs/portfolio_metrics.md`: valoracion diaria, pesos, rentabilidad basica y drawdown.
+- `docs/monthly_report.md`: generacion manual del informe mensual en Markdown.
 
 ## Legacy
 
