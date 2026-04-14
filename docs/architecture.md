@@ -37,6 +37,12 @@ Contiene los artefactos derivados:
 Responsable de descargar y normalizar precios, divisas y metadatos de mercado.
 
 ### `src/portfolio/`
+Estado actual de esta capa:
+
+- reconstruccion diaria de cantidades desde `transactions`,
+- reconciliacion contra `portfolio_snapshots`,
+- metricas agregadas con valor, pesos y drawdown,
+- y una base directa para reporting y Streamlit.
 
 Responsable de reconstrucción histórica de posiciones, métricas agregadas e interfaz de Streamlit.
 

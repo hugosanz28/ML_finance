@@ -19,12 +19,16 @@ El proyecto ya tiene una primera base funcional:
 - separación entre datos públicos de ejemplo y datos privados locales,
 - esquema inicial en DuckDB,
 - parsers para transacciones, movimientos de efectivo y snapshot de cartera DEGIRO,
+- reconstruccion diaria de posiciones con reconciliacion opcional contra snapshots del broker,
+- metricas agregadas de cartera con valor, pesos, rentabilidad basica y drawdown,
 - refresh de market data diario con `yfinance`,
 - y primer esqueleto para agentes y dashboard.
 
 El siguiente bloque importante es reconstruir posiciones por fecha y calcular métricas agregadas de cartera.
 
 ## Estructura del repositorio
+
+La reconstruccion diaria de posiciones ya esta disponible; el siguiente bloque funcional real es explotar ese historico para metricas agregadas.
 
 ```text
 ML_finance/
@@ -84,6 +88,8 @@ Después:
 2. Usa `src/degiro_exports/example/` y `src/data/sample/` para demos públicas.
 3. Si quieres refrescar precios de mercado, ejecuta `.\.venv\Scripts\python.exe scripts\refresh_market_data.py`.
 4. Consulta el plan en `docs/roadmap.md`.
+5. Si quieres ver el flujo del historico de posiciones, consulta `docs/position_history.md`.
+6. Si quieres ver la capa de valoracion agregada, consulta `docs/portfolio_metrics.md`.
 
 ## Dashboard
 
@@ -102,6 +108,8 @@ Ahora mismo solo hay un esqueleto mínimo; la funcionalidad llegará después de
 - `docs/decisions.md`: decisiones ya cerradas y su justificación.
 - `docs/data_model.md`: esquema inicial de DuckDB, claves y relaciones entre tablas.
 - `docs/market_data_refresh.md`: flujo real de refresh de precios y overrides manuales.
+- `docs/position_history.md`: reconstruccion diaria de cantidades y contraste con snapshots del broker.
+- `docs/portfolio_metrics.md`: valoracion diaria, pesos, rentabilidad basica y drawdown.
 
 ## Legacy
 

@@ -80,7 +80,7 @@ Objetivo: poder valorar la cartera día a día y reconstruir su evolución.
 - [ ] Definir proveedor inicial de precios
 - [ ] Descargar precios diarios para activos en cartera
 - [ ] Descargar tipos de cambio si son necesarios
-- [ ] Reconstruir posiciones por fecha a partir de transacciones
+- [x] Reconstruir posiciones por fecha a partir de transacciones
 - [ ] Generar snapshots diarios o semanales reproducibles
 - [ ] Calcular métricas básicas: valor, rentabilidad, asignación y drawdown
 
