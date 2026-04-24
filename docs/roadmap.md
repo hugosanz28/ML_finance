@@ -110,6 +110,14 @@ Issues sugeridos:
 
 Objetivo: encapsular los informes y enriquecerlos con contexto útil.
 
+Enfoque funcional previsto:
+
+- partir de un mandato explicito de la cuenta de inversion,
+- usar el informe mensual con historial como base del estado de cartera,
+- permitir una idea opcional del usuario para satelites o nuevos candidatos,
+- analizar contexto de mercado y encaje de posiciones con el objetivo de la cuenta,
+- y terminar en una recomendacion mensual de compra, no compra, venta o rebalanceo.
+
 - [ ] `monitor_tematico`: noticias y eventos sobre activos, sectores y geografías relevantes
 - [ ] `analista_activos`: análisis de empresas y de ETFs por índice, holdings, sectores y proveedor
 - [ ] `asistente_aportacion_mensual`: propuesta de aportación según presupuesto, pesos objetivo y desviaciones

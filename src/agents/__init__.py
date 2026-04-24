@@ -11,8 +11,12 @@ from src.agents.models import (
     AgentSource,
     build_agent_context,
 )
+from src.agents.analista_activos import AnalistaActivosAgent
+from src.agents.asistente_aportacion_mensual import AsistenteAportacionMensualAgent
+from src.agents.monitor_tematico import MonitorTematicoAgent
 
 __all__ = [
+    "AnalistaActivosAgent",
     "AgentArtifact",
     "AgentContext",
     "AgentFinding",
@@ -21,6 +25,8 @@ __all__ = [
     "AgentResult",
     "AgentSource",
     "AgentValidationError",
+    "AsistenteAportacionMensualAgent",
     "BaseAgent",
+    "MonitorTematicoAgent",
     "build_agent_context",
 ]
