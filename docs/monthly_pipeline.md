@@ -10,6 +10,18 @@
 .\.venv\Scripts\python.exe scripts\run_monthly_agents.py --llm-provider static --search-provider null
 ```
 
+El mismo flujo puede ejecutarse desde Streamlit:
+
+```powershell
+.\.venv\Scripts\python.exe -m streamlit run src\portfolio\dashboard.py
+```
+
+Abre `http://localhost:8501` cuando Streamlit termine de arrancar.
+
+La pestaña `Actualizar datos` permite subir CSVs, importar, refrescar FX,
+refrescar precios y generar informes. La pestaña `Agentes` permite revisar los
+inputs y ejecutar la red mensual.
+
 ## Entradas estables
 
 - CSV canonicos de DEGIRO: `src/degiro_exports/local/incoming/`

@@ -72,6 +72,12 @@ class PriceRefreshService:
                 )
                 continue
 
+            self.repository.delete_daily_prices(
+                asset_id=asset.asset_id,
+                provider_name=fetch_result.provider_name,
+                start_date=start_date,
+                end_date=end_date,
+            )
             written_records = self.repository.upsert_daily_prices(
                 asset_id=asset.asset_id,
                 provider_name=fetch_result.provider_name,

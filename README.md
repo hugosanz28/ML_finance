@@ -96,13 +96,13 @@ Después:
 
 ## Dashboard
 
-La primera interfaz será una app de Streamlit. El punto de entrada previsto es:
+La interfaz local de Streamlit permite revisar cartera, evolucion, informes, actualizar datos DEGIRO y ejecutar la demo de agentes.
 
 ```powershell
-streamlit run src/portfolio/dashboard.py
+.\.venv\Scripts\python.exe -m streamlit run src\portfolio\dashboard.py
 ```
 
-Ahora mismo solo hay un esqueleto mínimo; la funcionalidad llegará después del modelo de datos y del importador.
+Abre `http://localhost:8501` cuando Streamlit termine de arrancar. Guia completa: `docs/streamlit_dashboard.md`.
 
 ## Documentación clave
 
@@ -115,6 +115,7 @@ Ahora mismo solo hay un esqueleto mínimo; la funcionalidad llegará después de
 - `docs/portfolio_metrics.md`: valoracion diaria, pesos, rentabilidad basica y drawdown.
 - `docs/monthly_report.md`: generacion manual del informe mensual en Markdown.
 - `docs/monthly_pipeline.md`: flujo mensual completo, incluyendo FX, market data y agentes.
+- `docs/streamlit_dashboard.md`: uso del dashboard local para cartera, informes, actualizacion de datos y agentes.
 
 ## Legacy
 

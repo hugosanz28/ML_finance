@@ -307,6 +307,29 @@ class DuckDBMarketDataRepository:
 
         return len(rows)
 
+    def delete_daily_prices(
+        self,
+        *,
+        asset_id: str,
+        provider_name: str,
+        start_date,
+        end_date,
+    ) -> int:
+        """Delete provider prices for one asset inside an inclusive date window."""
+        with self.connection() as connection:
+            deleted_count = connection.execute(
+                """
+                DELETE FROM prices_daily
+                WHERE asset_id = ?
+                    AND price_provider = ?
+                    AND price_date >= ?
+                    AND price_date <= ?
+                RETURNING asset_id
+                """,
+                [asset_id, provider_name, start_date, end_date],
+            ).fetchall()
+        return len(deleted_count)
+
     def upsert_fx_rates(
         self,
         *,

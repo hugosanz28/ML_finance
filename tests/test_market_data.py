@@ -501,6 +501,67 @@ def test_price_refresh_service_persists_prices_into_duckdb(workspace_tmp_path: P
     ]
 
 
+def test_price_refresh_service_replaces_existing_provider_window(workspace_tmp_path: Path) -> None:
+    settings = load_settings(
+        env={"DATA_DIR": "private/data", "PORTFOLIO_DB_PATH": "private/data/portfolio.duckdb"},
+        repo_root=workspace_tmp_path,
+        env_file=workspace_tmp_path / ".env.missing",
+    )
+    repository = DuckDBMarketDataRepository(settings=settings)
+    repository.upsert_assets(
+        [
+            MarketAsset(
+                asset_id="asset_googl",
+                asset_name="Alphabet",
+                asset_type="stock",
+                trading_currency="USD",
+                ticker="GOOGL",
+            )
+        ]
+    )
+    repository.upsert_daily_prices(
+        asset_id="asset_googl",
+        provider_name="stub",
+        prices=(
+            DailyPriceRecord(price_date=date(2025, 11, 26), price_currency="USD", close_price=320.0),
+            DailyPriceRecord(price_date=date(2025, 11, 27), price_currency="USD", close_price=1190040.0),
+        ),
+    )
+    provider = StubPriceProvider(
+        {
+            "asset_googl": PriceFetchResult(
+                provider_name="stub",
+                resolved_symbol="GOOGL",
+                price_records=(
+                    DailyPriceRecord(price_date=date(2025, 11, 26), price_currency="USD", close_price=319.95),
+                    DailyPriceRecord(price_date=date(2025, 11, 28), price_currency="USD", close_price=320.18),
+                ),
+            )
+        }
+    )
+    service = PriceRefreshService(repository=repository, provider=provider, settings=settings)
+
+    summary = service.refresh_prices(
+        start_date=date(2025, 11, 26),
+        end_date=date(2025, 11, 28),
+        bootstrap_degiro_assets=False,
+    )
+
+    with repository.connection() as connection:
+        stored_rows = connection.execute(
+            """
+            SELECT price_date, close_price
+            FROM prices_daily
+            WHERE asset_id = 'asset_googl'
+            ORDER BY price_date
+            """
+        ).fetchall()
+
+    assert summary.total_records == 2
+    assert [row[0] for row in stored_rows] == [date(2025, 11, 26), date(2025, 11, 28)]
+    assert [float(row[1]) for row in stored_rows] == [pytest.approx(319.95), pytest.approx(320.18)]
+
+
 def test_price_refresh_service_bootstraps_assets_from_normalized_degiro(workspace_tmp_path: Path) -> None:
     settings = load_settings(
         env={"DATA_DIR": "private/data", "PORTFOLIO_DB_PATH": "private/data/portfolio.duckdb"},
