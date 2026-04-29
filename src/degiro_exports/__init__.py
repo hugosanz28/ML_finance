@@ -6,6 +6,12 @@ from .cash_movements import (
     parse_degiro_cash_movements_csv,
     persist_degiro_cash_movements_dataset,
 )
+from .importer import (
+    DegiroImportOutcome,
+    DegiroImportSummary,
+    classify_degiro_export,
+    import_degiro_exports,
+)
 from .portfolio_snapshots import (
     ParsedDegiroPortfolioSnapshots,
     parse_and_persist_degiro_portfolio_snapshots,
@@ -18,11 +24,18 @@ from .transactions import (
     parse_degiro_transactions_csv,
     persist_degiro_transactions_dataset,
 )
+from .warehouse import DegiroWarehouseLoadSummary, load_normalized_degiro_to_duckdb
 
 __all__ = [
+    "DegiroImportOutcome",
+    "DegiroImportSummary",
+    "DegiroWarehouseLoadSummary",
     "ParsedDegiroCashMovements",
     "ParsedDegiroPortfolioSnapshots",
     "ParsedDegiroTransactions",
+    "classify_degiro_export",
+    "import_degiro_exports",
+    "load_normalized_degiro_to_duckdb",
     "parse_degiro_cash_movements_csv",
     "parse_degiro_portfolio_snapshot_csv",
     "parse_degiro_transactions_csv",

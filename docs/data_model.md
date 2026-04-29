@@ -156,6 +156,11 @@ Ejemplo:
 
 significa `1 EUR = 1.08 USD`.
 
+El refresco operativo vive en `scripts/refresh_fx_rates.py` y esta documentado
+en `docs/fx_refresh.md`. Los tipos de cambio se guardan como fuente
+complementaria: no modifican los parquets normalizados, pero permiten cubrir
+huecos o recalcular importes base en metricas e informes.
+
 ### `reports_history`
 
 Metadatos de informes generados, no el contenido del informe.

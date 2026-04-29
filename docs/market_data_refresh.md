@@ -9,6 +9,10 @@ El refresh de precios diarios parte de los activos normalizados en:
 
 Esos activos se sincronizan en `assets_master` y despues se consulta el proveedor configurado, actualmente `yfinance`.
 
+El refresh de tipos de cambio se documenta aparte en `docs/fx_refresh.md`.
+Alimenta `fx_rates` con pares inferidos desde los normalizados de DEGIRO, por
+ejemplo `EUR/USD` o `EUR/CAD`.
+
 ## Ejecucion
 
 ```powershell

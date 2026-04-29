@@ -43,6 +43,7 @@ def test_load_settings_uses_repo_relative_defaults(workspace_tmp_path: Path) -> 
     assert settings.default_timezone == "Europe/Madrid"
     assert settings.price_provider == "yfinance"
     assert settings.monthly_contribution_eur == 500.0
+    assert settings.investment_brief_path == workspace_tmp_path / "src" / "data" / "local" / "investment_brief.md"
 
 
 def test_load_settings_reads_values_from_env_file(workspace_tmp_path: Path) -> None:
@@ -55,6 +56,7 @@ def test_load_settings_reads_values_from_env_file(workspace_tmp_path: Path) -> N
                 "DEFAULT_CURRENCY=USD",
                 "DEFAULT_TIMEZONE=America/New_York",
                 "MONTHLY_CONTRIBUTION_EUR=750",
+                "INVESTMENT_BRIEF_PATH=private/brief.md",
             ]
         ),
         encoding="utf-8",
@@ -70,6 +72,7 @@ def test_load_settings_reads_values_from_env_file(workspace_tmp_path: Path) -> N
     assert settings.default_currency == "USD"
     assert settings.default_timezone == "America/New_York"
     assert settings.monthly_contribution_eur == 750.0
+    assert settings.investment_brief_path == workspace_tmp_path / "private" / "brief.md"
 
 
 def test_explicit_overrides_take_precedence_over_env_file(workspace_tmp_path: Path) -> None:

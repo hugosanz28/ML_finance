@@ -315,6 +315,57 @@ def test_write_asset_overrides_template_creates_rows_for_selected_assets(workspa
     assert pd.isna(frame.iloc[0]["ticker"])
 
 
+def test_repository_upsert_assets_updates_existing_asset_metadata(workspace_tmp_path: Path) -> None:
+    settings = load_settings(
+        env={"DATA_DIR": "private/data", "PORTFOLIO_DB_PATH": "private/data/portfolio.duckdb"},
+        repo_root=workspace_tmp_path,
+        env_file=workspace_tmp_path / ".env.missing",
+    )
+    repository = DuckDBMarketDataRepository(settings=settings)
+
+    repository.upsert_assets(
+        [
+            MarketAsset(
+                asset_id="degiro:isin:ES0144580Y14",
+                asset_name="IBERDROLA SA",
+                asset_type="stock",
+                trading_currency="EUR",
+                first_seen_date=date(2025, 12, 31),
+                last_seen_date=date(2026, 4, 10),
+            )
+        ]
+    )
+
+    updated_count = repository.upsert_assets(
+        [
+            MarketAsset(
+                asset_id="degiro:isin:ES0144580Y14",
+                asset_name="IBERDROLA SA",
+                asset_type="stock",
+                trading_currency="EUR",
+                isin="ES0144580Y14",
+                ticker="IBE.MC",
+                broker_symbol="IBE",
+                exchange_mic="XMAD",
+                first_seen_date=date(2025, 12, 31),
+                last_seen_date=date(2026, 4, 12),
+                is_active=False,
+            )
+        ]
+    )
+
+    asset = repository.get_asset("degiro:isin:ES0144580Y14")
+
+    assert updated_count == 1
+    assert asset is not None
+    assert asset.isin == "ES0144580Y14"
+    assert asset.ticker == "IBE.MC"
+    assert asset.broker_symbol == "IBE"
+    assert asset.exchange_mic == "XMAD"
+    assert asset.last_seen_date == date(2026, 4, 12)
+    assert asset.is_active is False
+
+
 def test_price_refresh_service_uses_override_metadata_even_if_db_row_already_exists(workspace_tmp_path: Path) -> None:
     settings = load_settings(
         env={"DATA_DIR": "private/data", "PORTFOLIO_DB_PATH": "private/data/portfolio.duckdb"},

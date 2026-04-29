@@ -126,3 +126,58 @@ class PriceRefreshSummary:
     @property
     def skipped_assets(self) -> int:
         return sum(1 for outcome in self.outcomes if outcome.status == "skipped")
+
+
+@dataclass(frozen=True)
+class FxRateRecord:
+    """Single FX rate persisted into `fx_rates`."""
+
+    rate_date: date
+    rate: float
+    source_updated_at: datetime | None = None
+
+
+@dataclass(frozen=True)
+class FxFetchResult:
+    """Successful FX provider response for one currency pair."""
+
+    provider_name: str
+    base_currency: str
+    quote_currency: str
+    rate_records: tuple[FxRateRecord, ...]
+
+
+@dataclass(frozen=True)
+class FxRefreshOutcome:
+    """Refresh result for one currency pair."""
+
+    base_currency: str
+    quote_currency: str
+    provider_name: str
+    status: str
+    records_written: int
+    message: str | None = None
+
+    @property
+    def pair(self) -> str:
+        return f"{self.base_currency}/{self.quote_currency}"
+
+
+@dataclass(frozen=True)
+class FxRefreshSummary:
+    """Aggregate result for an FX refresh run."""
+
+    provider_name: str
+    outcomes: tuple[FxRefreshOutcome, ...]
+
+    @property
+    def total_records(self) -> int:
+        return sum(outcome.records_written for outcome in self.outcomes)
+
+    @property
+    def updated_pairs(self) -> int:
+        return sum(1 for outcome in self.outcomes if outcome.status == "updated")
+
+    @property
+    def skipped_pairs(self) -> int:
+        return sum(1 for outcome in self.outcomes if outcome.status == "skipped")

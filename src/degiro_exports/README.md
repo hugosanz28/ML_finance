@@ -9,7 +9,8 @@ Este directorio contiene la materia prima del proyecto.
 Estado actual:
 
 - ya existen parsers para transacciones, movimientos de efectivo y snapshot de cartera,
-- y su salida normalizada se guarda bajo `src/data/local/normalized/degiro/`.
+- su salida normalizada se guarda bajo `src/data/local/normalized/degiro/`,
+- y `scripts/import_degiro.py` ejecuta el import batch desde `local/incoming/`.
 
 Tipos de exportación esperados:
 
@@ -23,6 +24,19 @@ Convención canónica de nombres:
 - `transactions_YYYY-MM-DD_YYYY-MM-DD.csv`
 - `account_YYYY-MM-DD_YYYY-MM-DD.csv`
 - `portfolio_YYYY-MM-DD.csv`
+
+Import manual:
+
+```powershell
+.\.venv\Scripts\python.exe scripts\import_degiro.py
+```
+
+Opciones utiles:
+
+- `--dry-run`: lista los CSV detectados sin escribir parquets.
+- `--ignore-unknown`: ignora CSV que no sigan la convencion canonica.
+- `--incoming-dir RUTA`: cambia la carpeta de entrada.
+- `--output-dir RUTA`: cambia la carpeta normalizada de salida.
 
 Contrato detallado:
 

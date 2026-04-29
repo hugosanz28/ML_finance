@@ -9,7 +9,7 @@ from typing import Iterator, Sequence
 import duckdb
 
 from src.config import Settings, default_repo_root, ensure_local_directories, get_settings
-from src.market_data.models import DailyPriceRecord, MarketAsset
+from src.market_data.models import DailyPriceRecord, FxRateRecord, MarketAsset
 
 
 ASSET_COLUMNS = [
@@ -124,6 +124,8 @@ class DuckDBMarketDataRepository:
                 existing_asset_ids = {row[0] for row in existing_rows}
 
             new_rows = [row for row in rows if row[0] not in existing_asset_ids]
+            existing_rows = [row for row in rows if row[0] in existing_asset_ids]
+
             if new_rows:
                 connection.executemany(
                     """
@@ -145,6 +147,47 @@ class DuckDBMarketDataRepository:
                     """,
                     new_rows,
                 )
+
+            update_sql = """
+                UPDATE assets_master
+                SET
+                    asset_type = ?,
+                    asset_name = ?,
+                    asset_similar = ?,
+                    isin = ?,
+                    ticker = ?,
+                    broker_symbol = ?,
+                    exchange_mic = ?,
+                    trading_currency = ?,
+                    first_seen_date = ?,
+                    last_seen_date = ?,
+                    is_active = ?,
+                    updated_at = now()
+                WHERE asset_id = ?
+                """
+            for row in existing_rows:
+                update_parameters = (
+                    row[1],
+                    row[2],
+                    row[3],
+                    row[4],
+                    row[5],
+                    row[6],
+                    row[7],
+                    row[8],
+                    row[9],
+                    row[10],
+                    row[11],
+                    row[0],
+                )
+                try:
+                    connection.execute(update_sql, update_parameters)
+                except duckdb.ConstraintException:
+                    # DuckDB can reject updates on parent rows referenced by FK
+                    # tables even when the primary key is unchanged. Keep the
+                    # existing referenced row rather than breaking downstream
+                    # prices, transactions or snapshots.
+                    continue
 
         return len(rows)
 
@@ -263,3 +306,89 @@ class DuckDBMarketDataRepository:
             )
 
         return len(rows)
+
+    def upsert_fx_rates(
+        self,
+        *,
+        base_currency: str,
+        quote_currency: str,
+        provider_name: str,
+        rates: Sequence[FxRateRecord],
+    ) -> int:
+        """Insert or update daily FX rates for one pair and provider."""
+        if not rates:
+            return 0
+
+        normalized_base = base_currency.strip().upper()
+        normalized_quote = quote_currency.strip().upper()
+        rows = [
+            (
+                normalized_base,
+                normalized_quote,
+                rate.rate_date,
+                provider_name,
+                rate.rate,
+                rate.source_updated_at,
+            )
+            for rate in rates
+        ]
+
+        with self.connection() as connection:
+            connection.executemany(
+                """
+                INSERT INTO fx_rates (
+                    base_currency,
+                    quote_currency,
+                    rate_date,
+                    rate_provider,
+                    rate,
+                    source_updated_at
+                )
+                VALUES (?, ?, ?, ?, ?, ?)
+                ON CONFLICT (base_currency, quote_currency, rate_date, rate_provider) DO UPDATE SET
+                    rate = EXCLUDED.rate,
+                    source_updated_at = EXCLUDED.source_updated_at,
+                    ingested_at = now()
+                """,
+                rows,
+            )
+
+        return len(rows)
+
+    def list_fx_rates(
+        self,
+        *,
+        base_currency: str | None = None,
+        quote_currency: str | None = None,
+        provider_name: str | None = None,
+    ) -> list[tuple[str, str, object, str, float]]:
+        """List persisted FX rates ordered by pair and date."""
+        where_clauses: list[str] = []
+        parameters: list[object] = []
+
+        if base_currency:
+            where_clauses.append("base_currency = ?")
+            parameters.append(base_currency.strip().upper())
+        if quote_currency:
+            where_clauses.append("quote_currency = ?")
+            parameters.append(quote_currency.strip().upper())
+        if provider_name:
+            where_clauses.append("rate_provider = ?")
+            parameters.append(provider_name)
+
+        where_sql = ""
+        if where_clauses:
+            where_sql = "WHERE " + " AND ".join(where_clauses)
+
+        with self.connection() as connection:
+            rows = connection.execute(
+                f"""
+                SELECT base_currency, quote_currency, rate_date, rate_provider, rate
+                FROM fx_rates
+                {where_sql}
+                ORDER BY base_currency, quote_currency, rate_date, rate_provider
+                """,
+                parameters,
+            ).fetchall()
+
+        return [(row[0], row[1], row[2], row[3], float(row[4])) for row in rows]

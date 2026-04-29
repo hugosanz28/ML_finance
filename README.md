@@ -114,6 +114,7 @@ Ahora mismo solo hay un esqueleto mínimo; la funcionalidad llegará después de
 - `docs/position_history.md`: reconstruccion diaria de cantidades y contraste con snapshots del broker.
 - `docs/portfolio_metrics.md`: valoracion diaria, pesos, rentabilidad basica y drawdown.
 - `docs/monthly_report.md`: generacion manual del informe mensual en Markdown.
+- `docs/monthly_pipeline.md`: flujo mensual completo, incluyendo FX, market data y agentes.
 
 ## Legacy
 

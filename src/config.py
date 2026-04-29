@@ -20,6 +20,7 @@ DEFAULT_ENV_VALUES = {
     "DEFAULT_TIMEZONE": "Europe/Madrid",
     "PRICE_PROVIDER": "yfinance",
     "MONTHLY_CONTRIBUTION_EUR": "500",
+    "INVESTMENT_BRIEF_PATH": "src/data/local/investment_brief.md",
 }
 
 
@@ -93,6 +94,7 @@ class Settings:
     default_timezone: str
     price_provider: str
     monthly_contribution_eur: float
+    investment_brief_path: Path
 
     @property
     def initial_schema_path(self) -> Path:
@@ -162,6 +164,10 @@ def load_settings(
         _get_required_str(values, "REPORTS_DIR", str(Path(data_dir_value) / "reports")),
         resolved_repo_root,
     )
+    investment_brief_path = _resolve_path(
+        _get_required_str(values, "INVESTMENT_BRIEF_PATH", DEFAULT_ENV_VALUES["INVESTMENT_BRIEF_PATH"]),
+        resolved_repo_root,
+    )
 
     return Settings(
         repo_root=resolved_repo_root,
@@ -184,6 +190,7 @@ def load_settings(
             "MONTHLY_CONTRIBUTION_EUR",
             DEFAULT_ENV_VALUES["MONTHLY_CONTRIBUTION_EUR"],
         ),
+        investment_brief_path=investment_brief_path,
     )
 
 

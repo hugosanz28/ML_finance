@@ -11,6 +11,12 @@ from src.agents.models import (
     AgentSource,
     build_agent_context,
 )
+from src.agents.pipeline import (
+    MonthlyAgentPipelineResult,
+    build_portfolio_metrics_snapshot,
+    load_investment_brief,
+    run_monthly_agent_pipeline,
+)
 from src.agents.analista_activos import AnalistaActivosAgent
 from src.agents.asistente_aportacion_mensual import AsistenteAportacionMensualAgent
 from src.agents.monitor_tematico import MonitorTematicoAgent
@@ -28,5 +34,9 @@ __all__ = [
     "AsistenteAportacionMensualAgent",
     "BaseAgent",
     "MonitorTematicoAgent",
+    "MonthlyAgentPipelineResult",
+    "build_portfolio_metrics_snapshot",
     "build_agent_context",
+    "load_investment_brief",
+    "run_monthly_agent_pipeline",
 ]

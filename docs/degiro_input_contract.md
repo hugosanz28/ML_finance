@@ -352,11 +352,18 @@ Los ejemplos saneados no deben:
 ## Flujo de validacion recomendado
 
 1. Guardar el CSV original en `src/degiro_exports/local/incoming/`.
-2. Inspeccionar manualmente cabecera, delimitador, encoding y rango temporal.
+2. Inspeccionar manualmente cabecera, delimitador, encoding y rango temporal si es una muestra nueva.
 3. Asignar nombre canonico segun este contrato.
-4. Registrar metadatos minimos.
-5. Crear, si procede, un ejemplo saneado en `src/degiro_exports/example/`.
-6. Ajustar este documento con las cabeceras reales observadas.
+4. Ejecutar `.\.venv\Scripts\python.exe scripts\import_degiro.py`.
+5. Revisar el resumen del import y los parquets generados en `src/data/local/normalized/degiro/`.
+6. Crear, si procede, un ejemplo saneado en `src/degiro_exports/example/`.
+7. Ajustar este documento con las cabeceras reales observadas.
+
+`scripts/import_degiro.py` no implementa logica de parsing propia. Detecta el tipo de export por nombre de fichero y delega en los parsers versionados:
+
+- `parse_and_persist_degiro_transactions`
+- `parse_and_persist_degiro_cash_movements`
+- `parse_and_persist_degiro_portfolio_snapshots`
 
 ## Estado de cierre de `P2-01`
 
