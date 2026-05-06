@@ -443,3 +443,50 @@ def test_generate_monthly_report_keeps_history_across_multiple_runs() -> None:
     latest = get_latest_monthly_report(settings=settings)
     assert latest is not None
     assert latest.report_id == second.report_id
+
+
+def test_generate_monthly_report_prefers_broker_snapshot_for_asof_totals() -> None:
+    workspace_root = Path.cwd() / ".test_tmp"
+    workspace_root.mkdir(parents=True, exist_ok=True)
+    workspace = workspace_root / f"monthly-report-{uuid.uuid4().hex[:8]}"
+    workspace.mkdir(parents=True, exist_ok=True)
+    settings = _build_test_settings(workspace)
+
+    snapshots_dir = settings.normalized_data_dir / "degiro" / "portfolio_snapshots"
+    snapshots_dir.mkdir(parents=True, exist_ok=True)
+    pd.DataFrame(
+        [
+            {
+                "snapshot_date": "2026-04-12",
+                "asset_id": "asset-a",
+                "asset_name": "Asset A",
+                "asset_type": "etf",
+                "isin": "ISIN-A",
+                "quantity": 7.0,
+                "market_value_base": 720.0,
+            },
+            {
+                "snapshot_date": "2026-04-12",
+                "asset_id": "asset-b",
+                "asset_name": "Asset B",
+                "asset_type": "stock",
+                "isin": "ISIN-B",
+                "quantity": 20.0,
+                "market_value_base": 480.0,
+            },
+        ]
+    ).to_parquet(snapshots_dir / "portfolio_2026-04-12.parquet", index=False)
+
+    result = generate_monthly_report(
+        settings=settings,
+        metrics=_build_metrics(),
+        transactions=_build_transactions(),
+        cash_movements=_build_cash_movements(),
+        as_of_date=date(2026, 4, 12),
+        persist=False,
+    )
+
+    assert "- Valor total: 1,200.00 EUR" in result.content
+    assert result.current_allocation["valuation_status"].astype(str).eq("broker_snapshot").all()
+    assert float(result.current_allocation["market_value_base"].sum()) == 1200.0
+    assert result.period_summaries[0].total_market_value_end_base == 1200.0

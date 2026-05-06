@@ -55,6 +55,8 @@ def run_monthly_agent_pipeline(
     persist: bool = True,
     output_dir: str | Path | None = None,
     request_parameters: Mapping[str, Any] | None = None,
+    portfolio_metrics_snapshot: Mapping[str, Any] | None = None,
+    monthly_budget: float | None = None,
 ) -> MonthlyAgentPipelineResult:
     """Run monitor, asset analyst, and monthly assistant with shared inputs."""
     resolved_settings = get_settings() if settings is None else settings
@@ -71,7 +73,11 @@ def run_monthly_agent_pipeline(
         investment_brief_text=investment_brief_text,
         investment_brief_path=investment_brief_path,
     )
-    metrics_snapshot = build_portfolio_metrics_snapshot(resolved_metrics, as_of_date=as_of_date)
+    metrics_snapshot = (
+        _json_ready(dict(portfolio_metrics_snapshot))
+        if portfolio_metrics_snapshot is not None
+        else build_portfolio_metrics_snapshot(resolved_metrics, as_of_date=as_of_date)
+    )
 
     common_refs = _build_common_input_refs(
         investment_brief=investment_brief,
@@ -123,7 +129,13 @@ def run_monthly_agent_pipeline(
         base_currency=resolved_settings.default_currency,
         settings=resolved_settings,
         input_refs=(*common_refs, monitor_ref, analista_ref),
-        metadata={"monthly_budget": resolved_settings.monthly_contribution_eur},
+        metadata={
+            "monthly_budget": (
+                float(monthly_budget)
+                if monthly_budget is not None
+                else resolved_settings.monthly_contribution_eur
+            )
+        },
         run_id=run_id,
     )
     asistente_result = asistente_agent.execute(request, asistente_context)

@@ -48,6 +48,11 @@ El informe incluye:
 - variaciones relevantes por cambio de peso, valor y cantidad,
 - y notas de cobertura cuando faltan precios, FX o historico suficiente.
 
+Si existe snapshot de DEGIRO para la fecha de referencia (o la ultima fecha
+anterior disponible), el valor total y la asignacion actual se anclan a ese
+snapshot del broker. Las metricas de coste/PnL se completan con la serie
+recalculada cuando procede.
+
 Si no existe historico completo para una ventana, el informe no falla: usa el
 primer dato disponible y lo deja indicado en las notas.
 
