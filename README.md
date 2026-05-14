@@ -24,13 +24,17 @@ El proyecto ya tiene una primera base funcional:
 - informe mensual en Markdown para revision manual y agentes,
 - historico de informes y metadatos persistidos en DuckDB,
 - refresh de market data diario con `yfinance`,
+- politica de valoracion `broker_snapshot_anchored`: DEGIRO fija el precio local observado y `yfinance` solo aporta variacion relativa,
+- contratos de datos normalizados validados antes de persistir y cargar en DuckDB,
+- dashboard Streamlit con boton para actualizar FX/precios hasta hoy,
+- workflow de CI con pytest en GitHub Actions,
 - y primer esqueleto para agentes y dashboard.
 
-El siguiente bloque importante es reconstruir posiciones por fecha y calcular métricas agregadas de cartera.
+La reconstruccion diaria de posiciones, las metricas agregadas y la demo local de Streamlit ya estan disponibles.
 
 ## Estructura del repositorio
 
-La reconstruccion diaria de posiciones ya esta disponible; el siguiente bloque funcional real es explotar ese historico para metricas agregadas.
+La estructura separa codigo, datos privados, datos de ejemplo, scripts operativos, documentacion y tests.
 
 ```text
 ML_finance/
@@ -58,6 +62,7 @@ ML_finance/
 |- .env.example
 |- .gitattributes
 |- .gitignore
+|- pyproject.toml
 |- README.md
 `- requirements.txt
 ```
@@ -84,11 +89,22 @@ pip install -r requirements.txt
 Copy-Item .env.example .env
 ```
 
+El proyecto define metadatos y configuración de tests en `pyproject.toml`.
+Para validar el entorno local usa siempre el Python del virtualenv:
+
+```powershell
+.\.venv\Scripts\python.exe -m pytest
+```
+
+Los archivos del repositorio se mantienen en UTF-8. En Windows, si una consola
+muestra caracteres raros, valida el contenido desde Python o usa una terminal
+configurada con UTF-8; no debería afectar a los archivos versionados.
+
 Después:
 
 1. Coloca exportaciones reales en `src/degiro_exports/local/incoming/`.
 2. Usa `src/degiro_exports/example/` y `src/data/sample/` para demos públicas.
-3. Si quieres refrescar precios de mercado, ejecuta `.\.venv\Scripts\python.exe scripts\refresh_market_data.py`.
+3. Si quieres refrescar FX y precios de mercado por consola, ejecuta `.\.venv\Scripts\python.exe scripts\refresh_fx_rates.py --end-date YYYY-MM-DD` y `.\.venv\Scripts\python.exe scripts\refresh_market_data.py --end-date YYYY-MM-DD`.
 4. Consulta el plan en `docs/roadmap.md`.
 5. Si quieres ver el flujo del historico de posiciones, consulta `docs/position_history.md`.
 6. Si quieres ver la capa de valoracion agregada, consulta `docs/portfolio_metrics.md`.
@@ -96,7 +112,7 @@ Después:
 
 ## Dashboard
 
-La interfaz local de Streamlit permite revisar cartera, evolucion, informes, actualizar datos DEGIRO y ejecutar la demo de agentes.
+La interfaz local de Streamlit permite revisar cartera, evolucion, informes, actualizar datos DEGIRO y ejecutar la demo de agentes. En `Vista general`, el boton `Actualizar a hoy` refresca FX y precios hasta la fecha actual; la fecha principal de la vista avanza hasta la ultima fecha valorada disponible y el ultimo snapshot DEGIRO queda como ancla.
 
 ```powershell
 .\.venv\Scripts\python.exe -m streamlit run src\portfolio\dashboard.py

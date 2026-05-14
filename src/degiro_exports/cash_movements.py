@@ -14,6 +14,7 @@ import unicodedata
 import pandas as pd
 
 from src.config import Settings, ensure_local_directories, get_settings
+from src.degiro_exports.contracts import validate_normalized_degiro_frame
 
 
 ACCOUNT_FILENAME_RE = re.compile(
@@ -160,7 +161,12 @@ def persist_degiro_cash_movements_dataset(
     base_output_dir.mkdir(parents=True, exist_ok=True)
 
     output_path = (base_output_dir / f"{parsed.source_path.stem}.parquet").resolve()
-    _parquet_ready_frame(parsed.cash_movements).to_parquet(output_path, index=False)
+    ready = validate_normalized_degiro_frame(
+        "cash_movements",
+        _parquet_ready_frame(parsed.cash_movements),
+        source=str(parsed.source_path),
+    )
+    ready.to_parquet(output_path, index=False)
     return replace(parsed, output_path=output_path)
 
 

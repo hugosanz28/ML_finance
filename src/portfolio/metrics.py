@@ -15,7 +15,6 @@ from src.portfolio.positions import (
     load_normalized_degiro_snapshots,
     load_normalized_degiro_transactions,
     reconstruct_positions_by_date,
-    reconstruct_positions_from_normalized_degiro,
 )
 
 
@@ -37,6 +36,13 @@ POSITION_METRICS_COLUMNS = [
     "unrealized_return_pct",
     "weight",
     "valuation_status",
+    "pricing_policy",
+    "anchor_snapshot_date",
+    "anchor_market_price",
+    "provider_anchor_price",
+    "provider_anchor_price_date",
+    "provider_price_age_days",
+    "provider_anchor_age_days",
 ]
 
 PORTFOLIO_DAILY_METRICS_COLUMNS = [
@@ -71,6 +77,15 @@ _TRANSACTION_REQUIRED_COLUMNS = (
 _TRANSACTION_OPTIONAL_COLUMNS = ("fees_amount_base", "taxes_amount_base", "source_row")
 _FX_REQUIRED_COLUMNS = ("base_currency", "quote_currency", "rate_date", "rate")
 _FX_OPTIONAL_COLUMNS = ("rate_provider",)
+_SNAPSHOT_REQUIRED_COLUMNS = ("asset_id", "snapshot_date", "quantity")
+_SNAPSHOT_OPTIONAL_COLUMNS = (
+    "market_price",
+    "market_value",
+    "position_currency",
+    "market_value_base",
+    "base_currency",
+    "fx_rate_to_base",
+)
 
 
 @dataclass(frozen=True)
@@ -94,12 +109,15 @@ def calculate_portfolio_metrics(
     fx_rates: pd.DataFrame | None = None,
     base_currency: str = "EUR",
     use_adjusted_close: bool = False,
+    snapshots: pd.DataFrame | None = None,
+    pricing_policy: str = "external_absolute",
 ) -> PortfolioMetricsResult:
     """Value positions by date and derive aggregate portfolio metrics."""
     positions_frame = _prepare_positions_frame(positions)
     prices_frame = _prepare_prices_frame(prices, use_adjusted_close=use_adjusted_close)
     transactions_frame = _prepare_transactions_frame(transactions)
     fx_rates_frame = _prepare_fx_rates_frame(fx_rates)
+    snapshots_frame = _prepare_snapshots_frame(snapshots)
 
     if positions_frame.empty:
         raise ValueError("positions cannot be empty when calculating portfolio metrics.")
@@ -110,6 +128,8 @@ def calculate_portfolio_metrics(
         transactions_frame=transactions_frame,
         fx_rates_frame=fx_rates_frame,
         base_currency=base_currency.upper(),
+        snapshots_frame=snapshots_frame,
+        pricing_policy=pricing_policy,
     )
     portfolio_daily_metrics = _build_portfolio_daily_metrics(position_metrics)
 
@@ -133,35 +153,61 @@ def calculate_portfolio_metrics_from_normalized_degiro(
     zero_tolerance: float = 1e-8,
     price_provider: str | None = None,
     fx_provider: str | None = None,
+    pricing_policy: str = "broker_snapshot_anchored",
     persist: bool = False,
     output_dir: str | Path | None = None,
 ) -> PortfolioMetricsResult:
     """Run the full portfolio-metrics pipeline from normalized DEGIRO data and DuckDB prices."""
     resolved_settings = get_settings() if settings is None else settings
     resolved_repository = repository or DuckDBMarketDataRepository(settings=resolved_settings)
-
-    reconstructed = reconstruct_positions_from_normalized_degiro(
-        settings=resolved_settings,
-        normalized_degiro_dir=normalized_degiro_dir,
-        start_date=start_date,
-        end_date=end_date,
-        include_zero_quantity_days=include_zero_quantity_days,
-        zero_tolerance=zero_tolerance,
-        persist=False,
-    )
     transactions = load_normalized_degiro_transactions(
         settings=resolved_settings,
         normalized_degiro_dir=normalized_degiro_dir,
     )
+    snapshots = load_normalized_degiro_snapshots(
+        settings=resolved_settings,
+        normalized_degiro_dir=normalized_degiro_dir,
+    )
+
+    reconstructed = reconstruct_positions_by_date(
+        transactions,
+        snapshots=snapshots,
+        start_date=start_date,
+        end_date=end_date,
+        include_zero_quantity_days=include_zero_quantity_days,
+        zero_tolerance=zero_tolerance,
+    )
+    selected_asset_ids = reconstructed.positions["asset_id"].dropna().unique().tolist()
+    resolved_price_provider = price_provider or resolved_settings.price_provider
+    valuation_end_date = reconstructed.end_date
+    if end_date is None:
+        latest_price_date = _latest_price_date_from_duckdb(
+            repository=resolved_repository,
+            asset_ids=selected_asset_ids,
+            provider_name=resolved_price_provider,
+            max_date=date.today(),
+        )
+        if latest_price_date is not None and latest_price_date > valuation_end_date:
+            valuation_end_date = latest_price_date
+            reconstructed = reconstruct_positions_by_date(
+                transactions,
+                snapshots=snapshots,
+                start_date=start_date,
+                end_date=valuation_end_date,
+                include_zero_quantity_days=include_zero_quantity_days,
+                zero_tolerance=zero_tolerance,
+            )
+            selected_asset_ids = reconstructed.positions["asset_id"].dropna().unique().tolist()
+
     prices = load_prices_daily_from_duckdb(
         repository=resolved_repository,
-        asset_ids=reconstructed.positions["asset_id"].dropna().unique().tolist(),
-        end_date=reconstructed.end_date,
-        provider_name=price_provider or resolved_settings.price_provider,
+        asset_ids=selected_asset_ids,
+        end_date=valuation_end_date,
+        provider_name=resolved_price_provider,
     )
     fx_rates = load_fx_rates_from_duckdb(
         repository=resolved_repository,
-        end_date=reconstructed.end_date,
+        end_date=valuation_end_date,
         provider_name=fx_provider,
     )
     metrics = calculate_portfolio_metrics(
@@ -170,6 +216,8 @@ def calculate_portfolio_metrics_from_normalized_degiro(
         transactions=transactions,
         fx_rates=fx_rates,
         base_currency=resolved_settings.default_currency,
+        snapshots=snapshots,
+        pricing_policy=pricing_policy,
     )
     if not persist:
         return metrics
@@ -249,6 +297,39 @@ def load_prices_daily_from_duckdb(
             parameters,
         ).fetchdf()
     return frame
+
+
+def _latest_price_date_from_duckdb(
+    *,
+    repository: DuckDBMarketDataRepository,
+    asset_ids: list[str],
+    provider_name: str | None,
+    max_date: date,
+) -> date | None:
+    if not asset_ids:
+        return None
+
+    placeholders = ", ".join("?" for _ in asset_ids)
+    where_clauses = [f"asset_id IN ({placeholders})", "price_date <= ?"]
+    parameters: list[object] = [*asset_ids, max_date]
+
+    if provider_name:
+        where_clauses.append("price_provider = ?")
+        parameters.append(provider_name)
+
+    with repository.connection() as connection:
+        row = connection.execute(
+            f"""
+            SELECT MAX(price_date) AS latest_price_date
+            FROM prices_daily
+            WHERE {" AND ".join(where_clauses)}
+            """,
+            parameters,
+        ).fetchone()
+
+    if row is None or row[0] is None:
+        return None
+    return pd.Timestamp(row[0]).date()
 
 
 def load_fx_rates_from_duckdb(
@@ -366,6 +447,43 @@ def _prepare_fx_rates_frame(fx_rates: pd.DataFrame | None) -> pd.DataFrame:
     return frame.loc[:, [*_FX_REQUIRED_COLUMNS, *_FX_OPTIONAL_COLUMNS]]
 
 
+def _prepare_snapshots_frame(snapshots: pd.DataFrame | None) -> pd.DataFrame:
+    frame = pd.DataFrame(columns=[*_SNAPSHOT_REQUIRED_COLUMNS, *_SNAPSHOT_OPTIONAL_COLUMNS])
+    if snapshots is not None and not snapshots.empty:
+        frame = snapshots.copy()
+
+    _require_columns(frame, _SNAPSHOT_REQUIRED_COLUMNS, frame_name="snapshots")
+    for column in _SNAPSHOT_OPTIONAL_COLUMNS:
+        if column not in frame.columns:
+            frame[column] = None
+
+    if frame.empty:
+        frame["anchor_market_price"] = None
+        frame["anchor_market_value"] = None
+        return frame.loc[:, [*_SNAPSHOT_REQUIRED_COLUMNS, *_SNAPSHOT_OPTIONAL_COLUMNS, "anchor_market_price", "anchor_market_value"]]
+
+    frame["snapshot_date"] = pd.to_datetime(frame["snapshot_date"], errors="raise").dt.date
+    frame["quantity"] = pd.to_numeric(frame["quantity"], errors="raise")
+    frame["market_price"] = pd.to_numeric(frame["market_price"], errors="coerce")
+    frame["market_value"] = pd.to_numeric(frame["market_value"], errors="coerce")
+    frame["market_value_base"] = pd.to_numeric(frame["market_value_base"], errors="coerce")
+    frame["position_currency"] = frame["position_currency"].astype("string").str.upper()
+    frame["base_currency"] = frame["base_currency"].astype("string").str.upper()
+    frame["fx_rate_to_base"] = pd.to_numeric(frame["fx_rate_to_base"], errors="coerce")
+    frame["anchor_market_price"] = frame["market_price"]
+    frame["anchor_market_value"] = frame["market_value"]
+
+    missing_price = frame["anchor_market_price"].isna() & frame["market_value"].notna() & (frame["quantity"] != 0)
+    frame.loc[missing_price, "anchor_market_price"] = (
+        frame.loc[missing_price, "market_value"] / frame.loc[missing_price, "quantity"]
+    )
+    missing_value = frame["anchor_market_value"].isna() & frame["anchor_market_price"].notna()
+    frame.loc[missing_value, "anchor_market_value"] = (
+        frame.loc[missing_value, "quantity"] * frame.loc[missing_value, "anchor_market_price"]
+    )
+    return frame.loc[:, [*_SNAPSHOT_REQUIRED_COLUMNS, *_SNAPSHOT_OPTIONAL_COLUMNS, "anchor_market_price", "anchor_market_value"]]
+
+
 def _build_position_metrics(
     positions: pd.DataFrame,
     prices: pd.DataFrame,
@@ -373,10 +491,14 @@ def _build_position_metrics(
     transactions_frame: pd.DataFrame,
     fx_rates_frame: pd.DataFrame,
     base_currency: str,
+    snapshots_frame: pd.DataFrame,
+    pricing_policy: str,
 ) -> pd.DataFrame:
+    normalized_policy = _normalize_pricing_policy(pricing_policy)
     price_lookup = _build_price_lookup(prices)
     cost_basis_lookup = _build_cost_basis_lookup(transactions_frame)
     fx_lookup = _build_fx_lookup(fx_rates_frame)
+    snapshot_lookup = _build_snapshot_lookup(snapshots_frame)
 
     rows: list[dict[str, object]] = []
     for row in positions.sort_values(["asset_id", "position_date"]).to_dict(orient="records"):
@@ -386,6 +508,8 @@ def _build_position_metrics(
             cost_basis_lookup=cost_basis_lookup,
             fx_lookup=fx_lookup,
             base_currency=base_currency,
+            snapshot_lookup=snapshot_lookup,
+            pricing_policy=normalized_policy,
         )
         rows.append(valuation)
 
@@ -395,6 +519,8 @@ def _build_position_metrics(
     frame["market_value_base"] = pd.to_numeric(frame["market_value_base"], errors="coerce")
     frame["cost_basis_base"] = pd.to_numeric(frame["cost_basis_base"], errors="coerce")
     frame["unrealized_pnl_base"] = pd.to_numeric(frame["unrealized_pnl_base"], errors="coerce")
+    frame["anchor_snapshot_date"] = pd.to_datetime(frame["anchor_snapshot_date"])
+    frame["provider_anchor_price_date"] = pd.to_datetime(frame["provider_anchor_price_date"])
     frame["weight"] = 0.0
 
     totals = (
@@ -419,7 +545,7 @@ def _build_portfolio_daily_metrics(position_metrics: pd.DataFrame) -> pd.DataFra
         .agg(
             total_positions_count=("asset_id", "size"),
             valued_positions_count=("valuation_status", lambda values: int(sum(value.startswith("valued") for value in values))),
-            missing_price_positions_count=("valuation_status", lambda values: int(sum(value == "missing_price" for value in values))),
+            missing_price_positions_count=("valuation_status", lambda values: int(sum(value in {"missing_price", "missing_anchor", "missing_provider_anchor_price"} for value in values))),
             missing_fx_positions_count=("valuation_status", lambda values: int(sum(value == "missing_fx" for value in values))),
             total_market_value_base=("market_value_base", "sum"),
             total_cost_basis_base=("cost_basis_base", "sum"),
@@ -459,6 +585,39 @@ def _build_price_lookup(prices: pd.DataFrame) -> dict[str, pd.DataFrame]:
         current = group.drop_duplicates(subset=["asset_id", "price_date"], keep="last").copy()
         current["price_date"] = pd.to_datetime(current["price_date"])
         lookups[str(asset_id)] = current.loc[:, ["price_date", "price_currency", "effective_close_price"]]
+    return lookups
+
+
+def _build_snapshot_lookup(snapshots: pd.DataFrame) -> dict[str, pd.DataFrame]:
+    if snapshots.empty:
+        return {}
+
+    lookups: dict[str, pd.DataFrame] = {}
+    eligible = snapshots.loc[
+        snapshots["anchor_market_price"].notna()
+        & snapshots["snapshot_date"].notna()
+        & snapshots["position_currency"].notna()
+        & (snapshots["quantity"] > 0)
+    ].copy()
+    if eligible.empty:
+        return {}
+
+    for asset_id, group in eligible.sort_values(["asset_id", "snapshot_date"]).groupby("asset_id", sort=True):
+        current = group.drop_duplicates(subset=["asset_id", "snapshot_date"], keep="last").copy()
+        current["snapshot_date"] = pd.to_datetime(current["snapshot_date"])
+        lookups[str(asset_id)] = current.loc[
+            :,
+            [
+                "snapshot_date",
+                "quantity",
+                "anchor_market_price",
+                "anchor_market_value",
+                "position_currency",
+                "market_value_base",
+                "base_currency",
+                "fx_rate_to_base",
+            ],
+        ]
     return lookups
 
 
@@ -526,6 +685,8 @@ def _value_position_row(
     cost_basis_lookup: dict[str, pd.DataFrame],
     fx_lookup: dict[tuple[str, str], pd.DataFrame],
     base_currency: str,
+    snapshot_lookup: dict[str, pd.DataFrame],
+    pricing_policy: str,
 ) -> dict[str, object]:
     valuation_date = row["position_date"]
     asset_id = str(row["asset_id"])
@@ -565,11 +726,28 @@ def _value_position_row(
             "unrealized_return_pct": 0.0 if cash_currency == base_currency else None,
             "weight": 0.0,
             "valuation_status": valuation_status,
+            "pricing_policy": pricing_policy,
+            "anchor_snapshot_date": None,
+            "anchor_market_price": None,
+            "provider_anchor_price": None,
+            "provider_anchor_price_date": None,
+            "provider_price_age_days": 0,
+            "provider_anchor_age_days": None,
         }
+
+    if pricing_policy == "broker_snapshot_anchored":
+        return _value_position_row_with_broker_anchor(
+            row,
+            price_lookup=price_lookup,
+            cost_basis_lookup=cost_basis_lookup,
+            fx_lookup=fx_lookup,
+            snapshot_lookup=snapshot_lookup,
+            base_currency=base_currency,
+        )
 
     price_row = _resolve_latest_row(price_lookup.get(asset_id), date_column="price_date", as_of_date=valuation_date)
     if price_row is None:
-        return _build_unvalued_row(row, valuation_status="missing_price")
+        return _build_unvalued_row(row, valuation_status="missing_price", pricing_policy=pricing_policy)
 
     price_currency = str(price_row["price_currency"])
     close_price = float(price_row["effective_close_price"])
@@ -588,11 +766,12 @@ def _value_position_row(
         )
         if fx_rate_to_base is None:
             return {
-                **_build_unvalued_row(row, valuation_status="missing_fx"),
+                **_build_unvalued_row(row, valuation_status="missing_fx", pricing_policy=pricing_policy),
                 "price_date": price_row["price_date"].date(),
                 "price_currency": price_currency,
                 "close_price": close_price,
                 "market_value_local": market_value_local,
+                "provider_price_age_days": _days_between(valuation_date, price_row["price_date"].date()),
             }
         market_value_base = round(market_value_local / fx_rate_to_base, 8)
         valuation_status = "valued"
@@ -624,10 +803,163 @@ def _value_position_row(
         "unrealized_return_pct": unrealized_return_pct,
         "weight": 0.0,
         "valuation_status": valuation_status,
+        "pricing_policy": pricing_policy,
+        "anchor_snapshot_date": None,
+        "anchor_market_price": None,
+        "provider_anchor_price": None,
+        "provider_anchor_price_date": None,
+        "provider_price_age_days": _days_between(valuation_date, price_row["price_date"].date()),
+        "provider_anchor_age_days": None,
     }
 
 
-def _build_unvalued_row(row: dict[str, object], *, valuation_status: str) -> dict[str, object]:
+def _value_position_row_with_broker_anchor(
+    row: dict[str, object],
+    *,
+    price_lookup: dict[str, pd.DataFrame],
+    cost_basis_lookup: dict[str, pd.DataFrame],
+    fx_lookup: dict[tuple[str, str], pd.DataFrame],
+    snapshot_lookup: dict[str, pd.DataFrame],
+    base_currency: str,
+) -> dict[str, object]:
+    valuation_date = row["position_date"]
+    asset_id = str(row["asset_id"])
+    anchor_row = _resolve_anchor_row(
+        snapshot_lookup.get(asset_id),
+        date_column="snapshot_date",
+        as_of_date=valuation_date,
+    )
+    if anchor_row is None:
+        return _build_unvalued_row(row, valuation_status="missing_anchor", pricing_policy="broker_snapshot_anchored")
+
+    provider_anchor_row = _resolve_latest_row(
+        price_lookup.get(asset_id),
+        date_column="price_date",
+        as_of_date=anchor_row["snapshot_date"].date(),
+    )
+    if provider_anchor_row is None:
+        return _build_unvalued_row(
+            row,
+            valuation_status="missing_provider_anchor_price",
+            pricing_policy="broker_snapshot_anchored",
+            anchor_row=anchor_row,
+        )
+
+    provider_price_row = _resolve_latest_row(price_lookup.get(asset_id), date_column="price_date", as_of_date=valuation_date)
+    if provider_price_row is None:
+        return _build_unvalued_row(
+            row,
+            valuation_status="missing_price",
+            pricing_policy="broker_snapshot_anchored",
+            anchor_row=anchor_row,
+            provider_anchor_row=provider_anchor_row,
+        )
+
+    provider_anchor_price = float(provider_anchor_row["effective_close_price"])
+    if provider_anchor_price == 0:
+        return _build_unvalued_row(
+            row,
+            valuation_status="missing_provider_anchor_price",
+            pricing_policy="broker_snapshot_anchored",
+            anchor_row=anchor_row,
+            provider_anchor_row=provider_anchor_row,
+        )
+
+    quantity = float(row["quantity"])
+    anchor_market_price = float(anchor_row["anchor_market_price"])
+    anchor_market_value = float(anchor_row["anchor_market_value"])
+    anchor_quantity = float(anchor_row["quantity"])
+    if anchor_quantity == 0:
+        return _build_unvalued_row(
+            row,
+            valuation_status="missing_anchor",
+            pricing_policy="broker_snapshot_anchored",
+            anchor_row=anchor_row,
+            provider_anchor_row=provider_anchor_row,
+        )
+    provider_price = float(provider_price_row["effective_close_price"])
+    provider_ratio = provider_price / provider_anchor_price
+    anchor_unit_value = anchor_market_value / anchor_quantity
+    anchored_close_price = round(anchor_unit_value * provider_ratio, 8)
+    market_value_local = round(quantity * anchored_close_price, 8)
+    price_currency = str(anchor_row["position_currency"])
+
+    if price_currency == base_currency:
+        fx_rate_to_base = 1.0
+        market_value_base = market_value_local
+    else:
+        fx_rate_to_base = _resolve_fx_rate(
+            valuation_date,
+            from_currency=price_currency,
+            to_currency=base_currency,
+            fx_lookup=fx_lookup,
+        )
+        if fx_rate_to_base is None:
+            return {
+                **_build_unvalued_row(
+                    row,
+                    valuation_status="missing_fx",
+                    pricing_policy="broker_snapshot_anchored",
+                    anchor_row=anchor_row,
+                    provider_anchor_row=provider_anchor_row,
+                ),
+                "price_date": provider_price_row["price_date"].date(),
+                "price_currency": price_currency,
+                "close_price": anchored_close_price,
+                "market_value_local": market_value_local,
+                "provider_price_age_days": _days_between(valuation_date, provider_price_row["price_date"].date()),
+            }
+        market_value_base = round(market_value_local / fx_rate_to_base, 8)
+
+    cost_basis_row = _resolve_latest_row(cost_basis_lookup.get(asset_id), date_column="valuation_date", as_of_date=valuation_date)
+    cost_basis_base = None if cost_basis_row is None else round(float(cost_basis_row["cost_basis_base"]), 8)
+    unrealized_pnl_base = None
+    unrealized_return_pct = None
+    if cost_basis_base is not None:
+        unrealized_pnl_base = round(market_value_base - cost_basis_base, 8)
+        if cost_basis_base != 0:
+            unrealized_return_pct = round(unrealized_pnl_base / cost_basis_base, 8)
+
+    return {
+        "valuation_date": valuation_date,
+        "asset_id": asset_id,
+        "asset_name": row.get("asset_name"),
+        "asset_type": row.get("asset_type"),
+        "isin": row.get("isin"),
+        "quantity": quantity,
+        "price_date": provider_price_row["price_date"].date(),
+        "price_currency": price_currency,
+        "close_price": anchored_close_price,
+        "market_value_local": market_value_local,
+        "fx_rate_to_base": fx_rate_to_base,
+        "market_value_base": market_value_base,
+        "cost_basis_base": cost_basis_base,
+        "unrealized_pnl_base": unrealized_pnl_base,
+        "unrealized_return_pct": unrealized_return_pct,
+        "weight": 0.0,
+        "valuation_status": "valued_anchored",
+        "pricing_policy": "broker_snapshot_anchored",
+        "anchor_snapshot_date": anchor_row["snapshot_date"].date(),
+        "anchor_market_price": anchor_market_price,
+        "provider_anchor_price": provider_anchor_price,
+        "provider_anchor_price_date": provider_anchor_row["price_date"].date(),
+        "provider_price_age_days": _days_between(valuation_date, provider_price_row["price_date"].date()),
+        "provider_anchor_age_days": _days_between(anchor_row["snapshot_date"].date(), provider_anchor_row["price_date"].date()),
+    }
+
+
+def _build_unvalued_row(
+    row: dict[str, object],
+    *,
+    valuation_status: str,
+    pricing_policy: str,
+    anchor_row: pd.Series | None = None,
+    provider_anchor_row: pd.Series | None = None,
+) -> dict[str, object]:
+    anchor_date = None if anchor_row is None else anchor_row["snapshot_date"].date()
+    anchor_market_price = None if anchor_row is None else float(anchor_row["anchor_market_price"])
+    provider_anchor_price = None if provider_anchor_row is None else float(provider_anchor_row["effective_close_price"])
+    provider_anchor_date = None if provider_anchor_row is None else provider_anchor_row["price_date"].date()
     return {
         "valuation_date": row["position_date"],
         "asset_id": row["asset_id"],
@@ -646,6 +978,13 @@ def _build_unvalued_row(row: dict[str, object], *, valuation_status: str) -> dic
         "unrealized_return_pct": None,
         "weight": 0.0,
         "valuation_status": valuation_status,
+        "pricing_policy": pricing_policy,
+        "anchor_snapshot_date": anchor_date,
+        "anchor_market_price": anchor_market_price,
+        "provider_anchor_price": provider_anchor_price,
+        "provider_anchor_price_date": provider_anchor_date,
+        "provider_price_age_days": None,
+        "provider_anchor_age_days": None if anchor_date is None or provider_anchor_date is None else _days_between(anchor_date, provider_anchor_date),
     }
 
 
@@ -656,6 +995,18 @@ def _resolve_latest_row(frame: pd.DataFrame | None, *, date_column: str, as_of_d
     if eligible.empty:
         return None
     return eligible.iloc[-1]
+
+
+def _resolve_anchor_row(frame: pd.DataFrame | None, *, date_column: str, as_of_date: date) -> pd.Series | None:
+    if frame is None or frame.empty:
+        return None
+    eligible = frame.loc[frame[date_column] <= pd.Timestamp(as_of_date)]
+    if not eligible.empty:
+        return eligible.iloc[-1]
+    future = frame.loc[frame[date_column] > pd.Timestamp(as_of_date)]
+    if future.empty:
+        return None
+    return future.iloc[0]
 
 
 def _resolve_fx_rate(
@@ -687,6 +1038,17 @@ def _resolve_fx_rate(
     if rate == 0:
         return None
     return round(1 / rate, 10)
+
+
+def _normalize_pricing_policy(pricing_policy: str) -> str:
+    normalized = pricing_policy.strip().lower()
+    if normalized not in {"external_absolute", "broker_snapshot_anchored"}:
+        raise ValueError(f"Unsupported pricing_policy: {pricing_policy}")
+    return normalized
+
+
+def _days_between(later_date: date, earlier_date: date) -> int:
+    return (pd.Timestamp(later_date).date() - pd.Timestamp(earlier_date).date()).days
 
 
 def _require_columns(frame: pd.DataFrame, required_columns: tuple[str, ...], *, frame_name: str) -> None:

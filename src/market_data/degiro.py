@@ -337,12 +337,17 @@ def _normalize_optional_bool(value: object | None) -> bool | None:
 
 def _override_or_value(override: dict[str, object], key: str, fallback: str | None) -> str | None:
     value = override.get(key)
-    return fallback if value is None else str(value)
+    if value is None or pd.isna(value):
+        return fallback
+    text = str(value).strip()
+    return text or fallback
 
 
 def _override_or_bool(override: dict[str, object], key: str, fallback: bool) -> bool:
     value = override.get(key)
-    return fallback if value is None else bool(value)
+    if value is None or pd.isna(value):
+        return fallback
+    return bool(value)
 
 
 def _pick_last_text(series: pd.Series) -> str | None:

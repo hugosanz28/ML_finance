@@ -35,13 +35,17 @@ Contiene los artefactos derivados:
 ### `src/market_data/`
 
 Responsable de descargar y normalizar precios, divisas y metadatos de mercado.
+En la valoracion actual, los precios externos no sustituyen al precio del
+broker: aportan variacion relativa desde el ultimo precio local observado en
+snapshots DEGIRO.
 
 ### `src/portfolio/`
 Estado actual de esta capa:
 
 - reconstruccion diaria de cantidades desde `transactions`,
 - reconciliacion contra `portfolio_snapshots`,
-- metricas agregadas con valor, pesos y drawdown,
+- metricas agregadas con valor, pesos, drawdown y politica
+  `broker_snapshot_anchored`,
 - y una base directa para reporting y Streamlit.
 
 Responsable de reconstrucción histórica de posiciones, métricas agregadas e interfaz de Streamlit.
@@ -61,9 +65,10 @@ DEGIRO exports
     -> ingestión raw
     -> normalización
     -> almacenamiento local
-    -> refresco de precios
-    -> reconstrucción histórica
-    -> métricas e informes
+    -> refresco de FX/precios
+    -> reconstruccion historica
+    -> metricas ancladas a snapshots DEGIRO
+    -> informes
     -> agentes
     -> Streamlit
 ```
@@ -92,6 +97,7 @@ La primera interfaz se mantendrá simple y local. El objetivo no es hacer una ap
 
 - ver la asignación actual,
 - revisar evolución histórica,
+- refrescar FX y precios hasta hoy desde la vista general,
 - consultar cambios recientes,
 - y abrir los informes generados.
 

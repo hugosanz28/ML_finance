@@ -14,6 +14,7 @@ import unicodedata
 import pandas as pd
 
 from src.config import Settings, ensure_local_directories, get_settings
+from src.degiro_exports.contracts import validate_normalized_degiro_frame
 
 
 PORTFOLIO_FILENAME_RE = re.compile(r"^portfolio_(?P<snapshot_date>\d{4}-\d{2}-\d{2})\.csv$")
@@ -140,6 +141,7 @@ def persist_degiro_portfolio_snapshots_dataset(
     output_path = (base_output_dir / f"{parsed.source_path.stem}.parquet").resolve()
     ready = parsed.snapshots.copy()
     ready["snapshot_date"] = pd.to_datetime(ready["snapshot_date"])
+    ready = validate_normalized_degiro_frame("portfolio_snapshots", ready, source=str(parsed.source_path))
     ready.to_parquet(output_path, index=False)
     return replace(parsed, output_path=output_path)
 

@@ -165,6 +165,174 @@ def test_calculate_portfolio_metrics_uses_fx_rates_for_foreign_currency_assets()
     assert position_metric["valuation_status"] == "valued"
 
 
+def test_calculate_portfolio_metrics_can_anchor_prices_to_broker_snapshots() -> None:
+    positions = pd.DataFrame(
+        [
+            {"position_date": "2026-01-01", "asset_id": "asset-a", "asset_name": "Asset A", "asset_type": "etf", "quantity": 10},
+            {"position_date": "2026-01-02", "asset_id": "asset-a", "asset_name": "Asset A", "asset_type": "etf", "quantity": 10},
+        ]
+    )
+    prices = pd.DataFrame(
+        [
+            {"asset_id": "asset-a", "price_date": "2026-01-01", "price_currency": "EUR", "close_price": 50},
+            {"asset_id": "asset-a", "price_date": "2026-01-02", "price_currency": "EUR", "close_price": 55},
+        ]
+    )
+    snapshots = pd.DataFrame(
+        [
+            {
+                "asset_id": "asset-a",
+                "snapshot_date": "2026-01-01",
+                "quantity": 10,
+                "market_price": 100,
+                "market_value": 1000,
+                "position_currency": "EUR",
+            }
+        ]
+    )
+
+    metrics = calculate_portfolio_metrics(
+        positions,
+        prices,
+        snapshots=snapshots,
+        base_currency="EUR",
+        pricing_policy="broker_snapshot_anchored",
+    )
+
+    positions_metrics = metrics.position_metrics.copy()
+    assert positions_metrics["close_price"].tolist() == [100.0, 110.0]
+    assert positions_metrics["market_value_base"].tolist() == [1000.0, 1100.0]
+    assert positions_metrics["valuation_status"].tolist() == ["valued_anchored", "valued_anchored"]
+    assert positions_metrics["anchor_snapshot_date"].dt.date.tolist() == [date(2026, 1, 1), date(2026, 1, 1)]
+    assert positions_metrics["provider_anchor_price"].tolist() == [50.0, 50.0]
+
+
+def test_calculate_portfolio_metrics_uses_broker_market_value_anchor_when_quantity_is_rounded() -> None:
+    positions = pd.DataFrame(
+        [
+            {"position_date": "2026-01-01", "asset_id": "btc", "asset_name": "BTC", "asset_type": "crypto", "quantity": 0.0059},
+            {"position_date": "2026-01-02", "asset_id": "btc", "asset_name": "BTC", "asset_type": "crypto", "quantity": 0.0059},
+        ]
+    )
+    prices = pd.DataFrame(
+        [
+            {"asset_id": "btc", "price_date": "2026-01-01", "price_currency": "EUR", "close_price": 50_000},
+            {"asset_id": "btc", "price_date": "2026-01-02", "price_currency": "EUR", "close_price": 55_000},
+        ]
+    )
+    snapshots = pd.DataFrame(
+        [
+            {
+                "asset_id": "btc",
+                "snapshot_date": "2026-01-01",
+                "quantity": 0.0059,
+                "market_price": 50_000,
+                "market_value": 290.0,
+                "position_currency": "EUR",
+            }
+        ]
+    )
+
+    metrics = calculate_portfolio_metrics(
+        positions,
+        prices,
+        snapshots=snapshots,
+        base_currency="EUR",
+        pricing_policy="broker_snapshot_anchored",
+    )
+
+    positions_metrics = metrics.position_metrics.copy()
+    assert positions_metrics["close_price"].round(8).tolist() == [49_152.54237288, 54_067.79661017]
+    assert positions_metrics["market_value_base"].tolist() == [290.0, 319.0]
+
+
+def test_calculate_portfolio_metrics_scales_broker_value_anchor_by_current_quantity() -> None:
+    positions = pd.DataFrame(
+        [
+            {"position_date": "2026-01-01", "asset_id": "asset-a", "asset_name": "Asset A", "asset_type": "etf", "quantity": 10},
+            {"position_date": "2026-01-02", "asset_id": "asset-a", "asset_name": "Asset A", "asset_type": "etf", "quantity": 20},
+        ]
+    )
+    prices = pd.DataFrame(
+        [
+            {"asset_id": "asset-a", "price_date": "2026-01-01", "price_currency": "EUR", "close_price": 100},
+            {"asset_id": "asset-a", "price_date": "2026-01-02", "price_currency": "EUR", "close_price": 100},
+        ]
+    )
+    snapshots = pd.DataFrame(
+        [
+            {
+                "asset_id": "asset-a",
+                "snapshot_date": "2026-01-02",
+                "quantity": 20,
+                "market_price": 100,
+                "market_value": 2000,
+                "position_currency": "EUR",
+            }
+        ]
+    )
+
+    metrics = calculate_portfolio_metrics(
+        positions,
+        prices,
+        snapshots=snapshots,
+        base_currency="EUR",
+        pricing_policy="broker_snapshot_anchored",
+    )
+
+    positions_metrics = metrics.position_metrics.copy()
+    assert positions_metrics["close_price"].tolist() == [100.0, 100.0]
+    assert positions_metrics["market_value_base"].tolist() == [1000.0, 2000.0]
+
+
+def test_calculate_portfolio_metrics_anchored_policy_uses_daily_fx_after_local_price_anchor() -> None:
+    positions = pd.DataFrame(
+        [
+            {"position_date": "2026-01-01", "asset_id": "asset-us", "asset_name": "Asset US", "asset_type": "stock", "quantity": 2},
+            {"position_date": "2026-01-02", "asset_id": "asset-us", "asset_name": "Asset US", "asset_type": "stock", "quantity": 2},
+        ]
+    )
+    prices = pd.DataFrame(
+        [
+            {"asset_id": "asset-us", "price_date": "2026-01-01", "price_currency": "USD", "close_price": 50},
+            {"asset_id": "asset-us", "price_date": "2026-01-02", "price_currency": "USD", "close_price": 55},
+        ]
+    )
+    snapshots = pd.DataFrame(
+        [
+            {
+                "asset_id": "asset-us",
+                "snapshot_date": "2026-01-01",
+                "quantity": 2,
+                "market_price": 100,
+                "market_value": 200,
+                "position_currency": "USD",
+            }
+        ]
+    )
+    fx_rates = pd.DataFrame(
+        [
+            {"base_currency": "EUR", "quote_currency": "USD", "rate_date": "2026-01-01", "rate": 2.0},
+            {"base_currency": "EUR", "quote_currency": "USD", "rate_date": "2026-01-02", "rate": 4.0},
+        ]
+    )
+
+    metrics = calculate_portfolio_metrics(
+        positions,
+        prices,
+        fx_rates=fx_rates,
+        snapshots=snapshots,
+        base_currency="EUR",
+        pricing_policy="broker_snapshot_anchored",
+    )
+
+    positions_metrics = metrics.position_metrics.copy()
+    assert positions_metrics["close_price"].tolist() == [100.0, 110.0]
+    assert positions_metrics["market_value_local"].tolist() == [200.0, 220.0]
+    assert positions_metrics["market_value_base"].tolist() == [100.0, 55.0]
+    assert positions_metrics["fx_rate_to_base"].tolist() == [2.0, 4.0]
+
+
 def test_calculate_portfolio_metrics_from_normalized_degiro_loads_duckdb_prices(
     workspace_tmp_path: Path,
 ) -> None:
@@ -226,17 +394,25 @@ def test_calculate_portfolio_metrics_from_normalized_degiro_loads_duckdb_prices(
             DailyPriceRecord(price_date=date(2026, 1, 3), price_currency="EUR", close_price=25.0),
             DailyPriceRecord(price_date=date(2026, 1, 4), price_currency="EUR", close_price=25.0),
             DailyPriceRecord(price_date=date(2026, 1, 5), price_currency="EUR", close_price=30.0),
+            DailyPriceRecord(price_date=date(2026, 1, 6), price_currency="EUR", close_price=35.0),
         ),
     )
 
     metrics = calculate_portfolio_metrics_from_normalized_degiro(
         repository=repository,
         settings=settings,
+        pricing_policy="external_absolute",
     )
 
     daily = metrics.portfolio_daily_metrics.copy()
     daily["valuation_date"] = daily["valuation_date"].dt.date
 
-    assert daily["valuation_date"].tolist() == [date(2026, 1, 3), date(2026, 1, 4), date(2026, 1, 5)]
-    assert daily["total_market_value_base"].tolist() == [100.0, 100.0, 180.0]
-    assert daily["total_cost_basis_base"].tolist() == [100.0, 100.0, 160.0]
+    assert daily["valuation_date"].tolist() == [
+        date(2026, 1, 3),
+        date(2026, 1, 4),
+        date(2026, 1, 5),
+        date(2026, 1, 6),
+    ]
+    assert metrics.end_date == date(2026, 1, 6)
+    assert daily["total_market_value_base"].tolist() == [100.0, 100.0, 180.0, 210.0]
+    assert daily["total_cost_basis_base"].tolist() == [100.0, 100.0, 160.0, 160.0]

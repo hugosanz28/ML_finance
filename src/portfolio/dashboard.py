@@ -7,10 +7,8 @@ import json
 from pathlib import Path
 import re
 import sys
-import unicodedata
 from typing import Any
 
-import altair as alt
 import pandas as pd
 import streamlit as st
 
@@ -18,10 +16,15 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
-from src.agents import build_portfolio_metrics_snapshot, load_investment_brief, run_monthly_agent_pipeline
+from src.agents import load_investment_brief, run_monthly_agent_pipeline
 from src.config import Settings, get_settings
 from src.degiro_exports import import_degiro_exports, load_normalized_degiro_to_duckdb
-from src.market_data import DuckDBMarketDataRepository, FxRefreshService, PriceRefreshService
+from src.market_data import (
+    DuckDBMarketDataRepository,
+    FxRefreshService,
+    PriceRefreshService,
+    load_market_assets_from_normalized_degiro,
+)
 from src.portfolio import (
     PortfolioMetricsResult,
     calculate_portfolio_metrics_from_normalized_degiro,
@@ -29,6 +32,25 @@ from src.portfolio import (
     load_normalized_degiro_transactions,
 )
 from src.reports import generate_monthly_report, get_latest_monthly_report
+from src.portfolio.dashboard_uploads import (
+    _canonical_degiro_upload_name,
+    _detect_degiro_upload_kind,
+    _extract_dates_from_filename,
+    _friendly_degiro_kind,
+    _save_uploaded_degiro_files,
+)
+from src.portfolio.dashboard_transforms import (
+    _build_agent_snapshot_for_dashboard,
+    _build_asset_evolution_chart,
+    _build_asset_evolution_frame,
+    _build_net_trade_flow_by_day,
+    _build_value_with_trades_chart,
+    _daily_metrics,
+    _latest_broker_snapshot_view,
+    _net_external_contributions_until,
+    _parse_target_weights_input,
+    _positions_for_date,
+)
 
 
 def _apply_theme() -> None:
@@ -182,7 +204,7 @@ def _render_beginner_explainer() -> None:
     with st.expander("Como leer esta pantalla", expanded=False):
         st.markdown(
             """
-            - **Valor total**: ultimo valor del broker (DEGIRO) cuando hay snapshot disponible.
+            - **Valor total**: ultima valoracion calculada con snapshots DEGIRO como ancla y market data como variacion.
             - **Peso**: porcentaje que representa cada activo. Ayuda a ver concentracion.
             - **PnL no realizado**: ganancia o perdida teorica frente al coste base conocido.
             - **PnL realizado**: resultado ya consolidado (ventas cerradas, dividendos y otros flujos no abiertos).
@@ -218,7 +240,8 @@ def _render_sidebar(settings: Settings) -> None:
     st.sidebar.markdown("### Estado local")
     st.sidebar.caption("Datos disponibles en la bodega local.")
     st.sidebar.caption(f"`{settings.portfolio_db_path}`")
-    counts = _warehouse_counts(settings)
+    data_fingerprint = _dashboard_data_fingerprint(settings)
+    counts = _warehouse_counts(settings, data_fingerprint)
     for key, value in counts.items():
         st.sidebar.metric(_friendly_table_name(key), value)
 
@@ -232,40 +255,28 @@ def _render_portfolio_tab(settings: Settings) -> None:
         "Vista general",
         "Foto actual de la cartera: valor broker DEGIRO, reparto por activo y calidad de datos analiticos.",
     )
-    metrics = _load_metrics(settings)
+    _render_market_refresh_control(settings)
+
+    data_fingerprint = _dashboard_data_fingerprint(settings)
+    metrics = _load_metrics(settings, data_fingerprint)
     if metrics is None:
         _show_metrics_error()
         return
-    snapshots = _load_snapshots(settings)
+    snapshots = _load_snapshots(settings, data_fingerprint)
 
     daily = _daily_metrics(metrics)
     current_date = daily["valuation_date"].max()
     latest_external = daily.loc[daily["valuation_date"] == current_date].iloc[-1]
     broker_snapshot = _latest_broker_snapshot_view(snapshots)
-    value_help = "Valor de cartera segun el ultimo snapshot de DEGIRO disponible."
-    if broker_snapshot is not None:
-        current_date = broker_snapshot["snapshot_date"]
-        positions = broker_snapshot["positions"]
-        positions = _overlay_external_cost_metrics(positions, metrics, target_date=current_date)
-        total_value = broker_snapshot["total_market_value_base"]
-        total_unrealized, total_return = _derive_broker_pnl_with_external_cost_basis(
-            daily,
-            target_date=current_date,
-            total_market_value_base=total_value,
-        )
-        if total_unrealized is None or total_return is None:
-            total_unrealized, total_return = _derive_totals_from_positions(
-                positions,
-                total_market_value_base=total_value,
-            )
-    else:
-        positions = _positions_for_date(metrics, current_date)
-        total_value = float(latest_external["total_market_value_base"])
-        total_unrealized = float(latest_external["total_unrealized_pnl_base"])
-        total_return = float(latest_external["portfolio_return_pct"]) if pd.notna(latest_external["portfolio_return_pct"]) else None
-        value_help = "No hay snapshot DEGIRO; se muestra valoracion externa."
+    positions = _positions_for_date(metrics, current_date)
+    total_value = float(latest_external["total_market_value_base"])
+    total_unrealized = float(latest_external["total_unrealized_pnl_base"])
+    total_return = float(latest_external["portfolio_return_pct"]) if pd.notna(latest_external["portfolio_return_pct"]) else None
+    value_help = "Valoracion actualizada con precio local DEGIRO anclado y variacion diaria de market data."
 
     st.caption(f"Fecha de referencia: {current_date.isoformat()}")
+    if broker_snapshot is not None:
+        st.caption(f"Ultimo snapshot DEGIRO usado como ancla: {broker_snapshot['snapshot_date'].isoformat()}")
     net_contributions = _net_external_contributions_until(settings, as_of_date=current_date)
     total_realized = None
     if net_contributions is not None and total_unrealized is not None and not pd.isna(total_unrealized):
@@ -336,7 +347,7 @@ def _render_portfolio_tab(settings: Settings) -> None:
         st.caption("El peso indica que parte de la cartera representa cada activo.")
         st.dataframe(
             allocation,
-            use_container_width=True,
+            width="stretch",
             hide_index=True,
             column_config={
                 "asset_name": "Activo",
@@ -363,25 +374,24 @@ def _render_evolution_tab(settings: Settings) -> None:
         "Evolucion historica",
         "Evolucion del valor de cartera anclado a DEGIRO y dinamica de mercado entre snapshots.",
     )
-    metrics = _load_metrics(settings)
+    data_fingerprint = _dashboard_data_fingerprint(settings)
+    metrics = _load_metrics(settings, data_fingerprint)
     if metrics is None:
         _show_metrics_error()
         return
 
     daily = _daily_metrics(metrics)
-    snapshots = _load_snapshots(settings)
-    anchored_daily, anchor_note = _build_broker_anchored_daily_series(daily, snapshots)
-    daily_indexed = anchored_daily.set_index("valuation_date")
+    daily = daily.copy()
+    daily["total_market_value_broker_anchored"] = daily["total_market_value_base"]
+    daily_indexed = daily.set_index("valuation_date")
     transactions = _load_transactions(settings)
     st.markdown("#### Valor de la cartera")
     st.caption(
-        "Linea anclada al ultimo snapshot DEGIRO: el nivel absoluto viene del broker y la variacion diaria "
-        "la aporta market data."
+        "Valor calculado por activo: DEGIRO fija el precio local de referencia en cada snapshot y market data "
+        "aporta la variacion relativa diaria."
     )
-    if anchor_note:
-        st.caption(anchor_note)
     value_chart = _build_value_with_trades_chart(
-        daily_frame=anchored_daily,
+        daily_frame=daily,
         value_column="total_market_value_broker_anchored",
         transactions=transactions,
         base_currency=metrics.base_currency,
@@ -389,12 +399,17 @@ def _render_evolution_tab(settings: Settings) -> None:
     if value_chart is None:
         st.line_chart(daily_indexed[["total_market_value_broker_anchored"]])
     else:
-        st.altair_chart(value_chart, use_container_width=True)
+        st.altair_chart(value_chart, width="stretch")
 
     st.markdown("#### Evolucion por activo")
     include_cash = st.checkbox("Incluir posiciones de efectivo", value=False)
     top_n = st.slider("Numero maximo de activos", min_value=3, max_value=20, value=10, step=1)
-    per_asset = _build_asset_evolution_frame(metrics, include_cash=include_cash, top_n=top_n)
+    per_asset = _build_asset_evolution_frame(
+        metrics,
+        include_cash=include_cash,
+        top_n=top_n,
+        transactions=transactions,
+    )
     if per_asset.empty:
         st.info("No hay series de activos suficientes para esta vista.")
     else:
@@ -406,7 +421,7 @@ def _render_evolution_tab(settings: Settings) -> None:
         if per_asset_chart is None:
             st.line_chart(per_asset.set_index("valuation_date"))
         else:
-            st.altair_chart(per_asset_chart, use_container_width=True)
+            st.altair_chart(per_asset_chart, width="stretch")
 
     c1, c2 = st.columns(2)
     with c1:
@@ -420,8 +435,8 @@ def _render_evolution_tab(settings: Settings) -> None:
 
     st.markdown("#### Datos diarios")
     st.dataframe(
-        anchored_daily.sort_values("valuation_date", ascending=False),
-        use_container_width=True,
+        daily.sort_values("valuation_date", ascending=False),
+        width="stretch",
         hide_index=True,
     )
 
@@ -474,7 +489,7 @@ def _render_update_tab(settings: Settings) -> None:
         outcomes = _save_uploaded_degiro_files(uploaded_files, settings=settings, uploaded_at=date.today())
         saved_count = sum(outcome["status"] == "guardado" for outcome in outcomes)
         skipped_count = sum(outcome["status"] == "omitido" for outcome in outcomes)
-        st.dataframe(pd.DataFrame(outcomes), hide_index=True, use_container_width=True)
+        st.dataframe(pd.DataFrame(outcomes), hide_index=True, width="stretch")
         if saved_count:
             st.success(f"Guardados {saved_count} CSVs normalizados en {settings.degiro_exports_dir / 'incoming'}")
         if skipped_count:
@@ -510,9 +525,10 @@ def _render_update_tab(settings: Settings) -> None:
         st.caption("Actualiza precios diarios usando tickers y overrides.")
         if st.button("3. Refrescar precios"):
             with st.spinner("Consultando market data..."):
-                assets = DuckDBMarketDataRepository(settings=settings).list_assets(active_only=True)
+                repository = DuckDBMarketDataRepository(settings=settings)
+                assets = _load_refresh_assets(settings=settings, repository=repository)
                 start_date = _derive_start_date(assets)
-                price_summary = PriceRefreshService(settings=settings).refresh_prices(
+                price_summary = PriceRefreshService(repository=repository, settings=settings).refresh_prices(
                     start_date=start_date,
                     end_date=date.today(),
                 )
@@ -548,16 +564,76 @@ def _render_update_tab(settings: Settings) -> None:
         st.cache_data.clear()
 
 
+def _render_market_refresh_control(settings: Settings) -> None:
+    st.caption(
+        "La vista usa datos locales. Actualiza FX y precios para extender la valoracion hasta hoy."
+    )
+    left, right = st.columns([1, 4])
+    with left:
+        refresh_clicked = st.button("Actualizar a hoy", type="primary")
+    with right:
+        st.caption("No importa nuevos CSVs de DEGIRO; usa el ultimo snapshot como ancla.")
+
+    if not refresh_clicked:
+        return
+
+    target_date = date.today()
+    try:
+        with st.spinner(f"Actualizando FX y precios hasta {target_date.isoformat()}..."):
+            result = _refresh_market_data_to_date(settings=settings, target_date=target_date)
+    except Exception as exc:
+        st.error(f"No se pudieron actualizar los datos: {exc}")
+        return
+
+    st.cache_data.clear()
+    fx_summary = result["fx_summary"]
+    price_summary = result["price_summary"]
+    st.success(
+        "Actualizacion completada: "
+        f"FX pares={fx_summary.updated_pairs}, fx_filas={fx_summary.total_records}; "
+        f"activos={price_summary.updated_assets}, precio_filas={price_summary.total_records}."
+    )
+
+
+def _refresh_market_data_to_date(*, settings: Settings, target_date: date) -> dict[str, Any]:
+    repository = DuckDBMarketDataRepository(settings=settings)
+    fx_summary = FxRefreshService(repository=repository, settings=settings).refresh_rates(
+        end_date=target_date,
+        only_missing_base=False,
+    )
+    assets = _load_refresh_assets(settings=settings, repository=repository)
+    price_summary = PriceRefreshService(repository=repository, settings=settings).refresh_prices(
+        start_date=_derive_start_date(assets),
+        end_date=target_date,
+    )
+    return {
+        "target_date": target_date,
+        "fx_summary": fx_summary,
+        "price_summary": price_summary,
+    }
+
+
+def _load_refresh_assets(*, settings: Settings, repository: DuckDBMarketDataRepository):
+    assets = list(repository.list_assets(active_only=True))
+    known_asset_ids = {asset.asset_id for asset in assets}
+    for asset in load_market_assets_from_normalized_degiro(settings=settings):
+        if asset.is_active and asset.asset_id not in known_asset_ids:
+            assets.append(asset)
+            known_asset_ids.add(asset.asset_id)
+    return assets
+
+
 def _render_agents_tab(settings: Settings) -> None:
     _section_header(
         "Agentes",
         "Pipeline mensual: contexto tematico -> juicio por activo -> recomendacion mensual.",
     )
-    metrics = _load_metrics(settings)
+    data_fingerprint = _dashboard_data_fingerprint(settings)
+    metrics = _load_metrics(settings, data_fingerprint)
     if metrics is None:
         _show_metrics_error()
         return
-    snapshots = _load_snapshots(settings)
+    snapshots = _load_snapshots(settings, data_fingerprint)
 
     st.markdown(
         """
@@ -723,7 +799,7 @@ def _render_agent_result(name: str, result) -> None:
                         for finding in result.findings
                     ]
                 ),
-                use_container_width=True,
+                width="stretch",
                 hide_index=True,
             )
         st.json(
@@ -736,7 +812,7 @@ def _render_agent_result(name: str, result) -> None:
 
 
 @st.cache_data(show_spinner=False)
-def _load_metrics(_settings: Settings) -> PortfolioMetricsResult | None:
+def _load_metrics(_settings: Settings, data_fingerprint: tuple[tuple[str, int, int], ...]) -> PortfolioMetricsResult | None:
     try:
         return calculate_portfolio_metrics_from_normalized_degiro(settings=_settings)
     except Exception:
@@ -744,12 +820,12 @@ def _load_metrics(_settings: Settings) -> PortfolioMetricsResult | None:
 
 
 @st.cache_data(show_spinner=False)
-def _load_snapshots(_settings: Settings) -> pd.DataFrame:
+def _load_snapshots(_settings: Settings, data_fingerprint: tuple[tuple[str, int, int], ...]) -> pd.DataFrame:
     return load_normalized_degiro_snapshots(settings=_settings)
 
 
 @st.cache_data(show_spinner=False)
-def _warehouse_counts(_settings: Settings) -> dict[str, int]:
+def _warehouse_counts(_settings: Settings, data_fingerprint: tuple[tuple[str, int, int], ...]) -> dict[str, int]:
     repository = DuckDBMarketDataRepository(settings=_settings)
     tables = ("assets_master", "transactions", "cash_movements", "portfolio_snapshots", "prices_daily", "fx_rates")
     counts: dict[str, int] = {}
@@ -759,546 +835,21 @@ def _warehouse_counts(_settings: Settings) -> dict[str, int]:
     return counts
 
 
-def _daily_metrics(metrics: PortfolioMetricsResult) -> pd.DataFrame:
-    frame = metrics.portfolio_daily_metrics.copy()
-    frame["valuation_date"] = pd.to_datetime(frame["valuation_date"]).dt.date
-    return frame.sort_values("valuation_date")
+def _dashboard_data_fingerprint(settings: Settings) -> tuple[tuple[str, int, int], ...]:
+    paths: list[Path] = [settings.portfolio_db_path]
+    normalized_degiro_dir = settings.normalized_data_dir / "degiro"
+    if normalized_degiro_dir.exists():
+        paths.extend(sorted(normalized_degiro_dir.rglob("*.parquet")))
+    return tuple(_file_fingerprint(path) for path in paths if path.exists())
 
 
-def _positions_for_date(metrics: PortfolioMetricsResult, valuation_date: date) -> pd.DataFrame:
-    frame = metrics.position_metrics.copy()
-    frame["valuation_date"] = pd.to_datetime(frame["valuation_date"]).dt.date
-    return frame.loc[frame["valuation_date"] == valuation_date].copy()
+def _file_fingerprint(path: Path) -> tuple[str, int, int]:
+    stat = path.stat()
+    return (str(path), stat.st_mtime_ns, stat.st_size)
 
 
-def _latest_broker_snapshot_view(snapshots: pd.DataFrame) -> dict[str, Any] | None:
-    if snapshots is None or snapshots.empty:
-        return None
-    frame = snapshots.copy()
-    frame["snapshot_date"] = pd.to_datetime(frame["snapshot_date"], errors="coerce").dt.date
-    frame["market_value_base"] = pd.to_numeric(frame["market_value_base"], errors="coerce")
-    frame["unrealized_pnl_base"] = pd.to_numeric(frame.get("unrealized_pnl_base"), errors="coerce")
-    frame["quantity"] = pd.to_numeric(frame.get("quantity"), errors="coerce")
-    frame["asset_name"] = frame["asset_name"].fillna(frame["asset_id"]).astype("string")
-    frame["asset_type"] = frame["asset_type"].fillna("unknown").astype("string")
-    frame = frame.dropna(subset=["snapshot_date", "market_value_base"])
-    if frame.empty:
-        return None
-
-    latest_date = max(frame["snapshot_date"])
-    latest = frame.loc[frame["snapshot_date"] == latest_date].copy()
-    total_value = float(latest["market_value_base"].sum())
-    has_snapshot_unrealized = latest["unrealized_pnl_base"].notna().any()
-    if has_snapshot_unrealized:
-        total_unrealized = float(latest["unrealized_pnl_base"].fillna(0.0).sum())
-        total_cost = total_value - total_unrealized
-        portfolio_return_pct = None if abs(total_cost) < 1e-9 else total_unrealized / total_cost
-    else:
-        total_unrealized = None
-        portfolio_return_pct = None
-
-    latest["weight"] = 0.0 if abs(total_value) < 1e-9 else latest["market_value_base"] / total_value
-    latest["cost_basis_base"] = pd.NA
-    rows_with_unrealized = latest["unrealized_pnl_base"].notna()
-    latest.loc[rows_with_unrealized, "cost_basis_base"] = (
-        latest.loc[rows_with_unrealized, "market_value_base"] - latest.loc[rows_with_unrealized, "unrealized_pnl_base"]
-    )
-    latest["unrealized_return_pct"] = pd.to_numeric(
-        latest["unrealized_pnl_base"] / pd.to_numeric(latest["cost_basis_base"], errors="coerce").replace(0, pd.NA),
-        errors="coerce",
-    )
-    latest["valuation_status"] = "broker_snapshot"
-    positions = latest.loc[
-        :,
-        [
-            "asset_id",
-            "asset_name",
-            "asset_type",
-            "quantity",
-            "market_value_base",
-            "weight",
-            "cost_basis_base",
-            "unrealized_pnl_base",
-            "unrealized_return_pct",
-            "valuation_status",
-        ],
-    ].copy()
-
-    return {
-        "snapshot_date": latest_date,
-        "positions": positions,
-        "total_market_value_base": total_value,
-        "total_unrealized_pnl_base": total_unrealized,
-        "portfolio_return_pct": portfolio_return_pct,
-    }
-
-
-def _broker_snapshot_view_for_date(snapshots: pd.DataFrame, *, as_of_date: date) -> dict[str, Any] | None:
-    if snapshots is None or snapshots.empty:
-        return None
-    frame = snapshots.copy()
-    frame["snapshot_date"] = pd.to_datetime(frame["snapshot_date"], errors="coerce").dt.date
-    frame = frame.dropna(subset=["snapshot_date"])
-    eligible = frame.loc[frame["snapshot_date"] <= as_of_date].copy()
-    if eligible.empty:
-        return None
-    return _latest_broker_snapshot_view(eligible)
-
-
-def _build_broker_anchored_daily_series(daily: pd.DataFrame, snapshots: pd.DataFrame) -> tuple[pd.DataFrame, str]:
-    ready = daily.copy().sort_values("valuation_date")
-    ready["total_market_value_base"] = pd.to_numeric(ready["total_market_value_base"], errors="coerce")
-    ready["valuation_date"] = pd.to_datetime(ready["valuation_date"], errors="coerce").dt.date
-    ready = ready.dropna(subset=["valuation_date", "total_market_value_base"])
-    if ready.empty:
-        return ready, ""
-
-    broker = _latest_broker_snapshot_view(snapshots)
-    if broker is None:
-        ready["total_market_value_broker_anchored"] = ready["total_market_value_base"]
-        return ready, "No hay snapshot DEGIRO disponible; se muestra valoracion externa."
-
-    anchor_date = broker["snapshot_date"]
-    anchor_total = float(broker["total_market_value_base"])
-    anchor_rows = ready.loc[ready["valuation_date"] == anchor_date]
-    if anchor_rows.empty:
-        ready["total_market_value_broker_anchored"] = ready["total_market_value_base"]
-        return ready, (
-            f"No hay serie externa en la fecha del snapshot ({anchor_date.isoformat()}); "
-            "se muestra valoracion externa sin ancla."
-        )
-
-    external_anchor = float(anchor_rows.iloc[-1]["total_market_value_base"])
-    if abs(external_anchor) < 1e-9:
-        ready["total_market_value_broker_anchored"] = ready["total_market_value_base"]
-        return ready, "Ancla externa no valida (0); se muestra valoracion externa."
-
-    scale = anchor_total / external_anchor
-    ready["total_market_value_broker_anchored"] = (ready["total_market_value_base"] * scale).round(8)
-    return ready, (
-        f"Ancla DEGIRO aplicada en {anchor_date.isoformat()} "
-        f"({anchor_total:,.2f} EUR)."
-    )
-
-
-def _external_positions_for_date(metrics: PortfolioMetricsResult, *, target_date: date) -> pd.DataFrame:
-    frame = metrics.position_metrics.copy()
-    frame["valuation_date"] = pd.to_datetime(frame["valuation_date"], errors="coerce").dt.date
-    frame["cost_basis_base"] = pd.to_numeric(frame["cost_basis_base"], errors="coerce")
-    frame["unrealized_pnl_base"] = pd.to_numeric(frame["unrealized_pnl_base"], errors="coerce")
-    frame["unrealized_return_pct"] = pd.to_numeric(frame["unrealized_return_pct"], errors="coerce")
-    frame = frame.dropna(subset=["valuation_date", "asset_id"])
-    if frame.empty:
-        return pd.DataFrame(columns=["asset_id", "cost_basis_base", "unrealized_pnl_base", "unrealized_return_pct"])
-
-    dates = sorted(frame["valuation_date"].dropna().unique().tolist())
-    if not dates:
-        return pd.DataFrame(columns=["asset_id", "cost_basis_base", "unrealized_pnl_base", "unrealized_return_pct"])
-    if target_date in set(dates):
-        chosen_date = target_date
-    else:
-        fallback_dates = [date_value for date_value in dates if date_value <= target_date]
-        if not fallback_dates:
-            return pd.DataFrame(columns=["asset_id", "cost_basis_base", "unrealized_pnl_base", "unrealized_return_pct"])
-        chosen_date = max(fallback_dates)
-    current = frame.loc[frame["valuation_date"] == chosen_date, ["asset_id", "cost_basis_base", "unrealized_pnl_base", "unrealized_return_pct"]].copy()
-    return current
-
-
-def _overlay_external_cost_metrics(
-    broker_positions: pd.DataFrame,
-    metrics: PortfolioMetricsResult,
-    *,
-    target_date: date,
-) -> pd.DataFrame:
-    if broker_positions.empty:
-        return broker_positions
-    enriched = broker_positions.copy()
-    for column in ("cost_basis_base", "unrealized_pnl_base", "unrealized_return_pct"):
-        if column not in enriched.columns:
-            enriched[column] = pd.NA
-
-    external = _external_positions_for_date(metrics, target_date=target_date)
-    if external.empty:
-        return enriched
-
-    merged = enriched.merge(
-        external.rename(
-            columns={
-                "cost_basis_base": "cost_basis_external",
-                "unrealized_pnl_base": "unrealized_external",
-                "unrealized_return_pct": "return_external",
-            }
-        ),
-        on="asset_id",
-        how="left",
-    )
-    merged["cost_basis_base"] = pd.to_numeric(merged["cost_basis_base"], errors="coerce").fillna(
-        pd.to_numeric(merged["cost_basis_external"], errors="coerce")
-    )
-    merged["unrealized_pnl_base"] = pd.to_numeric(merged["unrealized_pnl_base"], errors="coerce").fillna(
-        pd.to_numeric(merged["unrealized_external"], errors="coerce")
-    )
-    merged["unrealized_return_pct"] = pd.to_numeric(merged["unrealized_return_pct"], errors="coerce").fillna(
-        pd.to_numeric(merged["return_external"], errors="coerce")
-    )
-    return merged.drop(columns=["cost_basis_external", "unrealized_external", "return_external"])
-
-
-def _derive_totals_from_positions(
-    positions: pd.DataFrame,
-    *,
-    total_market_value_base: float,
-) -> tuple[float | None, float | None]:
-    if positions.empty:
-        return None, None
-    cost = pd.to_numeric(positions.get("cost_basis_base"), errors="coerce")
-    if cost is None or cost.notna().sum() == 0:
-        return None, None
-    total_cost = float(cost.fillna(0.0).sum())
-    total_unrealized = float(total_market_value_base - total_cost)
-    total_return = None if abs(total_cost) < 1e-9 else total_unrealized / total_cost
-    return total_unrealized, total_return
-
-
-def _derive_broker_pnl_with_external_cost_basis(
-    daily: pd.DataFrame,
-    *,
-    target_date: date,
-    total_market_value_base: float,
-) -> tuple[float | None, float | None]:
-    frame = daily.copy()
-    frame["valuation_date"] = pd.to_datetime(frame["valuation_date"], errors="coerce").dt.date
-    frame["total_cost_basis_base"] = pd.to_numeric(frame["total_cost_basis_base"], errors="coerce")
-    frame = frame.dropna(subset=["valuation_date"]).sort_values("valuation_date")
-    if frame.empty:
-        return None, None
-
-    if target_date in set(frame["valuation_date"].tolist()):
-        row = frame.loc[frame["valuation_date"] == target_date].iloc[-1]
-    else:
-        candidates = frame.loc[frame["valuation_date"] <= target_date]
-        if candidates.empty:
-            return None, None
-        row = candidates.iloc[-1]
-
-    total_cost = float(row["total_cost_basis_base"]) if pd.notna(row["total_cost_basis_base"]) else None
-    if total_cost is None or abs(total_cost) < 1e-9:
-        return None, None
-    total_unrealized = float(total_market_value_base - total_cost)
-    total_return = total_unrealized / total_cost
-    return total_unrealized, total_return
-
-
-def _build_agent_snapshot_for_dashboard(
-    metrics: PortfolioMetricsResult,
-    *,
-    snapshots: pd.DataFrame,
-    as_of_date: date,
-) -> dict[str, Any]:
-    base_snapshot = build_portfolio_metrics_snapshot(metrics, as_of_date=as_of_date)
-    broker = _broker_snapshot_view_for_date(snapshots, as_of_date=as_of_date)
-    if broker is None:
-        return base_snapshot
-
-    positions = _overlay_external_cost_metrics(
-        broker["positions"],
-        metrics,
-        target_date=broker["snapshot_date"],
-    )
-    total_value = float(broker["total_market_value_base"])
-    total_unrealized, total_return = _derive_broker_pnl_with_external_cost_basis(
-        _daily_metrics(metrics),
-        target_date=broker["snapshot_date"],
-        total_market_value_base=total_value,
-    )
-    if total_unrealized is None or total_return is None:
-        total_unrealized, total_return = _derive_totals_from_positions(
-            positions,
-            total_market_value_base=total_value,
-        )
-
-    daily_payload = dict(base_snapshot.get("daily") or {})
-    daily_payload["valuation_date"] = broker["snapshot_date"].isoformat()
-    daily_payload["total_market_value_base"] = round(total_value, 8)
-    if total_unrealized is not None:
-        daily_payload["total_unrealized_pnl_base"] = round(float(total_unrealized), 8)
-    if total_return is not None:
-        daily_payload["portfolio_return_pct"] = round(float(total_return), 8)
-
-    selected_columns = [
-        "asset_id",
-        "asset_name",
-        "asset_type",
-        "isin",
-        "quantity",
-        "market_value_base",
-        "cost_basis_base",
-        "unrealized_pnl_base",
-        "unrealized_return_pct",
-        "weight",
-        "valuation_status",
-    ]
-    for column in selected_columns:
-        if column not in positions.columns:
-            positions[column] = pd.NA
-    positions_ready = positions.loc[:, selected_columns].sort_values(["weight", "asset_name"], ascending=[False, True])
-
-    return {
-        "as_of_date": broker["snapshot_date"].isoformat(),
-        "base_currency": metrics.base_currency,
-        "daily": _json_ready_value(daily_payload),
-        "positions": _json_ready_value(positions_ready.to_dict(orient="records")),
-    }
-
-
-def _parse_target_weights_input(raw_text: str) -> dict[str, Any]:
-    text = (raw_text or "").strip()
-    if not text:
-        return {}
-    try:
-        parsed = json.loads(text)
-    except json.JSONDecodeError:
-        return {}
-    return parsed if isinstance(parsed, dict) else {}
-
-
-def _json_ready_value(value: Any) -> Any:
-    if isinstance(value, dict):
-        return {str(key): _json_ready_value(item) for key, item in value.items()}
-    if isinstance(value, (tuple, list)):
-        return [_json_ready_value(item) for item in value]
-    if isinstance(value, (date, pd.Timestamp)):
-        return value.isoformat()
-    if value is None or pd.isna(value):
-        return None
-    return value
-
-
-def _net_external_contributions_until(settings: Settings, *, as_of_date: date) -> float | None:
-    repository = DuckDBMarketDataRepository(settings=settings)
-    query = """
-        SELECT SUM(
-            CASE
-                WHEN UPPER(movement_type) = 'DEPOSIT' THEN ABS(amount_base)
-                WHEN UPPER(movement_type) = 'WITHDRAWAL' THEN -ABS(amount_base)
-                ELSE 0
-            END
-        ) AS net_external
-        FROM cash_movements
-        WHERE amount_base IS NOT NULL
-          AND UPPER(movement_type) IN ('DEPOSIT', 'WITHDRAWAL')
-          AND COALESCE(value_date, movement_date) <= ?
-    """
-    with repository.connection() as connection:
-        row = connection.execute(query, [as_of_date]).fetchone()
-    if row is None or row[0] is None:
-        return None
-    return float(row[0])
-
-
-@st.cache_data(show_spinner=False)
 def _load_transactions(_settings: Settings) -> pd.DataFrame:
     return load_normalized_degiro_transactions(settings=_settings)
-
-
-def _build_net_trade_flow_by_day(transactions: pd.DataFrame) -> pd.DataFrame:
-    if transactions is None or transactions.empty:
-        return pd.DataFrame(columns=["valuation_date", "flujo_operativo_dia"])
-
-    frame = transactions.copy()
-    frame["trade_date"] = pd.to_datetime(frame.get("trade_date"), errors="coerce").dt.date
-    frame["transaction_type"] = frame["transaction_type"].fillna("").astype("string").str.upper()
-    for column in ("gross_amount_base", "fees_amount_base", "taxes_amount_base"):
-        frame[column] = pd.to_numeric(frame.get(column), errors="coerce").fillna(0.0)
-
-    frame["flujo_operativo"] = 0.0
-    buy_mask = frame["transaction_type"] == "BUY"
-    sell_mask = frame["transaction_type"] == "SELL"
-    frame.loc[buy_mask, "flujo_operativo"] = -(
-        frame.loc[buy_mask, "gross_amount_base"]
-        + frame.loc[buy_mask, "fees_amount_base"]
-        + frame.loc[buy_mask, "taxes_amount_base"]
-    )
-    frame.loc[sell_mask, "flujo_operativo"] = (
-        frame.loc[sell_mask, "gross_amount_base"]
-        - frame.loc[sell_mask, "fees_amount_base"]
-        - frame.loc[sell_mask, "taxes_amount_base"]
-    )
-    frame = frame.loc[frame["transaction_type"].isin(["BUY", "SELL"])].dropna(subset=["trade_date"])
-    if frame.empty:
-        return pd.DataFrame(columns=["valuation_date", "flujo_operativo_dia"])
-    return (
-        frame.groupby("trade_date", as_index=False)
-        .agg(flujo_operativo_dia=("flujo_operativo", "sum"))
-        .rename(columns={"trade_date": "valuation_date"})
-    )
-
-
-def _build_value_with_trades_chart(
-    *,
-    daily_frame: pd.DataFrame,
-    value_column: str,
-    transactions: pd.DataFrame,
-    base_currency: str,
-) -> alt.LayerChart | None:
-    if daily_frame.empty:
-        return None
-
-    ready_daily = daily_frame.copy()
-    ready_daily["valuation_date"] = pd.to_datetime(ready_daily["valuation_date"], errors="coerce").dt.date
-    ready_daily[value_column] = pd.to_numeric(ready_daily[value_column], errors="coerce")
-    ready_daily = ready_daily.dropna(subset=["valuation_date", value_column]).sort_values("valuation_date")
-    if ready_daily.empty:
-        return None
-
-    flows_by_day = _build_net_trade_flow_by_day(transactions)
-
-    merged = ready_daily.loc[:, ["valuation_date", value_column]].merge(
-        flows_by_day,
-        on="valuation_date",
-        how="left",
-    )
-    merged["flujo_operativo_dia"] = pd.to_numeric(merged["flujo_operativo_dia"], errors="coerce")
-    merged["tipo_operativa"] = "Sin operativa"
-    merged.loc[merged["flujo_operativo_dia"] < 0, "tipo_operativa"] = "Compra neta"
-    merged.loc[merged["flujo_operativo_dia"] > 0, "tipo_operativa"] = "Venta neta"
-
-    line = (
-        alt.Chart(merged)
-        .mark_line(color="#1d4ed8", strokeWidth=2.2)
-        .encode(
-            x=alt.X("valuation_date:T", title="Fecha"),
-            y=alt.Y(f"{value_column}:Q", title=f"Valor ({base_currency})"),
-            tooltip=[
-                alt.Tooltip("valuation_date:T", title="Fecha"),
-                alt.Tooltip(f"{value_column}:Q", title=f"Valor cartera ({base_currency})", format=",.2f"),
-            ],
-        )
-    )
-
-    markers_source = merged.loc[merged["flujo_operativo_dia"].notna() & (merged["flujo_operativo_dia"] != 0)].copy()
-    if markers_source.empty:
-        return line.properties(height=300)
-
-    markers = (
-        alt.Chart(markers_source)
-        .mark_circle(size=85, opacity=0.95)
-        .encode(
-            x=alt.X("valuation_date:T"),
-            y=alt.Y(f"{value_column}:Q"),
-            color=alt.Color(
-                "tipo_operativa:N",
-                scale=alt.Scale(domain=["Compra neta", "Venta neta"], range=["#0f766e", "#dc2626"]),
-                legend=alt.Legend(title="Operativa"),
-            ),
-            tooltip=[
-                alt.Tooltip("valuation_date:T", title="Fecha"),
-                alt.Tooltip(f"{value_column}:Q", title=f"Valor cartera ({base_currency})", format=",.2f"),
-                alt.Tooltip("flujo_operativo_dia:Q", title=f"Flujo operativo dia ({base_currency})", format=",.2f"),
-                alt.Tooltip("tipo_operativa:N", title="Tipo"),
-            ],
-        )
-    )
-    return alt.layer(line, markers).properties(height=300)
-
-
-def _build_asset_evolution_frame(
-    metrics: PortfolioMetricsResult,
-    *,
-    include_cash: bool,
-    top_n: int,
-) -> pd.DataFrame:
-    positions = metrics.position_metrics.copy()
-    if positions.empty:
-        return pd.DataFrame()
-
-    positions["valuation_date"] = pd.to_datetime(positions["valuation_date"], errors="coerce").dt.date
-    positions["market_value_base"] = pd.to_numeric(positions["market_value_base"], errors="coerce")
-    positions["quantity"] = pd.to_numeric(positions["quantity"], errors="coerce")
-    positions["asset_name"] = positions["asset_name"].fillna(positions["asset_id"]).astype("string")
-    if not include_cash:
-        positions = positions.loc[positions["asset_type"].fillna("").astype(str).str.lower() != "cash"].copy()
-    positions = positions.dropna(subset=["valuation_date", "asset_name", "market_value_base", "quantity"])
-    positions = positions.loc[positions["quantity"] > 0].copy()
-    if positions.empty:
-        return pd.DataFrame()
-    positions["unit_price_base"] = positions["market_value_base"] / positions["quantity"]
-    positions = positions.dropna(subset=["unit_price_base"])
-    positions = positions.loc[positions["unit_price_base"] > 0].copy()
-    if positions.empty:
-        return pd.DataFrame()
-
-    latest_date = positions["valuation_date"].max()
-    latest = (
-        positions.loc[positions["valuation_date"] == latest_date, ["asset_name", "market_value_base"]]
-        .groupby("asset_name", as_index=False)
-        .agg(latest_value=("market_value_base", "sum"))
-        .sort_values("latest_value", ascending=False)
-        .head(top_n)
-    )
-    selected_assets = set(latest["asset_name"].tolist())
-    filtered = positions.loc[positions["asset_name"].isin(selected_assets), ["valuation_date", "asset_name", "unit_price_base"]].copy()
-    series = (
-        filtered.groupby(["valuation_date", "asset_name"], as_index=False)
-        .agg(value=("unit_price_base", "mean"))
-        .pivot(index="valuation_date", columns="asset_name", values="value")
-        .sort_index()
-    )
-    if series.empty:
-        return pd.DataFrame()
-
-    normalized = pd.DataFrame(index=series.index)
-    for column in series.columns:
-        current = pd.to_numeric(series[column], errors="coerce")
-        first_valid = current.loc[current.notna() & (current != 0)]
-        if first_valid.empty:
-            continue
-        base_value = float(first_valid.iloc[0])
-        normalized[column] = ((current / base_value) - 1.0).mul(100.0).round(8)
-    series = normalized
-
-    series = series.dropna(axis=1, how="all")
-    if series.empty:
-        return pd.DataFrame()
-    return series.reset_index()
-
-
-def _build_asset_evolution_chart(
-    frame: pd.DataFrame,
-    *,
-    base_currency: str,
-) -> alt.Chart | None:
-    if frame.empty:
-        return None
-
-    long_frame = (
-        frame.melt(id_vars=["valuation_date"], var_name="asset_name", value_name="value")
-        .dropna(subset=["valuation_date", "asset_name", "value"])
-        .copy()
-    )
-    if long_frame.empty:
-        return None
-
-    y_title = "Rentabilidad (%)"
-    value_format = ".2f"
-    line = (
-        alt.Chart(long_frame)
-        .mark_line(strokeWidth=2)
-        .encode(
-            x=alt.X("valuation_date:T", title="Fecha"),
-            y=alt.Y("value:Q", title=y_title, scale=alt.Scale(zero=False)),
-            color=alt.Color("asset_name:N", title="Activo"),
-            tooltip=[
-                alt.Tooltip("valuation_date:T", title="Fecha"),
-                alt.Tooltip("asset_name:N", title="Activo"),
-                alt.Tooltip("value:Q", title=y_title, format=value_format),
-            ],
-        )
-        .properties(height=320)
-    )
-    baseline = alt.Chart(pd.DataFrame({"y": [0.0]})).mark_rule(color="#94a3b8", strokeDash=[4, 4]).encode(y="y:Q")
-    return alt.layer(baseline, line)
 
 
 def _render_quality_warnings(latest: pd.Series) -> None:
@@ -1375,124 +926,6 @@ def _generate_report_action(settings: Settings) -> None:
 def _derive_start_date(assets) -> date:
     dates = [asset.first_seen_date for asset in assets if asset.first_seen_date is not None]
     return min(dates) if dates else date.today()
-
-
-def _save_uploaded_degiro_files(uploaded_files: list[Any], *, settings: Settings, uploaded_at: date) -> list[dict[str, str]]:
-    incoming_dir = settings.degiro_exports_dir / "incoming"
-    incoming_dir.mkdir(parents=True, exist_ok=True)
-
-    outcomes: list[dict[str, str]] = []
-    for uploaded_file in uploaded_files:
-        canonical_name = _canonical_degiro_upload_name(uploaded_file.name, fallback_date=uploaded_at)
-        if canonical_name is None:
-            outcomes.append(
-                {
-                    "archivo_original": uploaded_file.name,
-                    "tipo_detectado": "desconocido",
-                    "guardado_como": "",
-                    "status": "omitido",
-                    "detalle": "Renombra el archivo incluyendo cartera/portfolio, transacciones/transactions o cuenta/account.",
-                }
-            )
-            continue
-
-        target_path = incoming_dir / canonical_name
-        existed = target_path.exists()
-        target_path.write_bytes(uploaded_file.getbuffer())
-        outcomes.append(
-            {
-                "archivo_original": uploaded_file.name,
-                "tipo_detectado": _friendly_degiro_kind(canonical_name),
-                "guardado_como": canonical_name,
-                "status": "guardado",
-                "detalle": "Sobrescrito" if existed else "Nuevo",
-            }
-        )
-
-    return outcomes
-
-
-def _canonical_degiro_upload_name(filename: str, *, fallback_date: date) -> str | None:
-    kind = _detect_degiro_upload_kind(filename)
-    if kind is None:
-        return None
-
-    dates = _extract_dates_from_filename(filename)
-    if kind == "portfolio":
-        snapshot_date = max(dates) if dates else fallback_date
-        return f"portfolio_{snapshot_date.isoformat()}.csv"
-
-    date_from, date_to = _date_range_from_filename_dates(dates, fallback_date=fallback_date)
-    if kind == "transactions":
-        return f"transactions_{date_from.isoformat()}_{date_to.isoformat()}.csv"
-    return f"account_{date_from.isoformat()}_{date_to.isoformat()}.csv"
-
-
-def _detect_degiro_upload_kind(filename: str) -> str | None:
-    normalized = _normalize_filename_text(filename)
-    portfolio_tokens = ("portfolio", "cartera", "posiciones", "positions", "snapshot")
-    transaction_tokens = ("transactions", "transaction", "transacciones", "transaccion", "operaciones", "ordenes", "orders")
-    account_tokens = ("account", "cuenta", "cash", "efectivo", "movimientos", "actividad", "activity")
-
-    if any(token in normalized for token in portfolio_tokens):
-        return "portfolio"
-    if any(token in normalized for token in transaction_tokens):
-        return "transactions"
-    if any(token in normalized for token in account_tokens):
-        return "account"
-    return None
-
-
-def _extract_dates_from_filename(filename: str) -> list[date]:
-    dates: list[date] = []
-    seen: set[date] = set()
-    normalized = _normalize_filename_text(filename)
-
-    patterns = (
-        (re.compile(r"(?<!\d)(\d{4})[-_.](\d{1,2})[-_.](\d{1,2})(?!\d)"), "ymd"),
-        (re.compile(r"(?<!\d)(\d{1,2})[-_.](\d{1,2})[-_.](\d{4})(?!\d)"), "dmy"),
-        (re.compile(r"(?<!\d)(\d{4})(\d{2})(\d{2})(?!\d)"), "compact_ymd"),
-        (re.compile(r"(?<!\d)(\d{2})(\d{2})(\d{4})(?!\d)"), "compact_dmy"),
-    )
-    for pattern, order in patterns:
-        for match in pattern.finditer(normalized):
-            parsed = _parse_filename_date(match.groups(), order)
-            if parsed is not None and parsed not in seen:
-                dates.append(parsed)
-                seen.add(parsed)
-    return sorted(dates)
-
-
-def _parse_filename_date(parts: tuple[str, ...], order: str) -> date | None:
-    try:
-        if order in {"ymd", "compact_ymd"}:
-            year, month, day = (int(part) for part in parts)
-        else:
-            day, month, year = (int(part) for part in parts)
-        return date(year, month, day)
-    except ValueError:
-        return None
-
-
-def _date_range_from_filename_dates(dates: list[date], *, fallback_date: date) -> tuple[date, date]:
-    if not dates:
-        return fallback_date, fallback_date
-    return min(dates), max(dates)
-
-
-def _normalize_filename_text(filename: str) -> str:
-    without_accents = unicodedata.normalize("NFKD", filename).encode("ascii", "ignore").decode("ascii")
-    return without_accents.lower()
-
-
-def _friendly_degiro_kind(canonical_name: str) -> str:
-    if canonical_name.startswith("transactions_"):
-        return "transacciones"
-    if canonical_name.startswith("account_"):
-        return "cuenta / efectivo"
-    if canonical_name.startswith("portfolio_"):
-        return "cartera"
-    return "desconocido"
 
 
 def _read_default_brief(settings: Settings) -> str:

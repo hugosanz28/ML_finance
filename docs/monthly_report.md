@@ -8,7 +8,7 @@ del snapshot disponible o para una fecha `as_of` concreta.
 Esta pensado para el flujo manual del proyecto:
 
 1. exportar o actualizar datos de DEGIRO,
-2. refrescar precios si hace falta,
+2. refrescar FX y precios si hace falta,
 3. generar el informe mensual,
 4. usar ese informe como entrada para agentes o para la revision personal.
 
@@ -52,6 +52,10 @@ Si existe snapshot de DEGIRO para la fecha de referencia (o la ultima fecha
 anterior disponible), el valor total y la asignacion actual se anclan a ese
 snapshot del broker. Las metricas de coste/PnL se completan con la serie
 recalculada cuando procede.
+
+La serie recalculada usa la politica `broker_snapshot_anchored`: el precio local
+absoluto viene del snapshot DEGIRO y el proveedor externo solo aporta variacion
+relativa. Para activos no EUR, la conversion final usa `fx_rates`.
 
 Si no existe historico completo para una ventana, el informe no falla: usa el
 primer dato disponible y lo deja indicado en las notas.

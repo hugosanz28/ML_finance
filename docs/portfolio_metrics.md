@@ -47,10 +47,49 @@ Campos principales:
 
 ## Comportamiento actual
 
+- por defecto usa `broker_snapshot_anchored`: DEGIRO fija el precio local de
+  referencia por activo en cada snapshot y `yfinance` solo aporta la variacion
+  relativa entre fechas,
+- la formula de precio local es:
+  `precio_DEGIRO_ancla * precio_proveedor_fecha / precio_proveedor_ancla`,
+- el valor local se ancla preferentemente al `market_value` del snapshot, no a
+  `quantity * market_price`, porque algunos brokers redondean la cantidad
+  visible en el CSV y conservan mas precision internamente,
+- para activos no EUR, el precio local anclado se convierte a moneda base con
+  el FX diario disponible en `fx_rates`; por eso el total EUR puede no coincidir
+  exactamente con el snapshot si DEGIRO uso otro cambio,
+- para fechas anteriores al primer snapshot disponible usa ese primer snapshot
+  como ancla hacia atras, de forma que la serie historica no queda sin valorar,
+- si `calculate_portfolio_metrics_from_normalized_degiro` se llama sin
+  `end_date`, la fecha final se extiende hasta el ultimo `price_date`
+  disponible en `prices_daily` para los activos de la cartera,
+- mantiene `external_absolute` como politica alternativa para comparar contra
+  precios absolutos del proveedor,
 - usa precio disponible mas reciente en o antes de cada fecha de valoracion,
+- recalibra cantidades cuando aparece un snapshot posterior del broker,
 - soporta coste base con media ponderada movil para `BUY` y `SELL`,
-- marca `missing_price` o `missing_fx` cuando no puede valorar una posicion,
+- marca `missing_price`, `missing_anchor`, `missing_provider_anchor_price` o
+  `missing_fx` cuando no puede valorar una posicion,
 - y calcula drawdown sobre el valor agregado efectivamente valorado.
+
+Columnas de auditoria relevantes:
+
+- `pricing_policy`
+- `anchor_snapshot_date`
+- `anchor_market_price`
+- `provider_anchor_price`
+- `provider_anchor_price_date`
+- `provider_price_age_days`
+- `provider_anchor_age_days`
+
+Estados habituales de `valuation_status`:
+
+- `valued_anchored`: posicion valorada con precio DEGIRO anclado y variacion del proveedor.
+- `valued_cash`: efectivo valorado directamente.
+- `missing_anchor`: no hay snapshot DEGIRO util para anclar.
+- `missing_provider_anchor_price`: falta el precio del proveedor en la fecha de ancla.
+- `missing_price`: falta precio diario del proveedor para la fecha de valoracion.
+- `missing_fx`: falta tipo de cambio para convertir a moneda base.
 
 ## Persistencia
 

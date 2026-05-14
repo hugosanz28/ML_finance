@@ -4,6 +4,24 @@
 
 Construir un sistema local y reproducible para seguir una cartera personal, partiendo de exportaciones oficiales de DEGIRO y enriqueciendo la información con datos de mercado, análisis y agentes de apoyo a la decisión.
 
+## Estado real actual
+
+Las fases base ya estan implementadas para uso local:
+
+- modelo DuckDB y estrategia `raw -> normalized -> curated`,
+- parsers DEGIRO de transacciones, cuenta y snapshots,
+- contratos normalizados validados antes de persistir/cargar,
+- refresh de FX y precios con overrides,
+- valoracion `broker_snapshot_anchored`,
+- reconstruccion diaria de posiciones con reanclaje por snapshots,
+- informe mensual persistido,
+- dashboard Streamlit con `Actualizar a hoy`,
+- agentes mensuales en modo demo/local o con proveedores reales,
+- y CI de pytest en GitHub Actions.
+
+Lo pendiente en este roadmap debe leerse como mejoras/publicacion: dataset demo
+anonimizado, refinamiento de agentes, analitica avanzada y material de showcase.
+
 ## Cómo organizarlo en GitHub
 
 La recomendación para GitHub es:

@@ -22,6 +22,12 @@ La pestaña `Actualizar datos` permite subir CSVs, importar, refrescar FX,
 refrescar precios y generar informes. La pestaña `Agentes` permite revisar los
 inputs y ejecutar la red mensual.
 
+Para una actualizacion rapida sin importar nuevos CSVs ni generar informe, usa
+`Vista general` -> `Actualizar a hoy`. Ese boton refresca FX y precios hasta la
+fecha actual, limpia la cache y mantiene el ultimo snapshot DEGIRO como ancla.
+La fecha visible de la vista pasa a ser la ultima fecha valorada disponible, no
+necesariamente la fecha del snapshot.
+
 ## Entradas estables
 
 - CSV canonicos de DEGIRO: `src/degiro_exports/local/incoming/`
@@ -40,5 +46,7 @@ inputs y ejecutar la red mensual.
 - `import_degiro.py` carga por defecto los parquets normalizados a DuckDB.
 - `refresh_fx_rates.py` no reescribe los parquets; alimenta `fx_rates`.
 - `refresh_market_data.py` usa `asset_overrides.csv` para tickers manuales y exclusiones.
+- La valoracion diaria usa `broker_snapshot_anchored`: el precio local absoluto
+  viene de snapshots DEGIRO y market data aporta la variacion relativa.
 - `run_monthly_agents.py` puede ejecutarse en modo demo sin red/API con `--llm-provider static --search-provider null`.
 - Para una ejecucion IA real, usa `--llm-provider openai` y, si quieres busqueda externa, `--search-provider duckduckgo`.

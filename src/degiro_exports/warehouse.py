@@ -9,6 +9,7 @@ from typing import Iterable
 import pandas as pd
 
 from src.config import Settings, get_settings
+from src.degiro_exports.contracts import validate_normalized_degiro_frame
 from src.market_data import DuckDBMarketDataRepository, sync_market_assets_from_normalized_degiro
 
 
@@ -48,15 +49,15 @@ def load_normalized_degiro_to_duckdb(
     )
     transactions_count = _upsert_transactions(
         resolved_repository,
-        _load_parquet_collection(base_dir / "transactions"),
+        _load_parquet_collection(base_dir / "transactions", dataset_name="transactions"),
     )
     cash_count = _upsert_cash_movements(
         resolved_repository,
-        _load_parquet_collection(base_dir / "cash_movements"),
+        _load_parquet_collection(base_dir / "cash_movements", dataset_name="cash_movements"),
     )
     snapshots_count = _upsert_portfolio_snapshots(
         resolved_repository,
-        _load_parquet_collection(base_dir / "portfolio_snapshots"),
+        _load_parquet_collection(base_dir / "portfolio_snapshots", dataset_name="portfolio_snapshots"),
     )
     return DegiroWarehouseLoadSummary(
         assets=assets_count,
@@ -288,8 +289,11 @@ def _upsert_portfolio_snapshots(repository: DuckDBMarketDataRepository, frame: p
     return len(rows)
 
 
-def _load_parquet_collection(directory: Path) -> pd.DataFrame:
-    frames = [pd.read_parquet(path) for path in sorted(directory.glob("*.parquet"))] if directory.exists() else []
+def _load_parquet_collection(directory: Path, *, dataset_name: str) -> pd.DataFrame:
+    frames = [
+        validate_normalized_degiro_frame(dataset_name, pd.read_parquet(path), source=str(path))
+        for path in sorted(directory.glob("*.parquet"))
+    ] if directory.exists() else []
     populated = [frame for frame in frames if not frame.empty]
     if not populated:
         return pd.DataFrame()

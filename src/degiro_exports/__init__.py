@@ -12,6 +12,11 @@ from .importer import (
     classify_degiro_export,
     import_degiro_exports,
 )
+from .contracts import (
+    NormalizedDatasetContract,
+    NormalizedDatasetContractError,
+    validate_normalized_degiro_frame,
+)
 from .portfolio_snapshots import (
     ParsedDegiroPortfolioSnapshots,
     parse_and_persist_degiro_portfolio_snapshots,
@@ -33,6 +38,8 @@ __all__ = [
     "ParsedDegiroCashMovements",
     "ParsedDegiroPortfolioSnapshots",
     "ParsedDegiroTransactions",
+    "NormalizedDatasetContract",
+    "NormalizedDatasetContractError",
     "classify_degiro_export",
     "import_degiro_exports",
     "load_normalized_degiro_to_duckdb",
@@ -45,4 +52,5 @@ __all__ = [
     "parse_and_persist_degiro_cash_movements",
     "parse_and_persist_degiro_portfolio_snapshots",
     "parse_and_persist_degiro_transactions",
+    "validate_normalized_degiro_frame",
 ]

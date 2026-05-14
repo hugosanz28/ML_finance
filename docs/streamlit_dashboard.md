@@ -26,11 +26,30 @@ en la terminal.
 
 ## Vistas incluidas
 
-- `Cartera`: asignacion actual y valor total anclado al ultimo snapshot DEGIRO, con PnL/rentabilidad sobre coste base conocido.
-- `Evolucion`: valor historico anclado a DEGIRO (nivel broker + variacion diaria de market data), drawdown, cobertura y tabla diaria.
+- `Vista general`: asignacion actual y valor total de la ultima fecha valorada. El ultimo snapshot DEGIRO se muestra como ancla, pero la fecha principal puede avanzar con market data posterior. Incluye `Actualizar a hoy` para refrescar FX y precios sin importar nuevos CSVs.
+- `Evolucion`: valor historico calculado por activo. DEGIRO fija el precio local de referencia en cada snapshot y market data aporta la variacion relativa diaria, sin aplicar un segundo anclaje global.
 - `Informes`: lectura de informes mensuales generados en `reports_history` o en la carpeta de informes.
 - `Actualizar datos`: subida de CSVs DEGIRO, importacion, carga DuckDB, refresh FX, refresh precios e informe mensual.
 - `Agentes`: revision de inputs, edicion del `investment_brief`, presupuesto mensual editable (`monthly_budget`), control de envio de `target_weights` y ejecucion de la red mensual de agentes.
+
+## Actualizar desde Vista general
+
+El boton `Actualizar a hoy` de `Vista general` ejecuta solo la parte de mercado:
+
+- refresca `fx_rates` hasta la fecha actual,
+- refresca `prices_daily` hasta la fecha actual,
+- limpia la cache de Streamlit para recalcular la vista,
+- y conserva el ultimo snapshot DEGIRO como ancla de posiciones/precios locales.
+
+Tras refrescar, la `Fecha de referencia` de `Vista general` sale de la ultima
+fecha valorada por `portfolio_daily_metrics`, no de la fecha del ultimo snapshot.
+Si hay precios posteriores al snapshot, las posiciones se proyectan hasta esa
+fecha con cantidades ancladas a DEGIRO y precios relativos de mercado.
+
+No importa nuevos CSVs ni cambia el snapshot de broker disponible. Si quieres que
+la cartera incluya nuevas compras, ventas, movimientos de efectivo o cantidades
+oficiales de DEGIRO, primero debes subir/importar las exportaciones en
+`Actualizar datos`.
 
 ## Flujo desde la UI
 
@@ -69,6 +88,9 @@ Flujo rapido equivalente:
 El boton `Ejecutar flujo mensual basico` encadena importacion, carga DuckDB, FX,
 precios e informe. No ejecuta automaticamente los agentes; eso se hace en la
 pestana `Agentes` para poder revisar antes los inputs.
+
+Para actualizar una cartera ya importada hasta hoy sin generar informe ni tocar
+CSV, usa `Vista general` -> `Actualizar a hoy`.
 
 ## Parar el dashboard
 

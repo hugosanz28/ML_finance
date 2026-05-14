@@ -197,7 +197,8 @@ def load_normalized_degiro_transactions(
 ) -> pd.DataFrame:
     """Load normalized DEGIRO transactions from parquet datasets."""
     return _load_parquet_collection(
-        _resolve_normalized_degiro_dir(settings=settings, normalized_degiro_dir=normalized_degiro_dir) / "transactions"
+        _resolve_normalized_degiro_dir(settings=settings, normalized_degiro_dir=normalized_degiro_dir) / "transactions",
+        dataset_name="transactions",
     )
 
 
@@ -209,7 +210,8 @@ def load_normalized_degiro_snapshots(
     """Load normalized DEGIRO portfolio snapshots from parquet datasets."""
     return _load_parquet_collection(
         _resolve_normalized_degiro_dir(settings=settings, normalized_degiro_dir=normalized_degiro_dir)
-        / "portfolio_snapshots"
+        / "portfolio_snapshots",
+        dataset_name="portfolio_snapshots",
     )
 
 
@@ -471,12 +473,30 @@ def _reconstruct_asset_history(
         row["trade_date"]: int(row["transaction_count"])
         for row in in_range_transactions.to_dict(orient="records")
     }
+    snapshot_quantity_map = {
+        row["snapshot_date"]: round(float(row["quantity"]), 8)
+        for row in asset_snapshots.loc[
+            (asset_snapshots["snapshot_date"] >= series_start_date)
+            & (asset_snapshots["snapshot_date"] <= end_date)
+        ].to_dict(orient="records")
+    }
+    snapshot_source_map = {
+        row["snapshot_date"]: row["snapshot_source"]
+        for row in asset_snapshots.loc[
+            (asset_snapshots["snapshot_date"] >= series_start_date)
+            & (asset_snapshots["snapshot_date"] <= end_date)
+        ].to_dict(orient="records")
+    }
 
     rows: list[dict[str, object]] = []
     running_quantity = initial_quantity
     for position_date in pd.date_range(series_start_date, end_date, freq="D").date:
+        snapshot_quantity = snapshot_quantity_map.get(position_date)
         transaction_delta = transaction_delta_map.get(position_date, 0.0)
-        running_quantity = round(running_quantity + transaction_delta, 8)
+        if snapshot_quantity is not None:
+            running_quantity = snapshot_quantity
+        else:
+            running_quantity = round(running_quantity + transaction_delta, 8)
         running_quantity = _normalize_quantity(running_quantity, zero_tolerance=zero_tolerance)
         _ensure_non_negative_quantity(
             running_quantity,
@@ -498,9 +518,9 @@ def _reconstruct_asset_history(
                 "quantity": running_quantity,
                 "transaction_delta": transaction_delta,
                 "transaction_count": transaction_count_map.get(position_date, 0),
-                "anchor_snapshot_date": anchor_date,
-                "anchor_snapshot_quantity": anchor_quantity if anchor_date is not None else None,
-                "anchor_snapshot_source": anchor_source,
+                "anchor_snapshot_date": position_date if snapshot_quantity is not None else anchor_date,
+                "anchor_snapshot_quantity": snapshot_quantity if snapshot_quantity is not None else anchor_quantity if anchor_date is not None else None,
+                "anchor_snapshot_source": snapshot_source_map.get(position_date, anchor_source),
             }
         )
     return rows
@@ -540,7 +560,7 @@ def _select_anchor_snapshot(
     return candidate
 
 
-def _load_parquet_collection(directory: Path) -> pd.DataFrame:
+def _load_parquet_collection(directory: Path, *, dataset_name: str) -> pd.DataFrame:
     frames: list[pd.DataFrame] = []
     for parquet_path in sorted(directory.glob("*.parquet")) if directory.exists() else []:
         frame = pd.read_parquet(parquet_path)

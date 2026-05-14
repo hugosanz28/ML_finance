@@ -13,6 +13,11 @@ contrato para las siguientes fases:
 
 El DDL ejecutable vive en `src/data/sql/001_initial_schema.sql`.
 
+Los contratos de datasets normalizados viven en `src/normalized_contracts.py` y
+se exponen para DEGIRO desde `src/degiro_exports/contracts.py`. Los importadores
+validan columnas obligatorias y tipos esperados antes de persistir Parquet o
+cargar DuckDB.
+
 ## Principios de modelado
 
 1. Las exportaciones del broker siguen siendo la fuente de verdad.
@@ -205,10 +210,33 @@ snapshot.
 - `cash_movements.amount` va firmado desde la perspectiva de la cuenta del
   broker.
 
+## Contratos normalizados
+
+La capa de normalizacion aplica contratos por dataset para evitar que cambios de
+parser o CSV lleguen silenciosamente a DuckDB.
+
+Contratos actuales:
+
+- `assets`
+- `transactions`
+- `cash_movements`
+- `portfolio_snapshots`
+
+Cada contrato define:
+
+- columnas obligatorias,
+- columnas opcionales conocidas,
+- tipos logicos esperados,
+- y validaciones minimas para fechas, numeros e identificadores.
+
+La validacion ocurre antes de escribir los parquets normalizados y antes de la
+carga a DuckDB. Si falta una columna obligatoria o un tipo no se puede convertir,
+el import falla de forma explicita.
+
 ## Preparacion para el importador DEGIRO
 
-El esquema deja preparado el terreno para la siguiente fase sin congelar aun
-un contrato raw demasiado pronto.
+El esquema y los contratos normalizados dejan preparado el terreno para ampliar
+casos de exportacion sin congelar un contrato raw demasiado pronto.
 
 Puntos ya cubiertos:
 
@@ -218,10 +246,8 @@ Puntos ya cubiertos:
 - `snapshot_source` para convivir con snapshots importados y reconstruidos
 - tablas de precios y FX conscientes del proveedor desde el inicio
 
-Fuera de alcance de esta issue:
+Fuera de alcance de esta capa:
 
-- implementacion de parsers
 - tablas raw de aterrizaje
-- orquestacion de importaciones
-- utilidades de rutas y entorno de `P1-02`
-- fixtures sinteticos de `P1-03`
+- migraciones historicas avanzadas
+- reglas fiscales especificas

@@ -169,8 +169,8 @@ def test_reconcile_positions_with_snapshots_marks_matches_and_mismatches() -> No
     reconciliation = reconstructed.snapshot_reconciliation.copy()
     reconciliation["snapshot_date"] = reconciliation["snapshot_date"].dt.date
 
-    assert reconciliation["comparison_status"].tolist() == ["matched", "mismatch"]
-    assert reconciliation["quantity_difference"].tolist() == [0.0, 1.0]
+    assert reconciliation["comparison_status"].tolist() == ["matched", "matched"]
+    assert reconciliation["quantity_difference"].tolist() == [0.0, 0.0]
 
 
 def test_reconstruct_positions_by_date_rejects_negative_running_quantities() -> None:

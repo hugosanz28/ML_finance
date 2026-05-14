@@ -47,7 +47,11 @@ Ejemplos:
 ```powershell
 .\.venv\Scripts\python.exe scripts\refresh_fx_rates.py --only-missing-base
 .\.venv\Scripts\python.exe scripts\refresh_fx_rates.py --pair EUR/USD --start-date 2025-11-01 --end-date 2026-04-12
+.\.venv\Scripts\python.exe scripts\refresh_fx_rates.py --end-date 2026-05-14
 ```
+
+Desde Streamlit, `Vista general` -> `Actualizar a hoy` ejecuta este refresh
+hasta la fecha actual antes de recalcular la cartera.
 
 ## Relacion con los normalizados
 

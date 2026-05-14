@@ -14,6 +14,7 @@ import unicodedata
 import pandas as pd
 
 from src.config import Settings, ensure_local_directories, get_settings
+from src.degiro_exports.contracts import validate_normalized_degiro_frame
 
 
 TRANSACTION_FILENAME_RE = re.compile(
@@ -193,8 +194,18 @@ def persist_degiro_transactions_dataset(
     transactions_output_path = (transactions_dir / f"{source_stem}.parquet").resolve()
     asset_hints_output_path = (assets_dir / f"{source_stem}_assets.parquet").resolve()
 
-    _parquet_ready_frame(parsed.transactions).to_parquet(transactions_output_path, index=False)
-    _parquet_ready_frame(parsed.asset_hints).to_parquet(asset_hints_output_path, index=False)
+    transactions_ready = validate_normalized_degiro_frame(
+        "transactions",
+        _parquet_ready_frame(parsed.transactions),
+        source=str(parsed.source_path),
+    )
+    assets_ready = validate_normalized_degiro_frame(
+        "assets",
+        _parquet_ready_frame(parsed.asset_hints),
+        source=str(parsed.source_path),
+    )
+    transactions_ready.to_parquet(transactions_output_path, index=False)
+    assets_ready.to_parquet(asset_hints_output_path, index=False)
 
     return replace(
         parsed,

@@ -283,6 +283,45 @@ def test_load_market_assets_from_normalized_degiro_applies_local_overrides(works
     assert assets[0].asset_id == "degiro:isin:ES0144580Y14"
 
 
+def test_load_market_assets_from_normalized_degiro_ignores_blank_override_values(workspace_tmp_path: Path) -> None:
+    settings = load_settings(
+        env={"DATA_DIR": "private/data", "PORTFOLIO_DB_PATH": "private/data/portfolio.duckdb"},
+        repo_root=workspace_tmp_path,
+        env_file=workspace_tmp_path / ".env.missing",
+    )
+    snapshots_dir = settings.normalized_data_dir / "degiro" / "portfolio_snapshots"
+    snapshots_dir.mkdir(parents=True, exist_ok=True)
+    pd.DataFrame(
+        [
+            {
+                "asset_id": "degiro:isin:US02079K3059",
+                "asset_name": "ALPHABET INC CLASS A",
+                "asset_type": "stock",
+                "isin": "US02079K3059",
+                "broker_symbol": "GOOGL",
+                "snapshot_date": "2026-04-12",
+                "position_currency": "USD",
+            }
+        ]
+    ).to_parquet(snapshots_dir / "portfolio.parquet", index=False)
+    settings.market_data_dir.mkdir(parents=True, exist_ok=True)
+    (settings.market_data_dir / "asset_overrides.csv").write_text(
+        "\n".join(
+            [
+                "asset_id,ticker,broker_symbol,is_active",
+                "degiro:isin:US02079K3059,,,true",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    assets = load_market_assets_from_normalized_degiro(settings=settings)
+
+    assert assets[0].ticker is None
+    assert assets[0].broker_symbol == "GOOGL"
+    assert "NAN" not in assets[0].candidate_symbols
+
+
 def test_write_asset_overrides_template_creates_rows_for_selected_assets(workspace_tmp_path: Path) -> None:
     settings = load_settings(
         env={"DATA_DIR": "private/data", "PORTFOLIO_DB_PATH": "private/data/portfolio.duckdb"},
