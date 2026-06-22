@@ -379,12 +379,18 @@ Configuracion OpenAI:
 - `OPENAI_API_KEY`: clave de API, leida desde variables de entorno o `.env`.
 - `OPENAI_MODEL`: modelo a usar; por defecto `gpt-4.1-mini`, configurable en `.env`.
 
+Configuracion de busqueda:
+
+- `TAVILY_API_KEY`: clave opcional de Tavily. Solo es necesaria si se usa
+  `--search-provider tavily` o la opcion `tavily` en el dashboard.
+
 Runner manual disponible:
 
 - `scripts/run_monitor_tematico.py`: permite ejecutar el agente sin instanciarlo a mano desde Python.
 - `--dry-run`: resuelve inputs y temas observados sin llamar al LLM ni a la web.
 - `--llm-provider openai|static`: permite dejar montada la tuberia sin llamadas reales mientras `static` no genera queries.
-- `--search-provider duckduckgo|null`: permite activar o desactivar la busqueda web.
+- `--search-provider duckduckgo|tavily|null`: permite elegir entre busqueda
+  best-effort sin API key, Tavily con API key o ejecucion sin busqueda web.
 - cache local por defecto en `src/data/local/agents/monitor_tematico/search_cache/`, salvo que se pase `--disable-cache`.
 
 Proveedores incluidos:
@@ -392,15 +398,20 @@ Proveedores incluidos:
 - `NullSearchProvider`: no devuelve resultados; sirve para ejecutar el agente sin internet y comprobar comportamiento `partial`.
 - `StaticSearchProvider`: devuelve resultados fijos; se usa en tests y puede servir para fixtures manuales.
 - `DuckDuckGoHtmlSearchProvider`: proveedor propio basico basado en la pagina HTML de DuckDuckGo, sin servicios de pago ni librerias nuevas.
+- `TavilySearchProvider`: proveedor API opcional para busqueda web mas estable
+  que el scraping HTML. Requiere `TAVILY_API_KEY` y usa busqueda `basic` por
+  defecto para contener consumo de creditos.
 - `CachedSearchProvider`: wrapper opcional para persistir resultados web en disco y reutilizarlos en ejecuciones posteriores.
 
 Limitaciones actuales:
 
 - La calidad de queries y findings depende del modelo LLM configurado.
 - La busqueda web propia es best-effort y puede fallar si cambia el HTML del buscador.
+- Tavily reduce la fragilidad del scraping, pero introduce una dependencia de
+  API externa y consumo de creditos. Si no hay `TAVILY_API_KEY`, el proveedor
+  falla con un error explicito.
 - El cache local evita repetir busquedas, pero todavia no implementa invalidacion por antiguedad ni limpieza automatica.
 - Todavia no se usa `yfinance` dentro del agente; queda como siguiente mejora para complementar noticias con movimiento de precio, volatilidad o drawdown.
-- Tavily queda como alternativa futura si el proveedor propio resulta insuficiente y su plan gratuito encaja.
 
 Tests cubiertos:
 

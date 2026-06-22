@@ -44,6 +44,7 @@ def test_load_settings_uses_repo_relative_defaults(workspace_tmp_path: Path) -> 
     assert settings.price_provider == "yfinance"
     assert settings.monthly_contribution_eur == 500.0
     assert settings.investment_brief_path == workspace_tmp_path / "src" / "data" / "local" / "investment_brief.md"
+    assert settings.portfolio_targets_path == workspace_tmp_path / "src" / "data" / "local" / "portfolio_targets.yaml"
 
 
 def test_load_settings_reads_values_from_env_file(workspace_tmp_path: Path) -> None:
@@ -57,6 +58,7 @@ def test_load_settings_reads_values_from_env_file(workspace_tmp_path: Path) -> N
                 "DEFAULT_TIMEZONE=America/New_York",
                 "MONTHLY_CONTRIBUTION_EUR=750",
                 "INVESTMENT_BRIEF_PATH=private/brief.md",
+                "PORTFOLIO_TARGETS_PATH=private/targets.yaml",
             ]
         ),
         encoding="utf-8",
@@ -73,6 +75,7 @@ def test_load_settings_reads_values_from_env_file(workspace_tmp_path: Path) -> N
     assert settings.default_timezone == "America/New_York"
     assert settings.monthly_contribution_eur == 750.0
     assert settings.investment_brief_path == workspace_tmp_path / "private" / "brief.md"
+    assert settings.portfolio_targets_path == workspace_tmp_path / "private" / "targets.yaml"
 
 
 def test_explicit_overrides_take_precedence_over_env_file(workspace_tmp_path: Path) -> None:
@@ -105,6 +108,29 @@ def test_explicit_overrides_take_precedence_over_env_file(workspace_tmp_path: Pa
     assert settings.portfolio_db_path == workspace_tmp_path / "state" / "custom.duckdb"
     assert settings.sample_data_dir == workspace_tmp_path / "external-sample"
     assert settings.price_provider == "stooq"
+
+
+def test_load_settings_can_use_env_file_from_environment(monkeypatch: pytest.MonkeyPatch, workspace_tmp_path: Path) -> None:
+    env_file = workspace_tmp_path / "demo" / ".env.demo"
+    env_file.parent.mkdir(parents=True)
+    env_file.write_text(
+        "\n".join(
+            [
+                "DATA_DIR=demo/local_data",
+                "DEGIRO_EXPORTS_DIR=demo/synthetic_degiro_exports",
+                "REPORTS_DIR=demo/local_data/reports",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("ML_FINANCE_ENV_FILE", str(env_file))
+
+    settings = load_settings(env={}, repo_root=workspace_tmp_path)
+
+    assert settings.env_file == env_file
+    assert settings.data_dir == workspace_tmp_path / "demo" / "local_data"
+    assert settings.degiro_exports_dir == workspace_tmp_path / "demo" / "synthetic_degiro_exports"
+    assert settings.reports_dir == workspace_tmp_path / "demo" / "local_data" / "reports"
 
 
 def test_ensure_local_directories_creates_private_workspace_dirs(workspace_tmp_path: Path) -> None:

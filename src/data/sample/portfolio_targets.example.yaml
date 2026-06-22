@@ -1,0 +1,10 @@
+base_currency: EUR
+monthly_contribution: 500
+risk_profile: medium
+target_allocation:
+  ETFs: 70
+  stocks: 20
+  cash: 10
+max_single_asset_weight: 15
+max_sector_weight: 30
+rebalance_mode: contributions_only

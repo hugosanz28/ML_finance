@@ -2,9 +2,10 @@
 
 Este directorio contiene la materia prima del proyecto.
 
-- `example/`: ejemplos saneados que sirven para documentar formatos y probar parsers.
+- `example/`: reserva para ejemplos saneados que documenten formatos o prueben parsers.
 - `local/`: exportaciones reales del usuario. Esta carpeta está ignorada por Git.
 - `local/incoming/`: aterrizaje inicial de CSV reales descargados desde DEGIRO.
+- `../../demo/synthetic_degiro_exports/`: exports ficticios usados por la demo publica.
 
 Estado actual:
 

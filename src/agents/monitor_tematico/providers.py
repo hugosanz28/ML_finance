@@ -16,10 +16,13 @@ from html import unescape
 from html.parser import HTMLParser
 import hashlib
 import json
+import os
 from pathlib import Path
 from typing import Protocol
 from urllib.parse import quote_plus, urlparse, parse_qs, unquote
 from urllib.request import Request, urlopen
+
+from dotenv import dotenv_values
 
 from src.agents.monitor_tematico._types import SearchResult
 
@@ -94,6 +97,20 @@ class StaticSearchProvider:
         end_date: date,
         max_results: int,
     ) -> tuple[SearchResult, ...]:
+        if not self._results_by_query:
+            return (
+                SearchResult(
+                    title=f"Synthetic context for {query}",
+                    url=f"synthetic://search/{abs(hash(query))}",
+                    snippet=(
+                        "Resultado sintetico local para demo: resume riesgos de mercado, "
+                        "valoracion y encaje con una cartera core/satellite."
+                    ),
+                    query=query,
+                    published_date=end_date,
+                    metadata={"provider": "static", "synthetic": True},
+                ),
+            )[:max_results]
         direct = self._results_by_query.get(query)
         if direct is not None:
             return direct[:max_results]
@@ -149,6 +166,100 @@ class DuckDuckGoHtmlSearchProvider:
         parser = _DuckDuckGoHtmlParser(query=query)
         parser.feed(raw_html)
         return parser.results[:max_results]
+
+
+class TavilySearchProvider:
+    """Tavily API search provider for more reliable agent web context.
+
+    Tavily is optional and configured through `TAVILY_API_KEY`. This provider
+    uses the HTTP API directly so the project does not need an extra SDK
+    dependency for local use.
+    """
+
+    endpoint = "https://api.tavily.com/search"
+
+    def __init__(
+        self,
+        *,
+        api_key: str | None = None,
+        timeout_seconds: float = 20.0,
+        search_depth: str = "basic",
+    ) -> None:
+        self.api_key = api_key or _resolve_env_value("TAVILY_API_KEY")
+        self.timeout_seconds = timeout_seconds
+        self.search_depth = search_depth
+
+    @property
+    def name(self) -> str:
+        return "tavily"
+
+    def search(
+        self,
+        query: str,
+        *,
+        start_date: date,
+        end_date: date,
+        max_results: int,
+    ) -> tuple[SearchResult, ...]:
+        if not self.api_key:
+            raise SearchProviderError("TAVILY_API_KEY is required when using the tavily search provider.")
+
+        payload = {
+            "query": f"{query} after:{start_date.isoformat()} before:{end_date.isoformat()}",
+            "search_depth": self.search_depth,
+            "max_results": max_results,
+            "include_answer": False,
+            "include_raw_content": False,
+        }
+        request = Request(
+            self.endpoint,
+            data=json.dumps(payload).encode("utf-8"),
+            headers={
+                "Authorization": f"Bearer {self.api_key}",
+                "Content-Type": "application/json",
+                "User-Agent": "ML_finance/1.0",
+            },
+            method="POST",
+        )
+        try:
+            with urlopen(request, timeout=self.timeout_seconds) as response:
+                raw_payload = response.read().decode("utf-8", errors="replace")
+        except OSError as exc:
+            raise SearchProviderError(f"{self.name} failed for query {query!r}: {exc}") from exc
+
+        try:
+            data = json.loads(raw_payload)
+        except json.JSONDecodeError as exc:
+            raise SearchProviderError(f"{self.name} returned invalid JSON for query {query!r}.") from exc
+
+        raw_results = data.get("results", [])
+        if not isinstance(raw_results, list):
+            raise SearchProviderError(f"{self.name} response did not include a valid results list.")
+
+        results: list[SearchResult] = []
+        for item in raw_results[:max_results]:
+            if not isinstance(item, dict):
+                continue
+            title = _clean_text(str(item.get("title") or ""))
+            url = str(item.get("url") or "").strip()
+            snippet = _clean_text(str(item.get("content") or item.get("snippet") or ""))
+            if not title or not url:
+                continue
+            results.append(
+                SearchResult(
+                    title=title,
+                    url=url,
+                    snippet=snippet,
+                    query=query,
+                    published_date=_parse_optional_iso_date(item.get("published_date")),
+                    metadata={
+                        "provider": self.name,
+                        "score": item.get("score"),
+                        "search_depth": self.search_depth,
+                    },
+                )
+            )
+        return tuple(results)
 
 
 class CachedSearchProvider:
@@ -290,6 +401,26 @@ def _normalize_duckduckgo_url(value: str) -> str:
         target = parse_qs(parsed.query).get("uddg", [""])[0]
         return unquote(target)
     return value
+
+
+def _parse_optional_iso_date(value: object) -> date | None:
+    if not value:
+        return None
+    try:
+        return date.fromisoformat(str(value)[:10])
+    except ValueError:
+        return None
+
+
+def _resolve_env_value(key: str) -> str | None:
+    value = os.environ.get(key)
+    if value:
+        return value
+    env_path = Path(__file__).resolve().parents[3] / ".env"
+    if not env_path.exists():
+        return None
+    env_value = dotenv_values(env_path).get(key)
+    return str(env_value).strip() if env_value else None
 
 
 def _store_cached_results(path: Path, results: tuple[SearchResult, ...]) -> None:

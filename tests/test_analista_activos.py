@@ -323,4 +323,20 @@ def test_analista_activos_returns_structured_findings_by_asset_type(workspace_tm
     assert semis.metadata["explicit_judgement"] == "do_not_incorporate"
     assert semis.metadata["portfolio_fit"] == "watch_only"
     assert result.metadata["monitor_findings_count"] == 1
+    assert result.metadata["agent_plan"]
+    assert "prioritize_assets" in result.metadata["selected_actions"]
+    assert "analyze_assets" in result.metadata["selected_actions"]
     assert any(source.metadata["input_key"] == "portfolio_metrics_snapshot" for source in result.sources)
+
+
+def test_analista_activos_records_skipped_assets_when_limited(workspace_tmp_path: Path) -> None:
+    context = _context(workspace_tmp_path)
+
+    result = AnalistaActivosAgent(llm_provider=StaticAssetLLMProvider()).execute(
+        AgentRequest(parameters={"max_assets": 2}),
+        context,
+    )
+
+    assert result.metadata["assets_count"] == 2
+    assert result.metadata["skipped_actions"]
+    assert any("skip_asset" in action["action"] for action in result.metadata["skipped_actions"])

@@ -1,0 +1,5 @@
+Fecha,Hora,Producto,ISIN,Bolsa de referencia,Centro de ejecución,Número,Precio,,Valor local,,Valor EUR,Tipo de cambio,Comisión AutoFX,Costes de transacción y/o externos EUR,Total EUR,ID Orden,
+15-01-2026,10:15,Synthetic Global Core UCITS ETF,IE00SYNCORE1,XET,XETA,40,"80,00",EUR,"-3200,00",EUR,"-3200,00",,"0,00","-2,00","-3202,00",DEMO-ORD-001,
+15-02-2026,10:20,Synthetic Defensive Bond UCITS ETF,IE00SYNBOND1,XET,XETA,30,"50,00",EUR,"-1500,00",EUR,"-1500,00",,"0,00","-1,50","-1501,50",DEMO-ORD-002,
+15-03-2026,10:25,Synthetic Quality Tech NV,NL00SYNTECH1,EAM,XAMS,8,"95,00",EUR,"-760,00",EUR,"-760,00",,"0,00","-1,20","-761,20",DEMO-ORD-003,
+15-04-2026,10:30,Synthetic Global Core UCITS ETF,IE00SYNCORE1,XET,XETA,8,"84,00",EUR,"-672,00",EUR,"-672,00",,"0,00","-1,00","-673,00",DEMO-ORD-004,

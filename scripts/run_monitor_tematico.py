@@ -20,6 +20,7 @@ from src.agents.monitor_tematico import (
     NullSearchProvider,
     OpenAIThemeLLMProvider,
     StaticThemeLLMProvider,
+    TavilySearchProvider,
     build_observed_topics,
 )
 from src.config import load_settings
@@ -59,9 +60,9 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--search-provider",
-        choices=("duckduckgo", "null"),
+        choices=("duckduckgo", "tavily", "null"),
         default="duckduckgo",
-        help="Search provider. Use `null` to avoid any real web search.",
+        help="Search provider. Use `tavily` for API-backed search or `null` to avoid real web search.",
     )
     parser.add_argument(
         "--disable-cache",
@@ -230,7 +231,11 @@ def _build_search_provider(args: argparse.Namespace, settings):
     if args.search_provider == "null":
         return NullSearchProvider()
 
-    provider = DuckDuckGoHtmlSearchProvider()
+    if args.search_provider == "tavily":
+        provider = TavilySearchProvider()
+    else:
+        provider = DuckDuckGoHtmlSearchProvider()
+
     if args.disable_cache:
         return provider
     cache_dir = args.cache_dir or (settings.data_dir / "agents" / "monitor_tematico" / "search_cache")

@@ -10,7 +10,7 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
-from src.agents import run_monthly_agent_pipeline
+from src.application import RunMonthlyAgentsRequest, RunMonthlyAgentsUseCase
 from src.config import get_settings
 
 
@@ -21,7 +21,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--monthly-report", type=Path, help="Path to a monthly Markdown report.")
     parser.add_argument("--user-satellite-interest", help="Optional one-off satellite idea for this run.")
     parser.add_argument("--llm-provider", choices=("static", "openai"), default="static")
-    parser.add_argument("--search-provider", choices=("null", "duckduckgo"), default="null")
+    parser.add_argument("--search-provider", choices=("null", "static", "duckduckgo", "tavily"), default="null")
     parser.add_argument("--no-persist", action="store_true", help="Do not write pipeline_result.json.")
     parser.add_argument("--output-dir", type=Path, help="Output directory for persisted agent results.")
     return parser.parse_args()
@@ -30,17 +30,19 @@ def parse_args() -> argparse.Namespace:
 def main() -> int:
     args = parse_args()
     settings = get_settings()
-    result = run_monthly_agent_pipeline(
-        settings=settings,
-        investment_brief_text=args.investment_brief_text,
-        investment_brief_path=args.investment_brief_file,
-        monthly_report_path=args.monthly_report,
-        user_satellite_interest=args.user_satellite_interest,
-        llm_provider=args.llm_provider,
-        search_provider=args.search_provider,
-        persist=not args.no_persist,
-        output_dir=args.output_dir,
+    use_case_result = RunMonthlyAgentsUseCase(settings=settings).execute(
+        RunMonthlyAgentsRequest(
+            investment_brief_text=args.investment_brief_text,
+            investment_brief_path=args.investment_brief_file,
+            monthly_report_path=args.monthly_report,
+            user_satellite_interest=args.user_satellite_interest,
+            llm_provider=args.llm_provider,
+            search_provider=args.search_provider,
+            persist=not args.no_persist,
+            output_dir=args.output_dir,
+        )
     )
+    result = use_case_result.pipeline_result
 
     print(f"Run: {result.run_id}")
     print(f"As of: {result.as_of_date.isoformat()}")

@@ -165,6 +165,13 @@ Issues sugeridos:
 - `#20` `P6-02` Implementar dashboard inicial de Streamlit
 - `#11` `P6-03` Mejorar README y material de showcase
 
+## Direccion v2
+
+La v2 no es prioridad inmediata. La direccion tecnica prevista esta en
+`docs/architecture_v2.md`: mantener Streamlit mientras la v1 se consolida,
+usar `src/application/` como contrato para futuras interfaces y valorar
+FastAPI + Angular solo cuando la UX, los jobs o el empaquetado lo justifiquen.
+
 ## Orden de ejecución recomendado
 
 1. Modelo de datos local

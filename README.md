@@ -28,7 +28,8 @@ El proyecto ya tiene una primera base funcional:
 - contratos de datos normalizados validados antes de persistir y cargar en DuckDB,
 - dashboard Streamlit con boton para actualizar FX/precios hasta hoy,
 - workflow de CI con pytest en GitHub Actions,
-- y primer esqueleto para agentes y dashboard.
+- agentes mensuales con prompts versionados, trazabilidad y modo demo sintetico,
+- y dashboard Streamlit reutilizando la capa de casos de uso.
 
 La reconstruccion diaria de posiciones, las metricas agregadas y la demo local de Streamlit ya estan disponibles.
 
@@ -51,11 +52,13 @@ ML_finance/
 |- scripts/
 |  `- README.md
 |- src/
+|  |- application/
 |  |- agents/
 |  |- analytics/
 |  |- data/
 |  |- degiro_exports/
 |  |- market_data/
+|  |- reports/
 |  `- portfolio/
 |- tests/
 |  `- README.md
@@ -71,9 +74,10 @@ ML_finance/
 
 El repositorio sigue una separación simple:
 
-- `src/degiro_exports/example/`: ejemplos saneados y compartibles.
+- `src/degiro_exports/example/`: reserva para ejemplos saneados de formato DEGIRO.
 - `src/degiro_exports/local/`: exportaciones reales del broker, ignoradas por Git.
-- `src/data/sample/`: datasets sintéticos o anonimizados para demo pública.
+- `demo/`: demo publica sintetica ejecutable sin datos reales.
+- `src/data/sample/`: datasets sinteticos o anonimizados para tests y ejemplos pequenos.
 - `src/data/local/`: base local, cachés, informes y artefactos privados, ignorados por Git.
 
 Esto permite tener un repositorio público útil y, a la vez, trabajar con tu cartera real sin subir datos sensibles.
@@ -96,6 +100,15 @@ Para validar el entorno local usa siempre el Python del virtualenv:
 .\.venv\Scripts\python.exe -m pytest
 ```
 
+Tambien hay comandos PowerShell versionados para los flujos habituales:
+
+```powershell
+.\scripts\test.ps1
+.\scripts\run_dashboard.ps1
+.\scripts\run_demo.ps1
+.\scripts\refresh_market_data.ps1 -EndDate 2026-05-14
+```
+
 Los archivos del repositorio se mantienen en UTF-8. En Windows, si una consola
 muestra caracteres raros, valida el contenido desde Python o usa una terminal
 configurada con UTF-8; no debería afectar a los archivos versionados.
@@ -103,12 +116,40 @@ configurada con UTF-8; no debería afectar a los archivos versionados.
 Después:
 
 1. Coloca exportaciones reales en `src/degiro_exports/local/incoming/`.
-2. Usa `src/degiro_exports/example/` y `src/data/sample/` para demos públicas.
+2. Usa `.\scripts\run_demo.ps1` para ensenar la demo publica sin datos reales.
 3. Si quieres refrescar FX y precios de mercado por consola, ejecuta `.\.venv\Scripts\python.exe scripts\refresh_fx_rates.py --end-date YYYY-MM-DD` y `.\.venv\Scripts\python.exe scripts\refresh_market_data.py --end-date YYYY-MM-DD`.
 4. Consulta el plan en `docs/roadmap.md`.
 5. Si quieres ver el flujo del historico de posiciones, consulta `docs/position_history.md`.
 6. Si quieres ver la capa de valoracion agregada, consulta `docs/portfolio_metrics.md`.
 7. Si quieres generar el informe mensual para revision y agentes, consulta `docs/monthly_report.md`.
+
+## Objetivos de cartera
+
+`investment_brief.md` sigue siendo el mandato narrativo de la cuenta: objetivo,
+horizonte, filosofia de inversion, preferencias y restricciones cualitativas.
+`portfolio_targets.yaml` anade la parte estructurada: aportacion mensual, pesos
+objetivo, perfil de riesgo y limites cuantitativos.
+
+Por defecto, el brief privado se carga desde:
+
+```text
+src/data/local/investment_brief.md
+```
+
+Y los objetivos estructurados privados se cargan desde:
+
+```text
+src/data/local/portfolio_targets.yaml
+```
+
+Ejemplos versionados sin datos reales:
+
+- `src/data/sample/investment_brief.example.md`
+- `src/data/sample/portfolio_targets.example.yaml`
+
+El pipeline envia ambos a los agentes: el brief como contexto cualitativo y los
+targets como `target_weights` para que `asistente_aportacion_mensual` compare
+cartera actual frente a objetivo.
 
 ## Dashboard
 
@@ -118,12 +159,44 @@ La interfaz local de Streamlit permite revisar cartera, evolucion, informes, act
 .\.venv\Scripts\python.exe -m streamlit run src\portfolio\dashboard.py
 ```
 
+Comando equivalente:
+
+```powershell
+.\scripts\run_dashboard.ps1
+```
+
 Abre `http://localhost:8501` cuando Streamlit termine de arrancar. Guia completa: `docs/streamlit_dashboard.md`.
+
+## Demo publica
+
+La demo sintetica vive en `demo/` y no usa `src/data/local/` ni
+`src/degiro_exports/local/`. Para prepararla y abrirla:
+
+```powershell
+.\scripts\run_demo.ps1
+```
+
+Si quieres ejecutar los pasos manualmente:
+
+```powershell
+$env:ML_FINANCE_ENV_FILE="demo/synthetic_config/.env.demo"
+.\.venv\Scripts\python.exe scripts\bootstrap_demo.py
+```
+
+Despues abre el dashboard con la misma variable de entorno:
+
+```powershell
+$env:ML_FINANCE_ENV_FILE="demo/synthetic_config/.env.demo"
+.\.venv\Scripts\python.exe -m streamlit run src\portfolio\dashboard.py
+```
+
+Guia completa: `demo/README.md`.
 
 ## Documentación clave
 
 - `docs/roadmap.md`: fases, backlog y traducción del plan a tareas de GitHub.
 - `docs/architecture.md`: flujo de datos, componentes y límites del sistema.
+- `docs/architecture_v2.md`: direccion futura FastAPI + Angular sin iniciar la migracion.
 - `docs/decisions.md`: decisiones ya cerradas y su justificación.
 - `docs/data_model.md`: esquema inicial de DuckDB, claves y relaciones entre tablas.
 - `docs/market_data_refresh.md`: flujo real de refresh de precios y overrides manuales.
@@ -132,6 +205,8 @@ Abre `http://localhost:8501` cuando Streamlit termine de arrancar. Guia completa
 - `docs/monthly_report.md`: generacion manual del informe mensual en Markdown.
 - `docs/monthly_pipeline.md`: flujo mensual completo, incluyendo FX, market data y agentes.
 - `docs/streamlit_dashboard.md`: uso del dashboard local para cartera, informes, actualizacion de datos y agentes.
+- `docs/privacy.md`: politica de privacidad local, rutas sensibles y checklist de secret scanning.
+- `src/application/README.md`: capa de casos de uso reutilizables para scripts, Streamlit y futuras interfaces.
 
 ## Legacy
 

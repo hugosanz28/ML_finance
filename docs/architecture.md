@@ -18,6 +18,13 @@ El proyecto debe ser útil para uso personal real y, al mismo tiempo, publicable
 
 ## Componentes
 
+### `src/application/`
+
+Contiene casos de uso reutilizables por scripts, Streamlit y una futura API o
+aplicacion de escritorio. Esta capa coordina servicios existentes y devuelve
+resultados estructurados; no debe duplicar calculos financieros ni contener
+logica de interfaz.
+
 ### `src/degiro_exports/`
 
 Contiene la entrada del sistema:
@@ -107,6 +114,14 @@ Punto de entrada previsto:
 src/portfolio/dashboard.py
 ```
 
+## Direccion v2
+
+La direccion tecnica para una futura v2 esta documentada en
+`docs/architecture_v2.md`. La decision actual es no migrar todavia: Streamlit
+sigue siendo la interfaz adecuada para consolidar la v1, mientras
+`src/application/` prepara el camino para una posible API FastAPI y un frontend
+Angular mas adelante.
+
 ## Agentes
 
 Los agentes no deben inventar el estado de la cartera. Deben consumir:
@@ -124,3 +139,6 @@ Secuencia recomendada:
 ## Límite entre repo público y entorno privado
 
 Por conveniencia local, los datos privados pueden vivir en rutas gitignoradas dentro del repo. Aun así, la arquitectura deja abierta una futura migración a rutas externas configuradas por variables de entorno si el volumen o la sensibilidad lo requieren.
+
+La politica operativa de privacidad, rutas sensibles y revision de secretos esta
+documentada en `docs/privacy.md`.

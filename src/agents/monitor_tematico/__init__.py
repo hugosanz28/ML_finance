@@ -22,6 +22,7 @@ from src.agents.monitor_tematico.providers import (
     SearchProvider,
     SearchProviderError,
     StaticSearchProvider,
+    TavilySearchProvider,
 )
 from src.agents.monitor_tematico.topic_builder import build_observed_topics
 
@@ -39,6 +40,7 @@ __all__ = [
     "SearchResultBundle",
     "StaticSearchProvider",
     "StaticThemeLLMProvider",
+    "TavilySearchProvider",
     "SynthesizedFinding",
     "ThemeLLMProvider",
     "ThemeLLMProviderError",

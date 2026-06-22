@@ -16,22 +16,29 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
-from src.agents import load_investment_brief, run_monthly_agent_pipeline
-from src.config import Settings, get_settings
-from src.degiro_exports import import_degiro_exports, load_normalized_degiro_to_duckdb
-from src.market_data import (
-    DuckDBMarketDataRepository,
-    FxRefreshService,
-    PriceRefreshService,
-    load_market_assets_from_normalized_degiro,
+from src.agents import load_investment_brief
+from src.agents.pipeline import extract_monthly_report_as_of_date, prepare_agent_metrics_snapshot
+from src.application import (
+    GenerateMonthlyReportRequest,
+    GenerateMonthlyReportUseCase,
+    ImportDegiroUseCase,
+    RefreshFxRequest,
+    RefreshFxUseCase,
+    RefreshMarketDataRequest,
+    RefreshMarketDataUseCase,
+    RunMonthlyAgentsRequest,
+    RunMonthlyAgentsUseCase,
 )
+from src.config import Settings, get_settings
+from src.market_data import DuckDBMarketDataRepository
 from src.portfolio import (
     PortfolioMetricsResult,
     calculate_portfolio_metrics_from_normalized_degiro,
     load_normalized_degiro_snapshots,
     load_normalized_degiro_transactions,
+    load_portfolio_targets,
 )
-from src.reports import generate_monthly_report, get_latest_monthly_report
+from src.reports import get_latest_monthly_report
 from src.portfolio.dashboard_uploads import (
     _canonical_degiro_upload_name,
     _detect_degiro_upload_kind,
@@ -504,12 +511,16 @@ def _render_update_tab(settings: Settings) -> None:
         st.caption("Convierte CSVs a parquets normalizados y carga DuckDB.")
         if st.button("1. Importar DEGIRO"):
             with st.spinner("Importando CSVs y cargando DuckDB..."):
-                summary = import_degiro_exports(settings=settings)
-                warehouse = load_normalized_degiro_to_duckdb(settings=settings)
-            st.success(
-                f"Importados={summary.imported_count}; DuckDB tx={warehouse.transactions}, "
-                f"cash={warehouse.cash_movements}, snapshots={warehouse.portfolio_snapshots}"
-            )
+                import_result = ImportDegiroUseCase(settings=settings).execute()
+                summary = import_result.import_summary
+                warehouse = import_result.warehouse_summary
+            if warehouse is None:
+                st.info(import_result.result.message)
+            else:
+                st.success(
+                    f"Importados={summary.imported_count}; DuckDB tx={warehouse.transactions}, "
+                    f"cash={warehouse.cash_movements}, snapshots={warehouse.portfolio_snapshots}"
+                )
             st.cache_data.clear()
     with c2:
         st.markdown("**FX**")
@@ -517,7 +528,9 @@ def _render_update_tab(settings: Settings) -> None:
         only_missing = st.checkbox("Solo huecos FX", value=True)
         if st.button("2. Refrescar FX"):
             with st.spinner("Consultando FX..."):
-                fx_summary = FxRefreshService(settings=settings).refresh_rates(only_missing_base=only_missing)
+                fx_summary = RefreshFxUseCase(settings=settings).execute(
+                    RefreshFxRequest(only_missing_base=only_missing)
+                ).summary
             st.success(f"Pares actualizados={fx_summary.updated_pairs}; filas={fx_summary.total_records}")
             st.cache_data.clear()
     with c3:
@@ -525,14 +538,14 @@ def _render_update_tab(settings: Settings) -> None:
         st.caption("Actualiza precios diarios usando tickers y overrides.")
         if st.button("3. Refrescar precios"):
             with st.spinner("Consultando market data..."):
-                repository = DuckDBMarketDataRepository(settings=settings)
-                assets = _load_refresh_assets(settings=settings, repository=repository)
-                start_date = _derive_start_date(assets)
-                price_summary = PriceRefreshService(repository=repository, settings=settings).refresh_prices(
-                    start_date=start_date,
-                    end_date=date.today(),
+                market_result = RefreshMarketDataUseCase(settings=settings).execute(
+                    RefreshMarketDataRequest(end_date=date.today())
                 )
-            st.success(f"Activos actualizados={price_summary.updated_assets}; filas={price_summary.total_records}")
+            if market_result.summary is None:
+                st.error(market_result.result.message)
+            else:
+                price_summary = market_result.summary
+                st.success(f"Activos actualizados={price_summary.updated_assets}; filas={price_summary.total_records}")
             st.cache_data.clear()
     with c4:
         st.markdown("**Informe**")
@@ -546,19 +559,21 @@ def _render_update_tab(settings: Settings) -> None:
     st.caption("Lanza datos, FX, precios e informe en una sola accion. Los agentes se ejecutan despues desde su pestaña.")
     if st.button("Ejecutar flujo mensual basico"):
         with st.spinner("Ejecutando importacion, FX, precios e informe..."):
-            import_summary = import_degiro_exports(settings=settings)
-            warehouse = load_normalized_degiro_to_duckdb(settings=settings)
-            fx_summary = FxRefreshService(settings=settings).refresh_rates(only_missing_base=True)
-            assets = DuckDBMarketDataRepository(settings=settings).list_assets(active_only=True)
-            price_summary = PriceRefreshService(settings=settings).refresh_prices(
-                start_date=_derive_start_date(assets),
-                end_date=date.today(),
+            import_result = ImportDegiroUseCase(settings=settings).execute()
+            import_summary = import_result.import_summary
+            warehouse = import_result.warehouse_summary
+            fx_summary = RefreshFxUseCase(settings=settings).execute(
+                RefreshFxRequest(only_missing_base=True)
+            ).summary
+            market_result = RefreshMarketDataUseCase(settings=settings).execute(
+                RefreshMarketDataRequest(end_date=date.today())
             )
-            report = generate_monthly_report(settings=settings)
+            report = GenerateMonthlyReportUseCase(settings=settings).execute().report
+        price_rows = market_result.summary.total_records if market_result.summary else 0
         st.success(
             "Flujo completado: "
-            f"imported={import_summary.imported_count}, tx={warehouse.transactions}, "
-            f"fx_rows={fx_summary.total_records}, price_rows={price_summary.total_records}, "
+            f"imported={import_summary.imported_count}, tx={warehouse.transactions if warehouse else 0}, "
+            f"fx_rows={fx_summary.total_records}, price_rows={price_rows}, "
             f"report={report.output_path.name if report.output_path else '-'}"
         )
         st.cache_data.clear()
@@ -596,31 +611,19 @@ def _render_market_refresh_control(settings: Settings) -> None:
 
 
 def _refresh_market_data_to_date(*, settings: Settings, target_date: date) -> dict[str, Any]:
-    repository = DuckDBMarketDataRepository(settings=settings)
-    fx_summary = FxRefreshService(repository=repository, settings=settings).refresh_rates(
-        end_date=target_date,
-        only_missing_base=False,
+    fx_summary = RefreshFxUseCase(settings=settings).execute(
+        RefreshFxRequest(end_date=target_date, only_missing_base=False)
+    ).summary
+    market_result = RefreshMarketDataUseCase(settings=settings).execute(
+        RefreshMarketDataRequest(end_date=target_date)
     )
-    assets = _load_refresh_assets(settings=settings, repository=repository)
-    price_summary = PriceRefreshService(repository=repository, settings=settings).refresh_prices(
-        start_date=_derive_start_date(assets),
-        end_date=target_date,
-    )
+    if market_result.summary is None:
+        raise RuntimeError(market_result.result.message)
     return {
         "target_date": target_date,
         "fx_summary": fx_summary,
-        "price_summary": price_summary,
+        "price_summary": market_result.summary,
     }
-
-
-def _load_refresh_assets(*, settings: Settings, repository: DuckDBMarketDataRepository):
-    assets = list(repository.list_assets(active_only=True))
-    known_asset_ids = {asset.asset_id for asset in assets}
-    for asset in load_market_assets_from_normalized_degiro(settings=settings):
-        if asset.is_active and asset.asset_id not in known_asset_ids:
-            assets.append(asset)
-            known_asset_ids.add(asset.asset_id)
-    return assets
 
 
 def _render_agents_tab(settings: Settings) -> None:
@@ -668,16 +671,20 @@ def _render_agents_tab(settings: Settings) -> None:
             value=True,
             help="Si lo desactivas, los agentes no reciben pesos objetivo y evaluan sin esa restriccion.",
         )
+        default_target_weights = _read_default_target_weights(settings)
         target_weights_text = st.text_area(
             "Pesos objetivo (JSON opcional)",
-            value='{"core": 0.80, "satellite": 0.20}',
+            value=json.dumps(default_target_weights, ensure_ascii=False, indent=2),
             height=110,
             disabled=not send_target_weights,
             help="Se pasa a `asistente_aportacion_mensual` para evaluar rebalanceo con criterio cuantitativo.",
         )
         llm_provider = st.selectbox("LLM provider", options=["static", "openai"], index=0)
-        search_provider = st.selectbox("Search provider", options=["null", "duckduckgo"], index=0)
-        st.caption("Usa `static/null` para demo sin coste ni red. Usa `openai/duckduckgo` para una ejecucion real.")
+        search_provider = st.selectbox("Search provider", options=["null", "duckduckgo", "tavily"], index=0)
+        st.caption(
+            "Usa `static/null` para demo sin coste ni red. "
+            "Usa `openai/tavily` para busqueda API o `openai/duckduckgo` como fallback best-effort."
+        )
     target_weights = _parse_target_weights_input(target_weights_text) if send_target_weights else {}
     target_weights_invalid = send_target_weights and target_weights_text.strip() and not target_weights
     if target_weights_invalid:
@@ -686,7 +693,7 @@ def _render_agents_tab(settings: Settings) -> None:
     reports = _list_reports(settings)
     report_option = None
     report_text_input = ""
-    report_as_of = metrics.end_date
+    report_as_of: date | None = None
     if reports:
         report_option = st.selectbox(
             "latest_monthly_report (fuente)",
@@ -699,7 +706,7 @@ def _render_agents_tab(settings: Settings) -> None:
             value=report_path.read_text(encoding="utf-8"),
             height=240,
         )
-        report_as_of = report_option.get("as_of_date") or metrics.end_date
+        report_as_of = extract_monthly_report_as_of_date(report_text_input, path=report_path) or report_option.get("as_of_date")
         st.caption(f"Fuente seleccionada: {report_path}")
     else:
         st.warning("No hay informes `.md` detectados en reports_history/reports. Genera uno primero.")
@@ -707,13 +714,30 @@ def _render_agents_tab(settings: Settings) -> None:
     snapshot_default = _build_agent_snapshot_for_dashboard(
         metrics,
         snapshots=snapshots,
-        as_of_date=report_as_of,
+        as_of_date=metrics.end_date,
     )
+    snapshot_default = prepare_agent_metrics_snapshot(snapshot_default, settings=settings)
     snapshot_text_input = st.text_area(
         "portfolio_metrics_snapshot (JSON editable)",
         value=json.dumps(snapshot_default, ensure_ascii=False, indent=2),
         height=240,
     )
+    st.markdown("#### Fechas de entrada")
+    st.json(
+        {
+            "portfolio_metrics_current": metrics.end_date.isoformat(),
+            "monthly_report_selected": report_as_of.isoformat() if report_as_of else None,
+            "portfolio_metrics_snapshot_default": snapshot_default.get("as_of_date"),
+        }
+    )
+    if report_as_of is None and report_option is not None:
+        st.warning("No se ha podido detectar `as_of_date` en el informe seleccionado.")
+    elif report_as_of is not None and report_as_of != metrics.end_date:
+        st.error(
+            "El informe mensual seleccionado no corresponde a la fecha valorada actual. "
+            f"Informe: {report_as_of.isoformat()} | cartera: {metrics.end_date.isoformat()}. "
+            "Genera un informe nuevo antes de ejecutar agentes."
+        )
 
     with st.expander("Inputs que recibiran los agentes", expanded=True):
         st.markdown("#### Resumen de inputs")
@@ -748,30 +772,59 @@ def _render_agents_tab(settings: Settings) -> None:
         except Exception:
             st.error("`portfolio_metrics_snapshot` no es JSON valido.")
             return
+        snapshot_as_of_raw = portfolio_metrics_snapshot.get("as_of_date")
+        try:
+            snapshot_as_of = date.fromisoformat(str(snapshot_as_of_raw)[:10]) if snapshot_as_of_raw else None
+        except ValueError:
+            st.error("`portfolio_metrics_snapshot.as_of_date` no es una fecha valida.")
+            return
+        selected_report_date = extract_monthly_report_as_of_date(report_text_input, path=Path(report_option["path"]))
+        if selected_report_date is None:
+            st.error("El informe seleccionado no contiene una fecha `as_of_date` detectable.")
+            return
+        if selected_report_date != metrics.end_date:
+            st.error(
+                "Bloqueado: el informe mensual no corresponde a la cartera actual. "
+                f"Informe: {selected_report_date.isoformat()} | cartera: {metrics.end_date.isoformat()}."
+            )
+            return
+        if snapshot_as_of != metrics.end_date:
+            st.error(
+                "`portfolio_metrics_snapshot` no corresponde a la cartera actual. "
+                f"Snapshot: {snapshot_as_of.isoformat() if snapshot_as_of else 'sin fecha'} | "
+                f"cartera: {metrics.end_date.isoformat()}."
+            )
+            return
         if target_weights_invalid:
             st.error("`target_weights` esta activado pero no es un JSON valido.")
             return
         override_dir = settings.data_dir / "agents" / "input_overrides"
         override_dir.mkdir(parents=True, exist_ok=True)
-        report_override_path = override_dir / "latest_monthly_report_override.md"
+        report_override_path = override_dir / f"latest_monthly_report_override_{selected_report_date.isoformat()}.md"
         report_override_path.write_text(report_text_input, encoding="utf-8")
 
         request_parameters: dict[str, Any] = {}
         if send_target_weights and target_weights:
             request_parameters["target_weights"] = target_weights
-        with st.spinner("Ejecutando agentes..."):
-            result = run_monthly_agent_pipeline(
-                settings=settings,
-                investment_brief_text=investment_brief,
-                monthly_report_path=report_override_path,
-                user_satellite_interest=user_interest or None,
-                monthly_budget=float(monthly_budget),
-                llm_provider=llm_provider,
-                search_provider=search_provider,
-                persist=True,
-                request_parameters=request_parameters,
-                portfolio_metrics_snapshot=portfolio_metrics_snapshot,
-            )
+        try:
+            with st.spinner("Ejecutando agentes..."):
+                agents_result = RunMonthlyAgentsUseCase(settings=settings).execute(
+                    RunMonthlyAgentsRequest(
+                        investment_brief_text=investment_brief,
+                        monthly_report_path=report_override_path,
+                        user_satellite_interest=user_interest or None,
+                        monthly_budget=float(monthly_budget),
+                        llm_provider=llm_provider,
+                        search_provider=search_provider,
+                        persist=True,
+                        request_parameters=request_parameters,
+                        portfolio_metrics_snapshot=portfolio_metrics_snapshot,
+                    )
+                )
+                result = agents_result.pipeline_result
+        except ValueError as exc:
+            st.error(str(exc))
+            return
         st.success(f"Run {result.run_id} guardado en {result.output_dir}")
         _render_agent_result("monitor_tematico", result.monitor_tematico)
         _render_agent_result("analista_activos", result.analista_activos)
@@ -785,6 +838,7 @@ def _render_agent_result(name: str, result) -> None:
             st.warning("\n".join(f"- {warning}" for warning in result.warnings))
         if result.errors:
             st.error("\n".join(f"- {error}" for error in result.errors))
+        _render_agent_autonomy(result.metadata)
         if result.findings:
             st.dataframe(
                 pd.DataFrame(
@@ -809,6 +863,46 @@ def _render_agent_result(name: str, result) -> None:
                 "artifacts": [artifact.title for artifact in result.artifacts],
             }
         )
+
+
+def _render_agent_autonomy(metadata: Mapping[str, Any]) -> None:
+    autonomy_keys = {
+        "agent_plan",
+        "allowed_actions",
+        "selected_actions",
+        "skipped_actions",
+        "applied_constraints",
+        "decision_basis",
+    }
+    if not any(key in metadata for key in autonomy_keys):
+        return
+    with st.container(border=True):
+        st.markdown("##### Autonomia acotada")
+        plan = metadata.get("agent_plan") or ()
+        selected_actions = metadata.get("selected_actions") or ()
+        applied_constraints = metadata.get("applied_constraints") or ()
+        columns = st.columns(3)
+        with columns[0]:
+            st.markdown("**Plan interno**")
+            st.markdown(_markdown_list(plan))
+        with columns[1]:
+            st.markdown("**Acciones usadas**")
+            st.markdown(_markdown_list(selected_actions))
+        with columns[2]:
+            st.markdown("**Restricciones**")
+            st.markdown(_markdown_list(applied_constraints))
+        skipped_actions = metadata.get("skipped_actions") or ()
+        if skipped_actions:
+            st.markdown("**Acciones descartadas**")
+            st.dataframe(pd.DataFrame(skipped_actions), width="stretch", hide_index=True)
+
+
+def _markdown_list(values: Any) -> str:
+    if not values:
+        return "- _Sin datos_"
+    if isinstance(values, str):
+        values = (values,)
+    return "\n".join(f"- {value}" for value in values)
 
 
 @st.cache_data(show_spinner=False)
@@ -919,13 +1013,10 @@ def _extract_report_as_of_date_from_path(path: Path) -> date | None:
 
 def _generate_report_action(settings: Settings) -> None:
     with st.spinner("Generando informe mensual..."):
-        report = generate_monthly_report(settings=settings)
+        report = GenerateMonthlyReportUseCase(settings=settings).execute(
+            GenerateMonthlyReportRequest()
+        ).report
     st.success(f"Informe generado: {report.output_path}")
-
-
-def _derive_start_date(assets) -> date:
-    dates = [asset.first_seen_date for asset in assets if asset.first_seen_date is not None]
-    return min(dates) if dates else date.today()
 
 
 def _read_default_brief(settings: Settings) -> str:
@@ -933,6 +1024,16 @@ def _read_default_brief(settings: Settings) -> str:
         return load_investment_brief(settings=settings)
     except FileNotFoundError:
         return ""
+
+
+def _read_default_target_weights(settings: Settings) -> dict[str, Any]:
+    try:
+        targets = load_portfolio_targets(settings=settings)
+    except ValueError:
+        return {"core": 0.80, "satellite": 0.20}
+    if targets is None:
+        return {"core": 0.80, "satellite": 0.20}
+    return targets.target_weights()
 
 
 def _show_metrics_error() -> None:

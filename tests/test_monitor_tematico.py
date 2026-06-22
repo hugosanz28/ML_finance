@@ -13,13 +13,16 @@ from src.agents.monitor_tematico import (
     LLMSearchQuery,
     MonitorTematicoAgent,
     NullSearchProvider,
+    SearchProviderError,
     SearchResult,
     StaticSearchProvider,
     StaticThemeLLMProvider,
     SynthesizedFinding,
+    TavilySearchProvider,
     ThemeSynthesis,
     build_observed_topics,
 )
+import src.agents.monitor_tematico.providers as search_providers
 from src.config import default_repo_root, load_settings
 
 
@@ -265,6 +268,9 @@ def test_monitor_tematico_turns_search_results_into_prioritized_findings(workspa
 
     assert result.status == "success"
     assert len(result.findings) == 2
+    assert "generate_search_queries" in result.metadata["selected_actions"]
+    assert "synthesize_external_findings" in result.metadata["selected_actions"]
+    assert "max_results_per_query=1" in result.metadata["applied_constraints"]
     assert result.findings[0].severity == "high"
     assert result.findings[0].metadata["impact_scope"] == "core"
     assert result.findings[0].metadata["downstream_hint"] == "consider_rebalance"
@@ -313,3 +319,70 @@ def test_cached_search_provider_reuses_local_results(workspace_tmp_path: Path) -
 
     assert provider.calls == 1
     assert first == second
+
+
+def test_tavily_search_provider_parses_api_results(monkeypatch: pytest.MonkeyPatch) -> None:
+    captured: dict[str, object] = {}
+
+    class FakeResponse:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, traceback) -> None:
+            return None
+
+        def read(self) -> bytes:
+            return (
+                b'{"results": ['
+                b'{"title": "ECB keeps rates steady", '
+                b'"url": "https://example.com/ecb", '
+                b'"content": "Policy rates remain relevant for EUR cash.", '
+                b'"published_date": "2026-05-20", '
+                b'"score": 0.91}'
+                b"]}"
+            )
+
+    def fake_urlopen(request, timeout):
+        captured["url"] = request.full_url
+        captured["headers"] = dict(request.header_items())
+        captured["body"] = request.data.decode("utf-8")
+        captured["timeout"] = timeout
+        return FakeResponse()
+
+    monkeypatch.setattr(search_providers, "urlopen", fake_urlopen)
+
+    provider = TavilySearchProvider(api_key="tvly-test", timeout_seconds=3.0)
+    results = provider.search(
+        "ECB policy rates",
+        start_date=date(2026, 5, 1),
+        end_date=date(2026, 5, 26),
+        max_results=2,
+    )
+
+    assert captured["url"] == "https://api.tavily.com/search"
+    assert captured["timeout"] == 3.0
+    assert "Bearer tvly-test" in captured["headers"]["Authorization"]
+    assert "after:2026-05-01" in captured["body"]
+    assert "before:2026-05-26" in captured["body"]
+    assert len(results) == 1
+    assert results[0].title == "ECB keeps rates steady"
+    assert results[0].url == "https://example.com/ecb"
+    assert results[0].snippet == "Policy rates remain relevant for EUR cash."
+    assert results[0].published_date == date(2026, 5, 20)
+    assert results[0].metadata["provider"] == "tavily"
+    assert results[0].metadata["score"] == 0.91
+
+
+def test_tavily_search_provider_requires_api_key(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("TAVILY_API_KEY", raising=False)
+    monkeypatch.setattr(search_providers, "dotenv_values", lambda path: {})
+
+    provider = TavilySearchProvider(api_key="")
+
+    with pytest.raises(SearchProviderError, match="TAVILY_API_KEY"):
+        provider.search(
+            "ECB policy rates",
+            start_date=date(2026, 5, 1),
+            end_date=date(2026, 5, 26),
+            max_results=2,
+        )

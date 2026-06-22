@@ -3,6 +3,7 @@
 from src.agents.asistente_aportacion_mensual._types import (
     MonthlyDecision,
     MonthlyRecommendation,
+    MonthlyScenario,
     PriorAgentFinding,
 )
 from src.agents.asistente_aportacion_mensual.agent import AsistenteAportacionMensualAgent
@@ -25,6 +26,7 @@ __all__ = [
     "ContributionLLMProviderError",
     "MonthlyDecision",
     "MonthlyRecommendation",
+    "MonthlyScenario",
     "OpenAIContributionLLMProvider",
     "PriorAgentFinding",
     "StaticContributionLLMProvider",

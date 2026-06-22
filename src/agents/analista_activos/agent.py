@@ -13,6 +13,7 @@ from src.agents.analista_activos.llm import (
     AssetLLMProviderError,
     OpenAIAssetLLMProvider,
 )
+from src.agents.autonomy import autonomy_metadata, skipped_action
 from src.agents.base import BaseAgent
 from src.agents.models import AgentContext, AgentFinding, AgentRequest, AgentResult, AgentSource
 
@@ -41,10 +42,12 @@ class AnalistaActivosAgent(BaseAgent):
     def run(self, request: AgentRequest, context: AgentContext) -> AgentResult:
         max_assets = int(request.parameters.get("max_assets", 12))
         input_texts = collect_input_texts(context)
-        assets = build_assets_under_review(request, context)[:max_assets]
         monitor_findings = build_monitor_context(context)
+        all_assets = build_assets_under_review(request, context)
+        assets = _prioritize_assets(all_assets, monitor_findings)[:max_assets]
         sources = _input_sources(context)
         warnings: list[str] = []
+        skipped_assets = _skipped_assets(all_assets, assets)
 
         if not context.has_input("portfolio_metrics_snapshot"):
             warnings.append("No se recibio portfolio_metrics_snapshot; el analisis de pesos y sobreextension queda limitado.")
@@ -59,6 +62,14 @@ class AnalistaActivosAgent(BaseAgent):
                 warnings=tuple(warnings),
                 errors=("No assets were built from monthly report, metrics, watchlist, user interest, or request scope.",),
                 metadata={
+                    **_asset_autonomy_metadata(
+                        selected_actions=("prioritize_assets", "declare_insufficient_universe"),
+                        skipped_actions=(skipped_action("analyze_assets", "No assets were available to review."),),
+                        max_assets=max_assets,
+                        assets=assets,
+                        skipped_assets=skipped_assets,
+                        monitor_findings_count=len(monitor_findings),
+                    ),
                     "llm_provider": self.llm_provider.name,
                     "assets_count": 0,
                     "monitor_findings_count": len(monitor_findings),
@@ -81,6 +92,14 @@ class AnalistaActivosAgent(BaseAgent):
                 sources=tuple(sources),
                 warnings=tuple([*warnings, str(exc)]),
                 metadata={
+                    **_asset_autonomy_metadata(
+                        selected_actions=("prioritize_assets",),
+                        skipped_actions=(skipped_action("analyze_assets", "LLM asset analysis failed."), *skipped_assets),
+                        max_assets=max_assets,
+                        assets=assets,
+                        skipped_assets=skipped_assets,
+                        monitor_findings_count=len(monitor_findings),
+                    ),
                     "llm_provider": self.llm_provider.name,
                     "assets": _assets_metadata(tuple(assets)),
                     "assets_count": len(assets),
@@ -102,6 +121,14 @@ class AnalistaActivosAgent(BaseAgent):
             sources=tuple(_deduplicate_sources(sources)),
             warnings=tuple(warnings),
             metadata={
+                **_asset_autonomy_metadata(
+                    selected_actions=("prioritize_assets", "analyze_assets"),
+                    skipped_actions=skipped_assets,
+                    max_assets=max_assets,
+                    assets=assets,
+                    skipped_assets=skipped_assets,
+                    monitor_findings_count=len(monitor_findings),
+                ),
                 "llm_provider": self.llm_provider.name,
                 "assets": _assets_metadata(tuple(assets)),
                 "assets_count": len(assets),
@@ -109,6 +136,90 @@ class AnalistaActivosAgent(BaseAgent):
                 "findings_count": len(findings),
             },
         )
+
+
+def _asset_autonomy_metadata(
+    *,
+    selected_actions: tuple[str, ...],
+    skipped_actions: tuple[dict[str, str], ...],
+    max_assets: int,
+    assets,
+    skipped_assets: tuple[dict[str, str], ...],
+    monitor_findings_count: int,
+) -> dict[str, object]:
+    return autonomy_metadata(
+        agent_plan=(
+            "Construir universo de posiciones y candidatos.",
+            "Priorizar activos por peso, senales del monitor, rol y riesgo potencial.",
+            "Analizar solo el subconjunto que cabe en max_assets.",
+            "Marcar activos omitidos por limite de cobertura.",
+        ),
+        allowed_actions=(
+            "prioritize_assets",
+            "analyze_assets",
+            "compare_against_brief",
+            "use_monitor_findings",
+            "skip_low_priority_assets",
+        ),
+        selected_actions=selected_actions,
+        skipped_actions=skipped_actions,
+        applied_constraints=(f"max_assets={max_assets}", "no_monthly_allocation_decision", "no_trade_execution"),
+        decision_basis=(
+            "investment_brief",
+            "latest_monthly_report",
+            "portfolio_metrics_snapshot",
+            f"monitor_findings_count={monitor_findings_count}",
+            f"reviewed_assets={len(tuple(assets))}",
+            f"skipped_assets={len(skipped_assets)}",
+        ),
+    )
+
+
+def _prioritize_assets(assets, monitor_findings) -> tuple:
+    monitor_text = " ".join(
+        " ".join(str(value or "") for value in (finding.title, finding.detail, finding.asset_id)).lower()
+        for finding in monitor_findings
+    )
+    return tuple(
+        sorted(
+            assets,
+            key=lambda asset: (
+                _asset_priority(asset, monitor_text),
+                asset.name.lower(),
+            ),
+            reverse=False,
+        )
+    )
+
+
+def _asset_priority(asset, monitor_text: str) -> tuple[int, float]:
+    name = str(asset.name or "").lower()
+    asset_id = str(asset.asset_id or "").lower()
+    monitor_hit = bool(monitor_text and (name in monitor_text or (asset_id and asset_id in monitor_text)))
+    role = str(asset.role or "").lower()
+    asset_type = str(asset.asset_type or "").lower()
+    weight = float(asset.current_weight or 0.0)
+    bucket = 0
+    if monitor_hit:
+        bucket = -3
+    elif weight >= 0.10:
+        bucket = -2
+    elif role == "candidate" or asset_type in {"stock", "crypto"}:
+        bucket = -1
+    return (bucket, -weight)
+
+
+def _skipped_assets(all_assets, selected_assets) -> tuple[dict[str, str], ...]:
+    selected_keys = {_asset_metadata_key(asset) for asset in selected_assets}
+    return tuple(
+        skipped_action(f"skip_asset:{asset.name}", "Omitted after prioritization because max_assets was reached.")
+        for asset in all_assets
+        if _asset_metadata_key(asset) not in selected_keys
+    )
+
+
+def _asset_metadata_key(asset) -> str:
+    return str(asset.asset_id or asset.ticker or asset.name).lower()
 
 
 def _finding_from_assessment(assessment: AssetAssessment, sources: list[AgentSource]) -> AgentFinding:

@@ -20,6 +20,7 @@ from typing import Any, Protocol
 
 from dotenv import dotenv_values
 
+from src.agents.prompts import load_prompt
 from src.agents.monitor_tematico._types import (
     LLMSearchQuery,
     ObservedTopic,
@@ -80,7 +81,7 @@ class StaticThemeLLMProvider:
         synthesis: ThemeSynthesis | None = None,
     ) -> None:
         self._queries = queries
-        self._synthesis = synthesis or ThemeSynthesis(summary="Sin hallazgos sintetizados.")
+        self._synthesis = synthesis
 
     @property
     def name(self) -> str:
@@ -98,7 +99,19 @@ class StaticThemeLLMProvider:
         end_date: date,
         max_queries: int,
     ) -> tuple[LLMSearchQuery, ...]:
-        return self._queries[:max_queries]
+        if self._queries:
+            return self._queries[:max_queries]
+        return tuple(
+            LLMSearchQuery(
+                query_id=f"static-{index + 1}",
+                query=" ".join((*topic.query_terms, "portfolio risk")),
+                topic_name=topic.name,
+                impact_scope=topic.role or "portfolio",
+                priority=topic.priority,
+                rationale="Consulta sintetica local para demo sin red.",
+            )
+            for index, topic in enumerate(observed_topics[:max_queries])
+        )
 
     def synthesize(
         self,
@@ -113,6 +126,34 @@ class StaticThemeLLMProvider:
         end_date: date,
         max_findings: int,
     ) -> ThemeSynthesis:
+        if self._synthesis is None:
+            findings = []
+            for bundle in search_bundles[:max_findings]:
+                source_urls = tuple(result.url for result in bundle.results)
+                findings.append(
+                    SynthesizedFinding(
+                        title=f"{bundle.search_query.topic_name}: contexto sintetico de seguimiento",
+                        detail=(
+                            "Hallazgo sintetico local: revisar que el peso y el rol del activo sigan "
+                            "alineados con el mandato antes de aportar mas capital."
+                        ),
+                        category="demo_context",
+                        severity="info",
+                        impact_scope=bundle.search_query.impact_scope,
+                        change_type="synthetic_demo",
+                        time_horizon="monthly",
+                        novelty="demo",
+                        affected_exposure=bundle.search_query.topic_name,
+                        potential_decision_relevance="review_fit",
+                        downstream_hint="use_as_demo_context",
+                        source_urls=source_urls,
+                        tags=("demo", "synthetic"),
+                    )
+                )
+            return ThemeSynthesis(
+                summary="Contexto tematico sintetico generado localmente para demo.",
+                findings=tuple(findings),
+            )
         return ThemeSynthesis(
             summary=self._synthesis.summary,
             findings=self._synthesis.findings[:max_findings],
@@ -291,22 +332,8 @@ class OpenAIThemeLLMProvider:
         return parsed
 
 
-_QUERY_SYSTEM_PROMPT = """
-Eres el cerebro de `monitor_tematico`, un agente de apoyo a decision mensual de cartera.
-Genera queries de busqueda web concretas y acotadas. No recomiendes compras ni ventas.
-Prioriza cambios relevantes para una cuenta cuyo objetivo es una entrada de vivienda en 3-4 anos.
-Incluye queries para core, satellites y candidatos solo si hay motivo.
-""".strip()
-
-
-_SYNTHESIS_SYSTEM_PROMPT = """
-Eres el cerebro de `monitor_tematico`, un agente de contexto de mercado.
-Resume noticias y resultados de busqueda en hallazgos estructurados.
-Clasifica cada hallazgo como fact, risk, catalyst, macro, regulation, product_change o coverage.
-Asigna severidad high, medium, low o info segun impacto potencial sobre la cuenta.
-Distingue impacto core, satellite, candidate, portfolio o mixed.
-No propongas importes ni recomendaciones directas de compra o venta.
-""".strip()
+_QUERY_SYSTEM_PROMPT = load_prompt("monitor_tematico.query")
+_SYNTHESIS_SYSTEM_PROMPT = load_prompt("monitor_tematico.synthesis")
 
 
 def _topic_payload(topic: ObservedTopic) -> dict[str, Any]:

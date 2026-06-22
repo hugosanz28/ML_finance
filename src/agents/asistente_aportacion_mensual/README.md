@@ -17,6 +17,7 @@ Salidas previstas:
 
 - propuesta de compra o reparto,
 - propuesta opcional de venta, reduccion o rebalanceo,
+- escenarios `conservador`, `neutral` y `oportunista`,
 - justificacion basada en desvios y reglas,
 - advertencias cuando falten datos o existan limites no cubiertos.
 
@@ -35,8 +36,20 @@ Result esperado:
 
 - `summary`: propuesta corta de aportacion y, si aplica, de rebalanceo.
 - `findings`: recomendaciones estructuradas por activo o bloque.
-- `artifacts`: tabla de reparto o recomendacion en markdown.
+- `artifacts`: tabla de reparto o recomendacion en markdown, incluyendo escenarios diferenciados.
 - `warnings`: carencias de datos, limites no cubiertos o imposibilidad de ejecutar parte de la propuesta.
+
+La decision estructurada (`MonthlyDecision`) mantiene `recommendations` como
+salida principal compatible y añade `scenarios`. Cada escenario contiene:
+
+- `name`: `conservador`, `neutral` u `oportunista`.
+- `recommended_action` y `budget_to_invest`.
+- recomendaciones internas por activo o bloque.
+- condiciones de ejecucion y notas de riesgo.
+
+Los escenarios deben usar pesos actuales frente a objetivos, desviaciones,
+limites de concentracion y rol `core`/`satellite`/`cash` cuando esos datos
+esten disponibles.
 
 ## Papel en el flujo mensual
 

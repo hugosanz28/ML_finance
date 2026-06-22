@@ -10,9 +10,11 @@ from typing import Any, Mapping, Protocol
 
 from dotenv import dotenv_values
 
+from src.agents.prompts import load_prompt
 from src.agents.asistente_aportacion_mensual._types import (
     MonthlyDecision,
     MonthlyRecommendation,
+    MonthlyScenario,
     PriorAgentFinding,
 )
 
@@ -48,11 +50,7 @@ class StaticContributionLLMProvider:
     """Deterministic LLM provider for tests and local fixtures."""
 
     def __init__(self, decision: MonthlyDecision | None = None) -> None:
-        self._decision = decision or MonthlyDecision(
-            summary="Sin recomendacion mensual sintetizada.",
-            primary_action="hold",
-            monthly_budget=0.0,
-        )
+        self._decision = decision
 
     @property
     def name(self) -> str:
@@ -71,14 +69,137 @@ class StaticContributionLLMProvider:
         upstream_findings: tuple[PriorAgentFinding, ...],
         max_recommendations: int,
     ) -> MonthlyDecision:
+        if self._decision is None:
+            return _static_monthly_decision(
+                monthly_budget=monthly_budget,
+                target_weights=target_weights,
+                current_allocation=current_allocation,
+                upstream_findings=upstream_findings,
+                max_recommendations=max_recommendations,
+            )
         return MonthlyDecision(
             summary=self._decision.summary,
             primary_action=self._decision.primary_action,
             monthly_budget=monthly_budget if self._decision.monthly_budget == 0.0 else self._decision.monthly_budget,
             recommendations=self._decision.recommendations[:max_recommendations],
+            scenarios=_limit_scenario_recommendations(self._decision.scenarios, max_recommendations=max_recommendations),
             assumptions=self._decision.assumptions,
             warnings=self._decision.warnings,
         )
+
+
+def _static_monthly_decision(
+    *,
+    monthly_budget: float,
+    target_weights: Mapping[str, Any],
+    current_allocation: tuple[Mapping[str, Any], ...],
+    upstream_findings: tuple[PriorAgentFinding, ...],
+    max_recommendations: int,
+) -> MonthlyDecision:
+    core_target = _first_target_weight(target_weights, ("core_global_equity", "core", "ETFs"), default=0.55)
+    satellite_target = _first_target_weight(target_weights, ("satellites", "satellite", "stocks"), default=0.10)
+    core_amount = round(monthly_budget * min(max(core_target, 0.0), 0.85), 2)
+    reserve_amount = round(max(monthly_budget - core_amount, 0.0), 2)
+    core_name = _first_asset_name(current_allocation, preferred_types=("etf",), fallback="Synthetic Global Core UCITS ETF")
+    satellite_name = _first_asset_name(current_allocation, preferred_types=("stock", "crypto"), fallback="satellite watchlist")
+    main = MonthlyRecommendation(
+        target=core_name,
+        action="buy",
+        recommendation_type="contribution",
+        suggested_amount=core_amount,
+        priority="high",
+        role="core",
+        rationale=(
+            "Propuesta sintetica local: reforzar el nucleo diversificado porque encaja mejor "
+            "con el horizonte de vivienda y reduce dependencia de satellites."
+        ),
+        source_signal_ids=tuple(finding.title for finding in upstream_findings[:3]),
+        tags=("demo", "core", "contribution"),
+    )
+    reserve = MonthlyRecommendation(
+        target="liquidez",
+        action="hold",
+        recommendation_type="hold",
+        suggested_amount=reserve_amount,
+        priority="medium",
+        role="cash",
+        rationale="Mantener una parte como liquidez defensiva para preservar flexibilidad.",
+        tags=("demo", "cash"),
+    )
+    satellite = MonthlyRecommendation(
+        target=satellite_name,
+        action="watch",
+        recommendation_type="candidate_decision",
+        suggested_amount=round(monthly_budget * min(max(satellite_target, 0.0), 0.15), 2),
+        priority="low",
+        role="satellite",
+        rationale="Vigilar como satellite pequeno, sin convertirlo en compra automatica.",
+        conditions=("Solo ejecutar si el peso satellite sigue bajo el objetivo y no aumenta concentracion.",),
+        warnings=("Mayor volatilidad que el nucleo defensivo.",),
+        tags=("demo", "satellite", "watch"),
+    )
+    scenarios = (
+        MonthlyScenario(
+            name="conservador",
+            summary="Invertir una parte reducida y mantener mas liquidez defensiva.",
+            recommended_action="mixed",
+            budget_to_invest=round(monthly_budget * 0.50, 2),
+            recommendations=(main, reserve),
+            conditions=("Usar si se prioriza estabilidad o hay incertidumbre de mercado.",),
+            risk_notes=("Menor participacion si el mercado sube.",),
+        ),
+        MonthlyScenario(
+            name="neutral",
+            summary="Aportar principalmente al core diversificado y no ampliar satellites.",
+            recommended_action="buy",
+            budget_to_invest=core_amount,
+            recommendations=(main,),
+            conditions=("Usar como escenario base de demo con revision manual.",),
+            risk_notes=("No elimina riesgo de mercado del core global.",),
+        ),
+        MonthlyScenario(
+            name="oportunista",
+            summary="Aportar al core y reservar una parte pequena para satellite condicionado.",
+            recommended_action="mixed",
+            budget_to_invest=monthly_budget,
+            recommendations=(main, satellite),
+            conditions=("Usar solo si el satellite sigue dentro de limites de concentracion.",),
+            risk_notes=("Aumenta volatilidad y riesgo tematico frente al escenario neutral.",),
+        ),
+    )
+    recommendations = (main, reserve, satellite)[:max_recommendations]
+    return MonthlyDecision(
+        summary="Recomendacion sintetica local: priorizar aportacion al core y revisar satellites manualmente.",
+        primary_action="mixed",
+        monthly_budget=monthly_budget,
+        recommendations=recommendations,
+        scenarios=scenarios,
+        assumptions=("Modo static: salida sintetica para demo, no recomendacion financiera real.",),
+    )
+
+
+def _first_target_weight(target_weights: Mapping[str, Any], keys: tuple[str, ...], *, default: float) -> float:
+    for key in keys:
+        value = target_weights.get(key)
+        try:
+            if value is not None:
+                return float(value)
+        except (TypeError, ValueError):
+            continue
+    return default
+
+
+def _first_asset_name(
+    current_allocation: tuple[Mapping[str, Any], ...],
+    *,
+    preferred_types: tuple[str, ...],
+    fallback: str,
+) -> str:
+    for item in current_allocation:
+        asset_type = str(item.get("asset_type") or "").lower()
+        if asset_type in preferred_types:
+            return str(item.get("asset_name") or item.get("asset_id") or fallback)
+    return fallback
 
 
 class OpenAIContributionLLMProvider:
@@ -131,6 +252,10 @@ class OpenAIContributionLLMProvider:
             recommendations=tuple(
                 _recommendation_from_payload(item)
                 for item in data.get("recommendations", [])[:max_recommendations]
+            ),
+            scenarios=tuple(
+                _scenario_from_payload(item, max_recommendations=max_recommendations)
+                for item in data.get("scenarios", [])
             ),
             assumptions=tuple(str(item) for item in data.get("assumptions", [])),
             warnings=tuple(str(item) for item in data.get("warnings", [])),
@@ -193,17 +318,7 @@ class OpenAIContributionLLMProvider:
         return parsed
 
 
-_DECISION_SYSTEM_PROMPT = """
-Eres `asistente_aportacion_mensual`, el sintetizador de decision mensual de una cartera personal.
-Debes proponer una decision accionable: buy, no_buy, reduce, sell_partial, rebalance, hold o watch.
-Puedes repartir el presupuesto mensual si hay conviccion suficiente, pero no ejecutes operaciones ni asumas integracion con broker.
-La decision debe respetar una cuenta para entrada de vivienda en 3-4 anos: preservacion de capital, volatilidad moderada,
-core diversificado y satellites minoritarios.
-Usa `monitor_tematico` como contexto de riesgos/catalizadores y `analista_activos` como criterio por activo.
-No conviertas ninguna senal individual en decision automatica; justifica por mandato, pesos, desviaciones, horizonte y riesgos.
-Si faltan datos, explicita supuestos y limitaciones.
-Si hay una idea puntual del usuario, deja claro si encaja como satellite pequeno, si debe vigilarse o si no encaja ahora.
-""".strip()
+_DECISION_SYSTEM_PROMPT = load_prompt("asistente_aportacion_mensual.decision")
 
 
 def _recommendation_from_payload(item: Mapping[str, Any]) -> MonthlyRecommendation:
@@ -219,6 +334,40 @@ def _recommendation_from_payload(item: Mapping[str, Any]) -> MonthlyRecommendati
         conditions=tuple(str(value) for value in item.get("conditions", [])),
         warnings=tuple(str(value) for value in item.get("warnings", [])),
         tags=tuple(str(value) for value in item.get("tags", [])),
+    )
+
+
+def _scenario_from_payload(item: Mapping[str, Any], *, max_recommendations: int) -> MonthlyScenario:
+    return MonthlyScenario(
+        name=str(item["name"]),
+        summary=str(item["summary"]),
+        recommended_action=str(item["recommended_action"]),
+        budget_to_invest=float(item["budget_to_invest"]),
+        recommendations=tuple(
+            _recommendation_from_payload(recommendation)
+            for recommendation in item.get("recommendations", [])[:max_recommendations]
+        ),
+        conditions=tuple(str(value) for value in item.get("conditions", [])),
+        risk_notes=tuple(str(value) for value in item.get("risk_notes", [])),
+    )
+
+
+def _limit_scenario_recommendations(
+    scenarios: tuple[MonthlyScenario, ...],
+    *,
+    max_recommendations: int,
+) -> tuple[MonthlyScenario, ...]:
+    return tuple(
+        MonthlyScenario(
+            name=scenario.name,
+            summary=scenario.summary,
+            recommended_action=scenario.recommended_action,
+            budget_to_invest=scenario.budget_to_invest,
+            recommendations=scenario.recommendations[:max_recommendations],
+            conditions=scenario.conditions,
+            risk_notes=scenario.risk_notes,
+        )
+        for scenario in scenarios
     )
 
 
@@ -242,10 +391,36 @@ def _decision_schema() -> dict[str, Any]:
         "warnings": {"type": "array", "items": {"type": "string"}},
         "tags": {"type": "array", "items": {"type": "string"}},
     }
+    recommendation_schema: dict[str, Any] = {
+        "type": "object",
+        "additionalProperties": False,
+        "required": list(recommendation_properties),
+        "properties": recommendation_properties,
+    }
+    scenario_properties: dict[str, Any] = {
+        "name": {"type": "string", "enum": ["conservador", "neutral", "oportunista"]},
+        "summary": {"type": "string"},
+        "recommended_action": {
+            "type": "string",
+            "enum": ["buy", "no_buy", "reduce", "sell_partial", "rebalance", "hold", "watch", "mixed"],
+        },
+        "budget_to_invest": {"type": "number"},
+        "recommendations": {"type": "array", "items": recommendation_schema},
+        "conditions": {"type": "array", "items": {"type": "string"}},
+        "risk_notes": {"type": "array", "items": {"type": "string"}},
+    }
     return {
         "type": "object",
         "additionalProperties": False,
-        "required": ["summary", "primary_action", "monthly_budget", "recommendations", "assumptions", "warnings"],
+        "required": [
+            "summary",
+            "primary_action",
+            "monthly_budget",
+            "recommendations",
+            "scenarios",
+            "assumptions",
+            "warnings",
+        ],
         "properties": {
             "summary": {"type": "string"},
             "primary_action": {
@@ -255,11 +430,15 @@ def _decision_schema() -> dict[str, Any]:
             "monthly_budget": {"type": "number"},
             "recommendations": {
                 "type": "array",
+                "items": recommendation_schema,
+            },
+            "scenarios": {
+                "type": "array",
                 "items": {
                     "type": "object",
                     "additionalProperties": False,
-                    "required": list(recommendation_properties),
-                    "properties": recommendation_properties,
+                    "required": list(scenario_properties),
+                    "properties": scenario_properties,
                 },
             },
             "assumptions": {"type": "array", "items": {"type": "string"}},

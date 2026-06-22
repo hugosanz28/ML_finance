@@ -48,7 +48,11 @@ dist/
 .env.*
 *.env
 !.env.example
+!demo/synthetic_config/.env.demo
 .streamlit/secrets.toml
+
+# Generated demo state
+demo/local_data/
 
 # Editors / OS
 .vscode/

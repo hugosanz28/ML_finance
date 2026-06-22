@@ -20,6 +20,11 @@ El generador vive en `src/reports/monthly.py` y se apoya en:
 - transacciones normalizadas en `src/data/local/normalized/degiro/transactions/`,
 - y movimientos de efectivo normalizados en `src/data/local/normalized/degiro/cash_movements/`.
 
+Los contratos compartidos del informe (`MonthlyReportResult`,
+`MonthlyPeriodSummary` y periodos por defecto) viven en
+`src/reports/monthly_models.py`. `src/reports/monthly.py` mantiene la
+orquestacion de carga, calculo, renderizado y persistencia del informe.
+
 La fecha de referencia real es la ultima fecha valorada disponible, salvo que se
 pase `--as-of-date`.
 

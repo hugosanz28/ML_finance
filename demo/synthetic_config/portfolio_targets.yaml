@@ -1,0 +1,11 @@
+base_currency: EUR
+monthly_contribution: 600
+risk_profile: medium
+target_allocation:
+  core_global_equity: 55
+  defensive_bonds: 25
+  satellites: 10
+  cash: 10
+max_single_asset_weight: 35
+max_sector_weight: 30
+rebalance_mode: contributions_only

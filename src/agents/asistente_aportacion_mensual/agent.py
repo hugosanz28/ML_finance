@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from src.agents.asistente_aportacion_mensual._types import MonthlyRecommendation
+from src.agents.asistente_aportacion_mensual._types import MonthlyRecommendation, MonthlyScenario
 from src.agents.asistente_aportacion_mensual.context_builder import (
     collect_input_texts,
     extract_current_allocation,
@@ -15,6 +15,7 @@ from src.agents.asistente_aportacion_mensual.llm import (
     ContributionLLMProviderError,
     OpenAIContributionLLMProvider,
 )
+from src.agents.autonomy import autonomy_metadata, skipped_action
 from src.agents.base import BaseAgent
 from src.agents.models import AgentArtifact, AgentContext, AgentFinding, AgentRequest, AgentResult, AgentSource
 
@@ -49,6 +50,13 @@ class AsistenteAportacionMensualAgent(BaseAgent):
         upstream_findings = extract_prior_findings(context)
         sources = _input_sources(context)
         warnings: list[str] = []
+        allowed_actions = (
+            "buy",
+            "wait",
+            "hold_cash",
+            "rebalance_with_contribution",
+            "manual_review_required",
+        )
 
         if monthly_budget <= 0:
             warnings.append("El presupuesto mensual resuelto no es positivo; la propuesta no puede repartir aportacion nueva.")
@@ -80,12 +88,22 @@ class AsistenteAportacionMensualAgent(BaseAgent):
                 sources=tuple(sources),
                 warnings=tuple([*warnings, str(exc)]),
                 metadata={
+                    **_contribution_autonomy_metadata(
+                        primary_action="manual_review_required",
+                        selected_actions=("manual_review_required",),
+                        skipped_actions=(skipped_action("decide_monthly_action", "LLM monthly decision failed."),),
+                        allowed_actions=allowed_actions,
+                        max_recommendations=max_recommendations,
+                        has_target_weights=bool(target_weights),
+                        has_expected_context=_has_expected_context(context, upstream_findings),
+                    ),
                     "llm_provider": self.llm_provider.name,
                     "monthly_budget": monthly_budget,
                     "target_weights": dict(target_weights),
                     "current_allocation_count": len(current_allocation),
                     "upstream_findings_count": len(upstream_findings),
                     "recommendations_count": 0,
+                    "scenarios_count": 0,
                 },
             )
 
@@ -99,20 +117,102 @@ class AsistenteAportacionMensualAgent(BaseAgent):
             status=status,
             summary=decision.summary,
             findings=findings,
-            artifacts=(_recommendation_artifact(decision.recommendations),) if findings else (),
+            artifacts=(_recommendation_artifact(decision.recommendations, decision.scenarios),) if findings or decision.scenarios else (),
             sources=tuple(_deduplicate_sources(sources)),
             warnings=tuple(warnings),
             metadata={
+                **_contribution_autonomy_metadata(
+                    primary_action=decision.primary_action,
+                    selected_actions=_selected_monthly_actions(decision.primary_action),
+                    skipped_actions=_skipped_monthly_actions(
+                        decision.primary_action,
+                        has_target_weights=bool(target_weights),
+                        has_expected_context=_has_expected_context(context, upstream_findings),
+                    ),
+                    allowed_actions=allowed_actions,
+                    max_recommendations=max_recommendations,
+                    has_target_weights=bool(target_weights),
+                    has_expected_context=_has_expected_context(context, upstream_findings),
+                ),
                 "llm_provider": self.llm_provider.name,
                 "primary_action": decision.primary_action,
                 "monthly_budget": decision.monthly_budget,
                 "target_weights": dict(target_weights),
                 "assumptions": decision.assumptions,
+                "scenarios": tuple(_scenario_metadata(scenario) for scenario in decision.scenarios),
                 "current_allocation_count": len(current_allocation),
                 "upstream_findings_count": len(upstream_findings),
                 "recommendations_count": len(findings),
+                "scenarios_count": len(decision.scenarios),
             },
         )
+
+
+def _contribution_autonomy_metadata(
+    *,
+    primary_action: str,
+    selected_actions: tuple[str, ...],
+    skipped_actions: tuple[dict[str, str], ...],
+    allowed_actions: tuple[str, ...],
+    max_recommendations: int,
+    has_target_weights: bool,
+    has_expected_context: bool,
+) -> dict[str, object]:
+    return autonomy_metadata(
+        agent_plan=(
+            "Resolver presupuesto mensual y restricciones de cartera.",
+            "Comparar asignacion actual con target_weights si estan disponibles.",
+            "Integrar hallazgos de monitor y analista.",
+            "Elegir una accion mensual permitida para revision manual.",
+        ),
+        allowed_actions=allowed_actions,
+        selected_actions=selected_actions,
+        skipped_actions=skipped_actions,
+        applied_constraints=(
+            f"max_recommendations={max_recommendations}",
+            f"has_target_weights={has_target_weights}",
+            f"has_expected_context={has_expected_context}",
+            "manual_review_only",
+            "no_trade_execution",
+        ),
+        decision_basis=(
+            "investment_brief",
+            "latest_monthly_report",
+            "portfolio_metrics_snapshot",
+            "target_weights",
+            "upstream_agent_findings",
+            f"primary_action={primary_action}",
+        ),
+    )
+
+
+def _selected_monthly_actions(primary_action: str) -> tuple[str, ...]:
+    action = str(primary_action or "").lower()
+    if action in {"buy", "mixed"}:
+        return ("buy", "rebalance_with_contribution")
+    if action in {"hold", "no_buy", "watch"}:
+        return ("wait", "hold_cash")
+    if action in {"rebalance", "reduce", "sell_partial"}:
+        return ("rebalance_with_contribution", "manual_review_required")
+    return ("manual_review_required",)
+
+
+def _skipped_monthly_actions(
+    primary_action: str,
+    *,
+    has_target_weights: bool,
+    has_expected_context: bool,
+) -> tuple[dict[str, str], ...]:
+    skipped: list[dict[str, str]] = []
+    selected = set(_selected_monthly_actions(primary_action))
+    for action in ("buy", "wait", "hold_cash", "rebalance_with_contribution", "manual_review_required"):
+        if action not in selected:
+            skipped.append(skipped_action(action, f"Primary action resolved to {primary_action}."))
+    if not has_target_weights:
+        skipped.append(skipped_action("rebalance_with_contribution", "No target_weights were available."))
+    if not has_expected_context:
+        skipped.append(skipped_action("buy", "Expected upstream context was incomplete."))
+    return tuple(skipped)
 
 
 def _finding_from_recommendation(recommendation: MonthlyRecommendation, sources: list[AgentSource]) -> AgentFinding:
@@ -146,8 +246,13 @@ def _severity_from_recommendation(recommendation: MonthlyRecommendation) -> str:
     return "info"
 
 
-def _recommendation_artifact(recommendations: tuple[MonthlyRecommendation, ...]) -> AgentArtifact:
+def _recommendation_artifact(
+    recommendations: tuple[MonthlyRecommendation, ...],
+    scenarios: tuple[MonthlyScenario, ...] = (),
+) -> AgentArtifact:
     rows = [
+        "## Recomendacion base",
+        "",
         "| Objetivo | Accion | Importe | Prioridad | Rol |",
         "| --- | --- | ---: | --- | --- |",
     ]
@@ -165,12 +270,73 @@ def _recommendation_artifact(recommendations: tuple[MonthlyRecommendation, ...])
             )
             + " |"
         )
+    if scenarios:
+        rows.extend(["", "## Escenarios"])
+    for scenario in scenarios:
+        rows.extend(
+            [
+                "",
+                f"### {scenario.name}",
+                "",
+                f"- Accion: {scenario.recommended_action}",
+                f"- Presupuesto a invertir: {scenario.budget_to_invest:.2f}",
+                f"- Resumen: {scenario.summary}",
+            ]
+        )
+        if scenario.conditions:
+            rows.append(f"- Condiciones: {'; '.join(scenario.conditions)}")
+        if scenario.risk_notes:
+            rows.append(f"- Riesgos: {'; '.join(scenario.risk_notes)}")
+        if scenario.recommendations:
+            rows.extend(
+                [
+                    "",
+                    "| Objetivo | Accion | Importe | Prioridad | Rol |",
+                    "| --- | --- | ---: | --- | --- |",
+                ]
+            )
+            for recommendation in scenario.recommendations:
+                rows.append(
+                    "| "
+                    + " | ".join(
+                        [
+                            recommendation.target,
+                            recommendation.action,
+                            f"{recommendation.suggested_amount:.2f}",
+                            recommendation.priority,
+                            recommendation.role or "-",
+                        ]
+                    )
+                    + " |"
+                )
     return AgentArtifact(
         artifact_type="recommendation",
         title="Propuesta mensual estructurada",
         content="\n".join(rows),
-        metadata={"rows": len(recommendations)},
+        metadata={"rows": len(recommendations), "scenarios": len(scenarios)},
     )
+
+
+def _scenario_metadata(scenario: MonthlyScenario) -> dict[str, object]:
+    return {
+        "name": scenario.name,
+        "summary": scenario.summary,
+        "recommended_action": scenario.recommended_action,
+        "budget_to_invest": scenario.budget_to_invest,
+        "conditions": scenario.conditions,
+        "risk_notes": scenario.risk_notes,
+        "recommendations": tuple(
+            {
+                "target": recommendation.target,
+                "action": recommendation.action,
+                "recommendation_type": recommendation.recommendation_type,
+                "suggested_amount": recommendation.suggested_amount,
+                "priority": recommendation.priority,
+                "role": recommendation.role,
+            }
+            for recommendation in scenario.recommendations
+        ),
+    }
 
 
 def _has_expected_context(context: AgentContext, upstream_findings) -> bool:

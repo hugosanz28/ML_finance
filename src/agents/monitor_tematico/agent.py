@@ -11,6 +11,7 @@ from datetime import date, timedelta
 from pathlib import Path
 
 from src.agents.base import BaseAgent
+from src.agents.autonomy import autonomy_metadata, skipped_action
 from src.agents.models import AgentContext, AgentFinding, AgentRequest, AgentResult, AgentSource
 from src.agents.monitor_tematico._types import (
     SearchResult,
@@ -72,6 +73,13 @@ class MonitorTematicoAgent(BaseAgent):
         max_queries = int(request.parameters.get("max_queries", max_topics))
         max_results_per_query = int(request.parameters.get("max_results_per_query", 2))
         max_findings = int(request.parameters.get("max_findings", 10))
+        allowed_actions = (
+            "select_observed_topics",
+            "generate_search_queries",
+            "search_web",
+            "synthesize_external_findings",
+            "declare_insufficient_evidence",
+        )
 
         # Phase 2: translate internal inputs into a concrete monitoring universe.
         # This is where current positions, optional watchlist items, and optional
@@ -84,6 +92,16 @@ class MonitorTematicoAgent(BaseAgent):
                 summary="No se pudo construir un universo tematico minimo para monitorizar.",
                 errors=("No observed topics were built from the available inputs.",),
                 metadata={
+                    **_monitor_autonomy_metadata(
+                        selected_actions=("select_observed_topics", "declare_insufficient_evidence"),
+                        skipped_actions=(
+                            skipped_action("generate_search_queries", "No observed topics were available."),
+                            skipped_action("search_web", "No observed topics were available."),
+                            skipped_action("synthesize_external_findings", "No observed topics were available."),
+                        ),
+                        applied_constraints=_monitor_constraints(max_topics, max_queries, max_results_per_query, max_findings),
+                        allowed_actions=allowed_actions,
+                    ),
                     "window_start": window_start.isoformat(),
                     "window_end": window_end.isoformat(),
                     "search_provider": self.search_provider.name,
@@ -120,6 +138,15 @@ class MonitorTematicoAgent(BaseAgent):
                 sources=tuple(_deduplicate_sources(sources)),
                 warnings=tuple(warnings),
                 metadata={
+                    **_monitor_autonomy_metadata(
+                        selected_actions=("select_observed_topics", "generate_search_queries", "declare_insufficient_evidence"),
+                        skipped_actions=(
+                            skipped_action("search_web", "LLM did not generate search queries."),
+                            skipped_action("synthesize_external_findings", "No search results were available."),
+                        ),
+                        applied_constraints=_monitor_constraints(max_topics, max_queries, max_results_per_query, max_findings),
+                        allowed_actions=allowed_actions,
+                    ),
                     "window_start": window_start.isoformat(),
                     "window_end": window_end.isoformat(),
                     "search_provider": self.search_provider.name,
@@ -164,6 +191,12 @@ class MonitorTematicoAgent(BaseAgent):
                 sources=tuple(_deduplicate_sources(sources)),
                 warnings=tuple(warnings),
                 metadata={
+                    **_monitor_autonomy_metadata(
+                        selected_actions=("select_observed_topics", "generate_search_queries", "search_web", "declare_insufficient_evidence"),
+                        skipped_actions=(skipped_action("synthesize_external_findings", "No external results were returned."),),
+                        applied_constraints=_monitor_constraints(max_topics, max_queries, max_results_per_query, max_findings),
+                        allowed_actions=allowed_actions,
+                    ),
                     "window_start": window_start.isoformat(),
                     "window_end": window_end.isoformat(),
                     "search_provider": self.search_provider.name,
@@ -201,6 +234,12 @@ class MonitorTematicoAgent(BaseAgent):
                 sources=tuple(_deduplicate_sources(sources)),
                 warnings=tuple(warnings),
                 metadata={
+                    **_monitor_autonomy_metadata(
+                        selected_actions=("select_observed_topics", "generate_search_queries", "search_web"),
+                        skipped_actions=(skipped_action("synthesize_external_findings", "LLM synthesis failed."),),
+                        applied_constraints=_monitor_constraints(max_topics, max_queries, max_results_per_query, max_findings),
+                        allowed_actions=allowed_actions,
+                    ),
                     "window_start": window_start.isoformat(),
                     "window_end": window_end.isoformat(),
                     "search_provider": self.search_provider.name,
@@ -225,6 +264,17 @@ class MonitorTematicoAgent(BaseAgent):
             sources=tuple(_deduplicate_sources(sources)),
             warnings=tuple(warnings),
             metadata={
+                **_monitor_autonomy_metadata(
+                    selected_actions=(
+                        "select_observed_topics",
+                        "generate_search_queries",
+                        "search_web",
+                        "synthesize_external_findings",
+                    ),
+                    skipped_actions=(),
+                    applied_constraints=_monitor_constraints(max_topics, max_queries, max_results_per_query, max_findings),
+                    allowed_actions=allowed_actions,
+                ),
                 "window_start": window_start.isoformat(),
                 "window_end": window_end.isoformat(),
                 "search_provider": self.search_provider.name,
@@ -235,6 +285,44 @@ class MonitorTematicoAgent(BaseAgent):
                 "findings_count": len(findings),
             },
         )
+
+
+def _monitor_autonomy_metadata(
+    *,
+    selected_actions: tuple[str, ...],
+    skipped_actions: tuple[dict[str, str], ...],
+    applied_constraints: tuple[str, ...],
+    allowed_actions: tuple[str, ...],
+) -> dict[str, object]:
+    return autonomy_metadata(
+        agent_plan=(
+            "Construir universo observado desde cartera, brief e intereses opcionales.",
+            "Elegir queries acotadas para eventos externos relevantes.",
+            "Buscar solo dentro de proveedores y limites configurados.",
+            "Sintetizar hallazgos citables o declarar evidencia insuficiente.",
+        ),
+        allowed_actions=allowed_actions,
+        selected_actions=selected_actions,
+        skipped_actions=skipped_actions,
+        applied_constraints=applied_constraints,
+        decision_basis=("investment_brief", "latest_monthly_report", "observed_topics", "search_results"),
+    )
+
+
+def _monitor_constraints(
+    max_topics: int,
+    max_queries: int,
+    max_results_per_query: int,
+    max_findings: int,
+) -> tuple[str, ...]:
+    return (
+        f"max_topics={max_topics}",
+        f"max_queries={max_queries}",
+        f"max_results_per_query={max_results_per_query}",
+        f"max_findings={max_findings}",
+        "no_trade_execution",
+        "requires_cited_sources_for_external_claims",
+    )
 
 
 def _resolve_window(request: AgentRequest, context: AgentContext) -> tuple[date, date]:

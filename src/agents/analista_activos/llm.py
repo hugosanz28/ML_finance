@@ -10,6 +10,7 @@ from typing import Any, Protocol
 
 from dotenv import dotenv_values
 
+from src.agents.prompts import load_prompt
 from src.agents.analista_activos._types import (
     AssetAnalysis,
     AssetAssessment,
@@ -46,7 +47,7 @@ class StaticAssetLLMProvider:
     """Deterministic LLM provider for tests and local fixtures."""
 
     def __init__(self, analysis: AssetAnalysis | None = None) -> None:
-        self._analysis = analysis or AssetAnalysis(summary="Sin analisis de activos.")
+        self._analysis = analysis
 
     @property
     def name(self) -> str:
@@ -62,11 +63,65 @@ class StaticAssetLLMProvider:
         monitor_findings: tuple[MonitorContextFinding, ...],
         max_assets: int,
     ) -> AssetAnalysis:
+        if self._analysis is None:
+            if not portfolio_metrics_snapshot and not monitor_findings:
+                return AssetAnalysis(summary="Sin analisis de activos.")
+            assessments = tuple(
+                AssetAssessment(
+                    asset_name=asset.name,
+                    asset_type=asset.asset_type,
+                    portfolio_fit=_static_portfolio_fit(asset),
+                    explicit_judgement=_static_judgement(asset),
+                    horizon_fit="compatible_with_manual_review",
+                    risk_level=_static_risk_level(asset),
+                    valuation_signal="neutral",
+                    rationale=(
+                        "Evaluacion sintetica local para demo: revisar peso, rol y concentracion "
+                        "antes de decidir la aportacion mensual."
+                    ),
+                    concentration_view=(
+                        f"Peso actual aproximado: {asset.current_weight:.2%}."
+                        if asset.current_weight is not None
+                        else "Peso actual no disponible."
+                    ),
+                    portfolio_role_view=f"Rol inferido: {asset.role or 'portfolio'}.",
+                    monitor_context_used=tuple(finding.title for finding in monitor_findings[:3]),
+                    tags=("demo", "synthetic", asset.asset_type),
+                )
+                for asset in assets[:max_assets]
+            )
+            return AssetAnalysis(
+                summary="Analisis sintetico local de activos para demo.",
+                assessments=assessments,
+            )
         return AssetAnalysis(
             summary=self._analysis.summary,
             assessments=self._analysis.assessments[:max_assets],
             warnings=self._analysis.warnings,
         )
+
+
+def _static_portfolio_fit(asset: AssetUnderReview) -> str:
+    role = (asset.role or "").lower()
+    if "cash" in role or asset.asset_type == "cash":
+        return "defensive"
+    if "satellite" in role or asset.asset_type in {"stock", "crypto"}:
+        return "satellite"
+    return "core"
+
+
+def _static_judgement(asset: AssetUnderReview) -> str:
+    if asset.asset_type in {"stock", "crypto"}:
+        return "watch"
+    return "maintain"
+
+
+def _static_risk_level(asset: AssetUnderReview) -> str:
+    if asset.asset_type in {"stock", "crypto"}:
+        return "medium"
+    if asset.asset_type == "cash":
+        return "low"
+    return "moderate"
 
 
 class OpenAIAssetLLMProvider:
@@ -169,19 +224,7 @@ class OpenAIAssetLLMProvider:
         return parsed
 
 
-_ANALYSIS_SYSTEM_PROMPT = """
-Eres `analista_activos`, una capa de criterio por activo para una cartera personal.
-Evalua posiciones actuales y candidatos frente al mandato de la cuenta.
-El objetivo de referencia es acumular capital para entrada de vivienda en 3-4 anos, priorizando preservacion de capital,
-volatilidad moderada, core diversificado y satellites minoritarios.
-No calcules importes concretos de compra o venta.
-Emite un juicio explicito por activo: maintain, watch, incorporate, do_not_incorporate o reduce.
-Diferencia el encaje como core, satellite, watch_only, reduce o not_fit.
-Para acciones, cubre negocio, fundamentales, valoracion y riesgos.
-Para ETFs, cubre proveedor, indice, holdings principales, sectores, geografia y concentracion cuando la informacion exista.
-Para BTC, metales u otros activos, no fuerces fundamentales empresariales; evalua volatilidad, liquidez, rol en cartera y horizonte.
-Los hallazgos de `monitor_tematico` son contexto, no decisiones automaticas.
-""".strip()
+_ANALYSIS_SYSTEM_PROMPT = load_prompt("analista_activos.analysis")
 
 
 def _asset_payload(asset: AssetUnderReview) -> dict[str, Any]:

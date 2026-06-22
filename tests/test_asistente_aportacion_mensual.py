@@ -12,6 +12,7 @@ from src.agents.asistente_aportacion_mensual import (
     AsistenteAportacionMensualAgent,
     MonthlyDecision,
     MonthlyRecommendation,
+    MonthlyScenario,
     StaticContributionLLMProvider,
     extract_current_allocation,
     extract_prior_findings,
@@ -288,6 +289,9 @@ def test_asistente_aportacion_returns_actionable_monthly_recommendation(workspac
 
     assert result.status == "success"
     assert result.metadata["primary_action"] == "mixed"
+    assert "buy" in result.metadata["selected_actions"]
+    assert "rebalance_with_contribution" in result.metadata["selected_actions"]
+    assert "manual_review_only" in result.metadata["applied_constraints"]
     assert result.metadata["monthly_budget"] == 1000
     assert result.metadata["upstream_findings_count"] == 3
     assert len(result.findings) == 3
@@ -298,3 +302,92 @@ def test_asistente_aportacion_returns_actionable_monthly_recommendation(workspac
     assert result.findings[2].metadata["recommendation_type"] == "risk_control"
     assert result.artifacts[0].artifact_type == "recommendation"
     assert "iShares Core MSCI World UCITS ETF" in (result.artifacts[0].content or "")
+
+
+def test_asistente_aportacion_returns_scenario_based_monthly_recommendation(workspace_tmp_path: Path) -> None:
+    context = _context(workspace_tmp_path)
+    scenario_recommendation = MonthlyRecommendation(
+        target="iShares Core MSCI World UCITS ETF",
+        action="buy",
+        recommendation_type="contribution",
+        suggested_amount=700.0,
+        priority="high",
+        role="core",
+        rationale="Reduce desviacion frente al objetivo core sin aumentar satelites.",
+        tags=("core", "scenario"),
+    )
+    decision = MonthlyDecision(
+        summary="Escenario neutral: aportar al core y esperar en satelites.",
+        primary_action="mixed",
+        monthly_budget=1000.0,
+        recommendations=(scenario_recommendation,),
+        scenarios=(
+            MonthlyScenario(
+                name="conservador",
+                summary="Invertir solo una parte y reservar liquidez por volatilidad.",
+                recommended_action="mixed",
+                budget_to_invest=400.0,
+                recommendations=(
+                    MonthlyRecommendation(
+                        target="liquidez",
+                        action="hold",
+                        recommendation_type="hold",
+                        suggested_amount=600.0,
+                        priority="medium",
+                        role="cash",
+                        rationale="Mantiene colchon defensivo para el objetivo de vivienda.",
+                    ),
+                ),
+                conditions=("Ejecutar si la volatilidad sigue elevada.",),
+                risk_notes=("Menor participacion si el mercado rebota.",),
+            ),
+            MonthlyScenario(
+                name="neutral",
+                summary="Aportar principalmente al core global.",
+                recommended_action="buy",
+                budget_to_invest=700.0,
+                recommendations=(scenario_recommendation,),
+                conditions=("Ejecutar si el peso core sigue por debajo del objetivo.",),
+                risk_notes=("No ampliar satellites este mes.",),
+            ),
+            MonthlyScenario(
+                name="oportunista",
+                summary="Aportar core y dejar una pequena parte tactica condicionada.",
+                recommended_action="mixed",
+                budget_to_invest=1000.0,
+                recommendations=(
+                    scenario_recommendation,
+                    MonthlyRecommendation(
+                        target="ETF de semiconductores",
+                        action="watch",
+                        recommendation_type="candidate_decision",
+                        suggested_amount=100.0,
+                        priority="low",
+                        role="satellite",
+                        rationale="Solo encaja si no supera el limite de satelites.",
+                        conditions=("Esperar mejor margen de seguridad.",),
+                    ),
+                ),
+                conditions=("Usar solo si satellites siguen bajo limite.",),
+                risk_notes=("Mayor riesgo de concentracion tematica.",),
+            ),
+        ),
+        assumptions=("Pesos objetivo disponibles.",),
+    )
+
+    result = AsistenteAportacionMensualAgent(llm_provider=StaticContributionLLMProvider(decision)).execute(
+        AgentRequest(parameters={"monthly_budget": 1000}),
+        context,
+    )
+
+    assert result.status == "success"
+    assert result.metadata["scenarios_count"] == 3
+    assert [scenario["name"] for scenario in result.metadata["scenarios"]] == [
+        "conservador",
+        "neutral",
+        "oportunista",
+    ]
+    assert result.metadata["scenarios"][1]["budget_to_invest"] == 700.0
+    assert "### conservador" in (result.artifacts[0].content or "")
+    assert "### neutral" in (result.artifacts[0].content or "")
+    assert "### oportunista" in (result.artifacts[0].content or "")

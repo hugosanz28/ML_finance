@@ -37,6 +37,19 @@ class MonthlyRecommendation:
 
 
 @dataclass(frozen=True)
+class MonthlyScenario:
+    """One scenario-specific monthly contribution plan."""
+
+    name: str
+    summary: str
+    recommended_action: str
+    budget_to_invest: float
+    recommendations: tuple[MonthlyRecommendation, ...] = ()
+    conditions: tuple[str, ...] = ()
+    risk_notes: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True)
 class MonthlyDecision:
     """Structured decision returned by the contribution assistant LLM."""
 
@@ -44,5 +57,6 @@ class MonthlyDecision:
     primary_action: str
     monthly_budget: float
     recommendations: tuple[MonthlyRecommendation, ...] = ()
+    scenarios: tuple[MonthlyScenario, ...] = ()
     assumptions: tuple[str, ...] = ()
     warnings: tuple[str, ...] = ()

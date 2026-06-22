@@ -21,6 +21,7 @@ DEFAULT_ENV_VALUES = {
     "PRICE_PROVIDER": "yfinance",
     "MONTHLY_CONTRIBUTION_EUR": "500",
     "INVESTMENT_BRIEF_PATH": "src/data/local/investment_brief.md",
+    "PORTFOLIO_TARGETS_PATH": "src/data/local/portfolio_targets.yaml",
 }
 
 
@@ -95,6 +96,7 @@ class Settings:
     price_provider: str
     monthly_contribution_eur: float
     investment_brief_path: Path
+    portfolio_targets_path: Path
 
     @property
     def initial_schema_path(self) -> Path:
@@ -124,7 +126,12 @@ def load_settings(
 ) -> Settings:
     """Build settings from defaults, .env values, and environment overrides."""
     resolved_repo_root = default_repo_root() if repo_root is None else Path(repo_root).expanduser().resolve()
-    resolved_env_file = resolved_repo_root / ".env" if env_file is None else Path(env_file).expanduser()
+    env_file_override = os.environ.get("ML_FINANCE_ENV_FILE")
+    resolved_env_file = (
+        resolved_repo_root / ".env"
+        if env_file is None and not env_file_override
+        else Path(env_file_override if env_file is None else env_file).expanduser()
+    )
     if not resolved_env_file.is_absolute():
         resolved_env_file = resolved_repo_root / resolved_env_file
     resolved_env_file = resolved_env_file.resolve()
@@ -168,6 +175,10 @@ def load_settings(
         _get_required_str(values, "INVESTMENT_BRIEF_PATH", DEFAULT_ENV_VALUES["INVESTMENT_BRIEF_PATH"]),
         resolved_repo_root,
     )
+    portfolio_targets_path = _resolve_path(
+        _get_required_str(values, "PORTFOLIO_TARGETS_PATH", DEFAULT_ENV_VALUES["PORTFOLIO_TARGETS_PATH"]),
+        resolved_repo_root,
+    )
 
     return Settings(
         repo_root=resolved_repo_root,
@@ -191,6 +202,7 @@ def load_settings(
             DEFAULT_ENV_VALUES["MONTHLY_CONTRIBUTION_EUR"],
         ),
         investment_brief_path=investment_brief_path,
+        portfolio_targets_path=portfolio_targets_path,
     )
 
 

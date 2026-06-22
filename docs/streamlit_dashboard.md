@@ -9,6 +9,16 @@ cd C:\Users\huugosz\Documents\GitHub\ML_finance
 .\.venv\Scripts\python.exe -m streamlit run src\portfolio\dashboard.py
 ```
 
+Por defecto usa `.env` y las rutas reales locales. Para abrir la demo
+sintetica, prepara primero `scripts\bootstrap_demo.py` y ejecuta:
+
+```powershell
+$env:ML_FINANCE_ENV_FILE="demo/synthetic_config/.env.demo"
+.\.venv\Scripts\python.exe -m streamlit run src\portfolio\dashboard.py
+```
+
+Ese modo apunta a `demo/local_data/` y no a `src/data/local/`.
+
 Despues abre:
 
 ```text
@@ -30,7 +40,7 @@ en la terminal.
 - `Evolucion`: valor historico calculado por activo. DEGIRO fija el precio local de referencia en cada snapshot y market data aporta la variacion relativa diaria, sin aplicar un segundo anclaje global.
 - `Informes`: lectura de informes mensuales generados en `reports_history` o en la carpeta de informes.
 - `Actualizar datos`: subida de CSVs DEGIRO, importacion, carga DuckDB, refresh FX, refresh precios e informe mensual.
-- `Agentes`: revision de inputs, edicion del `investment_brief`, presupuesto mensual editable (`monthly_budget`), control de envio de `target_weights` y ejecucion de la red mensual de agentes.
+- `Agentes`: revision de inputs, edicion del `investment_brief`, presupuesto mensual editable (`monthly_budget`), control de envio de `target_weights` y ejecucion de la red mensual de agentes. Antes de ejecutar muestra la fecha valorada actual, la fecha del informe mensual y la fecha del snapshot que recibiran los agentes.
 
 ## Actualizar desde Vista general
 
@@ -60,7 +70,19 @@ oficiales de DEGIRO, primero debes subir/importar las exportaciones en
 5. Pulsa `2. Refrescar FX`.
 6. Pulsa `3. Refrescar precios`.
 7. Pulsa `4. Generar informe`.
-8. Entra en `Agentes`, revisa los inputs, activa o desactiva `Enviar target_weights al pipeline`, y ejecuta la red con `static/null` para demo local o `openai/duckduckgo` para una ejecucion real.
+8. Entra en `Agentes`, revisa los inputs, activa o desactiva `Enviar target_weights al pipeline`, y ejecuta la red con `static/null` para demo local. Para una ejecucion real usa `openai/tavily` si tienes `TAVILY_API_KEY`; `openai/duckduckgo` queda como fallback best-effort sin API key.
+
+La pestaña `Agentes` bloquea la ejecucion si el informe mensual seleccionado no
+corresponde a la fecha valorada actual de la cartera, o si el
+`portfolio_metrics_snapshot` editable tiene otro `as_of_date`. Esto evita mezclar
+un informe antiguo con metricas actuales. Si aparece el bloqueo, vuelve a
+`Actualizar datos` y genera un informe nuevo para la fecha actual antes de
+ejecutar la red.
+
+El `portfolio_metrics_snapshot` editable se prepara con `asset_overrides.csv`.
+Cuando DEGIRO trae nombres truncados, la UI conserva el valor original como
+`broker_asset_name` y muestra en `asset_name` el nombre normalizado que usaran
+los agentes.
 
 Al guardar desde la UI, el dashboard detecta el tipo de exportacion por el
 nombre del archivo y lo copia a `incoming` con el nombre canonico que exige el
@@ -104,16 +126,36 @@ Get-Process | Where-Object { $_.ProcessName -like "*python*" }
 
 ## Contratos usados
 
-El dashboard no calcula cartera por su cuenta. Consume:
+El dashboard no calcula cartera por su cuenta. Para acciones operativas usa la
+capa `src/application/` y, para lectura/visualizacion, consume contratos de
+dominio ya existentes.
+
+Casos de uso operativos:
+
+- `ImportDegiroUseCase`
+- `RefreshFxUseCase`
+- `RefreshMarketDataUseCase`
+- `GenerateMonthlyReportUseCase`
+- `RunMonthlyAgentsUseCase`
+
+Contratos de dominio consumidos directamente:
 
 - `calculate_portfolio_metrics_from_normalized_degiro`
-- `generate_monthly_report` y `get_latest_monthly_report`
-- `import_degiro_exports` y `load_normalized_degiro_to_duckdb`
-- `FxRefreshService` y `PriceRefreshService`
-- `run_monthly_agent_pipeline`
+- `get_latest_monthly_report`
 
 El `investment_brief` editable vive por defecto en:
 
 ```text
 src/data/local/investment_brief.md
 ```
+
+Los objetivos estructurados de cartera viven por defecto en:
+
+```text
+src/data/local/portfolio_targets.yaml
+```
+
+El dashboard usa ese archivo para pre-rellenar `target_weights` en la pestaña
+`Agentes`. Si el archivo no existe o no es valido, mantiene un valor JSON de
+fallback editable. El contrato de ejemplo esta en
+`src/data/sample/portfolio_targets.example.yaml`.

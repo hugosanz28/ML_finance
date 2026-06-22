@@ -7,4 +7,4 @@ La estrategia de tests crecerá por capas:
 - tests de reconstrucción histórica,
 - y tests de generación de informes.
 
-Los fixtures públicos vivirán aquí o en `src/data/sample/`, siempre anonimizados o sintetizados.
+Los fixtures publicos viven aqui, en `src/data/sample/` o en `demo/` cuando forman parte de la demo ejecutable, siempre anonimizados o sintetizados.

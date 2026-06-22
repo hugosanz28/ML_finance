@@ -15,5 +15,6 @@ Describe el problema que resuelve o el valor que aporta.
 ## Checklist
 
 - [ ] Documentación actualizada si era necesario
-- [ ] No se han subido datos personales ni secretos
+- [ ] No se han subido datos personales, artefactos de `src/data/local/` ni exportaciones reales de DEGIRO
+- [ ] Se ha revisado el diff con la checklist de `docs/privacy.md` cuando el cambio toca datos, agentes, informes o configuracion
 - [ ] El cambio encaja con `docs/architecture.md`

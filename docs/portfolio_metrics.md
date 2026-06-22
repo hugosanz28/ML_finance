@@ -2,7 +2,10 @@
 
 ## Resumen
 
-La capa de metricas agregadas vive en `src/portfolio/metrics.py`.
+La capa de calculo de metricas agregadas vive en `src/portfolio/metrics.py`.
+Los contratos compartidos de salida (`PortfolioMetricsResult`,
+`POSITION_METRICS_COLUMNS` y `PORTFOLIO_DAILY_METRICS_COLUMNS`) viven en
+`src/portfolio/metrics_models.py`.
 
 Parte de:
 

@@ -40,6 +40,9 @@ necesariamente la fecha del snapshot.
 - Bodega DuckDB: `src/data/local/portfolio.duckdb`
 - Informes mensuales: `src/data/local/reports/`
 - Resultados de agentes: `src/data/local/agents/monthly_pipeline/<run_id>/pipeline_result.json`
+- Audit trail de agentes: `src/data/local/agents/monthly_pipeline/<run_id>/run_metadata.json`,
+  `input_payload.json` y `agents/<agent_name>/...`
+- Overrides temporales de informes para agentes: `src/data/local/agents/input_overrides/latest_monthly_report_override_YYYY-MM-DD.md`
 
 ## Notas operativas
 
@@ -49,4 +52,42 @@ necesariamente la fecha del snapshot.
 - La valoracion diaria usa `broker_snapshot_anchored`: el precio local absoluto
   viene de snapshots DEGIRO y market data aporta la variacion relativa.
 - `run_monthly_agents.py` puede ejecutarse en modo demo sin red/API con `--llm-provider static --search-provider null`.
-- Para una ejecucion IA real, usa `--llm-provider openai` y, si quieres busqueda externa, `--search-provider duckduckgo`.
+- Para una ejecucion IA real, usa `--llm-provider openai`. Para busqueda externa
+  prioriza `--search-provider tavily` si tienes `TAVILY_API_KEY`; usa
+  `--search-provider duckduckgo` como fallback best-effort sin API key.
+- La red de agentes valida fechas antes de ejecutarse: el `as_of_date` del
+  informe mensual y el `as_of_date` de `portfolio_metrics_snapshot` deben
+  coincidir. Si se pasa un informe Markdown manual, la fecha se extrae de
+  `as_of_date:` en el frontmatter o del titulo `Informe mensual ... YYYY-MM-DD`.
+- Desde Streamlit la validacion es mas estricta: el informe seleccionado y el
+  snapshot enviado a agentes deben coincidir tambien con la fecha valorada
+  actual de la cartera. Si no coinciden, hay que generar un informe nuevo antes
+  de ejecutar agentes.
+- Antes de llamar a los agentes, `portfolio_metrics_snapshot` se enriquece con
+  `asset_overrides.csv`: nombre normalizado, ticker, mercado y divisa de trading.
+  Si DEGIRO entrega un nombre truncado, se conserva como `broker_asset_name` y
+  `asset_name` pasa a ser el nombre normalizado.
+- El informe que reciben los agentes incorpora una seccion `Referencia de activos
+  para agentes` con nombre normalizado, nombre broker, ISIN, ticker, divisa y
+  tipo. Esto evita que el LLM tenga que inferir el producto desde nombres
+  truncados en tablas Markdown.
+- `pipeline_result.json` persiste resultados finales, fuentes y findings, pero
+  no repite cuerpos completos de inputs dentro de cada `source.metadata`. Las
+  claves voluminosas como `content`, `positions`, `daily` o `findings` se
+  reflejan en `omitted_metadata_keys`.
+
+## Busqueda externa para agentes
+
+El monitor tematico soporta tres modos:
+
+- `null`: no busca en la web; util para demo local o pruebas sin red.
+- `duckduckgo`: scraping HTML best-effort sin coste ni API key. Puede devolver
+  cero resultados si cambia el HTML, hay bloqueo o la query no encaja.
+- `tavily`: proveedor API mas estable para agentes. Requiere `TAVILY_API_KEY`
+  en `.env` o en variables de entorno.
+
+Ejemplo con Tavily:
+
+```powershell
+.\.venv\Scripts\python.exe scripts\run_monthly_agents.py --llm-provider openai --search-provider tavily
+```
