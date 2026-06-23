@@ -5,7 +5,6 @@
 Desde la raiz del repo:
 
 ```powershell
-cd C:\Users\huugosz\Documents\GitHub\ML_finance
 .\.venv\Scripts\python.exe -m streamlit run src\portfolio\dashboard.py
 ```
 
@@ -40,7 +39,23 @@ en la terminal.
 - `Evolucion`: valor historico calculado por activo. DEGIRO fija el precio local de referencia en cada snapshot y market data aporta la variacion relativa diaria, sin aplicar un segundo anclaje global.
 - `Informes`: lectura de informes mensuales generados en `reports_history` o en la carpeta de informes.
 - `Actualizar datos`: subida de CSVs DEGIRO, importacion, carga DuckDB, refresh FX, refresh precios e informe mensual.
-- `Agentes`: revision de inputs, edicion del `investment_brief`, presupuesto mensual editable (`monthly_budget`), control de envio de `target_weights` y ejecucion de la red mensual de agentes. Antes de ejecutar muestra la fecha valorada actual, la fecha del informe mensual y la fecha del snapshot que recibiran los agentes.
+- `Agentes`: revision de inputs, edicion del `investment_brief`, presupuesto mensual editable (`monthly_budget`), control de envio de `target_weights`, ejecucion de la red mensual de agentes y exploracion de auditoria de runs guardados. Antes de ejecutar muestra la fecha valorada actual, la fecha del informe mensual y la fecha del snapshot que recibiran los agentes.
+
+## Organizacion del codigo
+
+`src/portfolio/dashboard.py` es solo el entrypoint de Streamlit: configura la
+pagina, pinta el sidebar y conecta las pestanas. La logica visual vive en
+modulos separados:
+
+- `dashboard_overview.py`: `Vista general`, `Evolucion` y refresh a hoy.
+- `dashboard_reports.py`: lectura y generacion de informes.
+- `dashboard_data_update.py`: subida de CSVs e import/refresh de datos.
+- `dashboard_agents.py`: inputs, ejecucion y visualizacion de agentes.
+- `dashboard_common.py`: tema, cache, formateo y helpers compartidos.
+
+La logica de transformacion de datos para graficas se mantiene en
+`dashboard_transforms.py`, y la gestion de uploads DEGIRO en
+`dashboard_uploads.py`.
 
 ## Actualizar desde Vista general
 
@@ -83,6 +98,26 @@ El `portfolio_metrics_snapshot` editable se prepara con `asset_overrides.csv`.
 Cuando DEGIRO trae nombres truncados, la UI conserva el valor original como
 `broker_asset_name` y muestra en `asset_name` el nombre normalizado que usaran
 los agentes.
+
+### Auditoria de agentes
+
+La pestana `Agentes` incluye un bloque `Auditoria de agentes` para revisar runs
+persistidos en `src/data/local/agents/monthly_pipeline/<run_id>/` o en el
+directorio demo equivalente. Esta vista permite inspeccionar:
+
+- estado del run, fechas, inputs y versiones de prompts;
+- plan interno, acciones permitidas, acciones usadas, acciones descartadas y
+  base de decision de cada agente;
+- warnings y errores;
+- findings, artifacts y metadata completa;
+- fuentes citadas por agente y por finding;
+- prompts renderizados;
+- inputs efectivos recibidos por cada agente;
+- request y raw response guardada.
+
+La `raw_response` puede aparecer como `not_captured` porque los proveedores
+actuales devuelven objetos de dominio ya parseados. Si mas adelante interesa
+auditar la respuesta bruta del LLM, habra que ampliar el contrato de providers.
 
 Al guardar desde la UI, el dashboard detecta el tipo de exportacion por el
 nombre del archivo y lo copia a `incoming` con el nombre canonico que exige el

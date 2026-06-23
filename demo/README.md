@@ -3,6 +3,10 @@
 Esta carpeta permite ensenar el proyecto sin usar datos personales. Todos los
 CSV, objetivos y brief incluidos aqui son ficticios.
 
+La demo representa la **v1 local con Streamlit**: prepara un workspace sintetico
+en `demo/local_data/` y abre el mismo dashboard que se usa con la cartera real,
+pero apuntando a datos ficticios.
+
 ## Separacion frente a la cartera real
 
 La cartera real usa por defecto:
@@ -43,6 +47,12 @@ El bootstrap importa los CSV DEGIRO sinteticos, carga DuckDB en
 `demo/local_data/portfolio.duckdb`, inserta precios sinteticos offline y genera
 un informe mensual demo en `demo/local_data/reports/`.
 
+Este es el comando recomendado para ensenar el proyecto a otra persona:
+
+```powershell
+.\scripts\run_demo.ps1
+```
+
 ## Abrir dashboard demo
 
 Si ya has ejecutado el bootstrap y no quieres regenerar datos:
@@ -64,6 +74,13 @@ Abre `http://localhost:8501`. En la pestana `Agentes`, usa:
 - `Search provider`: `static`
 
 Asi no se usan claves API ni red.
+
+En la demo puedes mostrar:
+
+- vista general de cartera ficticia;
+- evolucion y metricas;
+- informe mensual demo;
+- agentes con plan interno, acciones usadas, restricciones y trazabilidad.
 
 ## Ejecutar agentes demo por consola
 

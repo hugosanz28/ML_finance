@@ -1,6 +1,9 @@
 # Scripts
 
-Este directorio se reserva para comandos manuales o automatizables del proyecto.
+Este directorio contiene los comandos manuales y automatizables de la **v1 local
+con Streamlit**. Los wrappers PowerShell son la entrada recomendada en Windows;
+los scripts Python quedan como primitivas reutilizables por Streamlit, CI o
+futuras interfaces.
 
 Scripts disponibles:
 
@@ -17,6 +20,17 @@ Scripts disponibles:
 - `refresh_market_data.ps1`
 
 La idea es que cada script haga una sola cosa y pueda ejecutarse de forma reproducible en local.
+
+## Flujos principales
+
+- Demo publica: `.\scripts\run_demo.ps1`
+- Dashboard local privado: `.\scripts\run_dashboard.ps1`
+- Tests: `.\scripts\test.ps1`
+- Refresco de datos: `.\scripts\refresh_market_data.ps1 -EndDate YYYY-MM-DD`
+
+La demo usa `demo/synthetic_config/.env.demo` y escribe en `demo/local_data/`.
+El dashboard privado usa `.env` y las rutas `src/degiro_exports/local/` y
+`src/data/local/`.
 
 Notas de uso:
 
@@ -53,10 +67,22 @@ Abrir dashboard real:
 .\scripts\run_dashboard.ps1
 ```
 
+Abrir dashboard real con un env file concreto:
+
+```powershell
+.\scripts\run_dashboard.ps1 -EnvFile .env
+```
+
 Preparar y abrir demo publica:
 
 ```powershell
 .\scripts\run_demo.ps1
+```
+
+Abrir demo sin regenerar datos:
+
+```powershell
+.\scripts\run_demo.ps1 -SkipBootstrap
 ```
 
 Refrescar FX y precios hasta una fecha:

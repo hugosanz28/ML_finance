@@ -11,7 +11,11 @@
 
 ## Estado actual
 
-El proyecto ya tiene una primera base funcional:
+El proyecto esta en **v1 local con Streamlit**. Esta version esta pensada para
+ejecutarse en el ordenador del usuario, con datos privados en rutas locales
+ignoradas por Git y una demo sintetica publicable.
+
+La v1 local con Streamlit incluye:
 
 - estructura de carpetas reorganizada,
 - documentación de roadmap y arquitectura,
@@ -26,12 +30,16 @@ El proyecto ya tiene una primera base funcional:
 - refresh de market data diario con `yfinance`,
 - politica de valoracion `broker_snapshot_anchored`: DEGIRO fija el precio local observado y `yfinance` solo aporta variacion relativa,
 - contratos de datos normalizados validados antes de persistir y cargar en DuckDB,
-- dashboard Streamlit con boton para actualizar FX/precios hasta hoy,
+- dashboard Streamlit como interfaz principal de la v1,
+- boton para actualizar FX/precios hasta hoy desde la vista general,
 - workflow de CI con pytest en GitHub Actions,
 - agentes mensuales con prompts versionados, trazabilidad y modo demo sintetico,
 - y dashboard Streamlit reutilizando la capa de casos de uso.
 
-La reconstruccion diaria de posiciones, las metricas agregadas y la demo local de Streamlit ya estan disponibles.
+La reconstruccion diaria de posiciones, las metricas agregadas, los informes,
+los agentes y la demo local de Streamlit ya estan disponibles. Una futura
+interfaz web esta documentada como direccion tecnica, pero no forma parte de la
+v1 actual.
 
 ## Estructura del repositorio
 
@@ -113,15 +121,24 @@ Los archivos del repositorio se mantienen en UTF-8. En Windows, si una consola
 muestra caracteres raros, valida el contenido desde Python o usa una terminal
 configurada con UTF-8; no debería afectar a los archivos versionados.
 
-Después:
+Despues, elige uno de estos dos flujos:
+
+### Flujo demo publico
+
+Usa datos sinteticos y no toca tu cartera real:
+
+```powershell
+.\scripts\run_demo.ps1
+```
+
+### Flujo local privado
+
+Usa tus exportaciones reales y rutas ignoradas por Git:
 
 1. Coloca exportaciones reales en `src/degiro_exports/local/incoming/`.
-2. Usa `.\scripts\run_demo.ps1` para ensenar la demo publica sin datos reales.
-3. Si quieres refrescar FX y precios de mercado por consola, ejecuta `.\.venv\Scripts\python.exe scripts\refresh_fx_rates.py --end-date YYYY-MM-DD` y `.\.venv\Scripts\python.exe scripts\refresh_market_data.py --end-date YYYY-MM-DD`.
-4. Consulta el plan en `docs/roadmap.md`.
-5. Si quieres ver el flujo del historico de posiciones, consulta `docs/position_history.md`.
-6. Si quieres ver la capa de valoracion agregada, consulta `docs/portfolio_metrics.md`.
-7. Si quieres generar el informe mensual para revision y agentes, consulta `docs/monthly_report.md`.
+2. Ejecuta `.\scripts\run_dashboard.ps1` para abrir la v1 local con Streamlit.
+3. Si quieres refrescar FX y precios de mercado por consola, ejecuta `.\scripts\refresh_market_data.ps1 -EndDate YYYY-MM-DD`.
+4. Consulta `docs/streamlit_dashboard.md` para el uso completo del dashboard.
 
 ## Objetivos de cartera
 
@@ -153,7 +170,11 @@ cartera actual frente a objetivo.
 
 ## Dashboard
 
-La interfaz local de Streamlit permite revisar cartera, evolucion, informes, actualizar datos DEGIRO y ejecutar la demo de agentes. En `Vista general`, el boton `Actualizar a hoy` refresca FX y precios hasta la fecha actual; la fecha principal de la vista avanza hasta la ultima fecha valorada disponible y el ultimo snapshot DEGIRO queda como ancla.
+La interfaz principal de la v1 es un dashboard local de Streamlit. Permite
+revisar cartera, evolucion, informes, actualizar datos DEGIRO y ejecutar
+agentes. En `Vista general`, el boton `Actualizar a hoy` refresca FX y precios
+hasta la fecha actual; la fecha principal de la vista avanza hasta la ultima
+fecha valorada disponible y el ultimo snapshot DEGIRO queda como ancla.
 
 ```powershell
 .\.venv\Scripts\python.exe -m streamlit run src\portfolio\dashboard.py
@@ -169,7 +190,8 @@ Abre `http://localhost:8501` cuando Streamlit termine de arrancar. Guia completa
 
 ## Demo publica
 
-La demo sintetica vive en `demo/` y no usa `src/data/local/` ni
+La demo sintetica vive en `demo/` y sirve para ensenar la v1 local con Streamlit
+sin exponer datos reales. No usa `src/data/local/` ni
 `src/degiro_exports/local/`. Para prepararla y abrirla:
 
 ```powershell
@@ -197,6 +219,7 @@ Guia completa: `demo/README.md`.
 - `docs/roadmap.md`: fases, backlog y traducción del plan a tareas de GitHub.
 - `docs/architecture.md`: flujo de datos, componentes y límites del sistema.
 - `docs/architecture_v2.md`: direccion futura FastAPI + Angular sin iniciar la migracion.
+- `docs/api_contracts.md`: contratos futuros de API local antes de implementar FastAPI.
 - `docs/decisions.md`: decisiones ya cerradas y su justificación.
 - `docs/data_model.md`: esquema inicial de DuckDB, claves y relaciones entre tablas.
 - `docs/market_data_refresh.md`: flujo real de refresh de precios y overrides manuales.
@@ -207,6 +230,14 @@ Guia completa: `demo/README.md`.
 - `docs/streamlit_dashboard.md`: uso del dashboard local para cartera, informes, actualizacion de datos y agentes.
 - `docs/privacy.md`: politica de privacidad local, rutas sensibles y checklist de secret scanning.
 - `src/application/README.md`: capa de casos de uso reutilizables para scripts, Streamlit y futuras interfaces.
+
+## Direccion futura
+
+La v1 se mantiene como aplicacion local con Streamlit. Antes de migrar a otra
+interfaz web, el objetivo es consolidar esta version: demo publica, privacidad,
+comandos reproducibles, capa `src/application/` y separacion progresiva del
+dashboard. La direccion FastAPI + Angular esta documentada en
+`docs/architecture_v2.md`, pero no es prioridad inmediata.
 
 ## Legacy
 

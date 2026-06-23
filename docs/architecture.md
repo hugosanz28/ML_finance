@@ -25,6 +25,11 @@ aplicacion de escritorio. Esta capa coordina servicios existentes y devuelve
 resultados estructurados; no debe duplicar calculos financieros ni contener
 logica de interfaz.
 
+La v1 de Streamlit consume esta capa tanto para acciones operativas como para
+read models principales del dashboard. Una futura API debe mantener la misma
+regla: endpoints finos que llamen a `src/application/`, no a detalles internos
+de `src/portfolio/`, `src/reports/` o `src/agents/`.
+
 ### `src/degiro_exports/`
 
 Contiene la entrada del sistema:
@@ -114,6 +119,12 @@ Punto de entrada previsto:
 src/portfolio/dashboard.py
 ```
 
+`dashboard.py` actua como entrypoint y navegacion. Las pestanas viven en modulos
+especificos (`dashboard_overview.py`, `dashboard_reports.py`,
+`dashboard_data_update.py`, `dashboard_agents.py`) y los helpers compartidos en
+`dashboard_common.py`. Esta separacion reduce acoplamiento antes de una posible
+interfaz web futura.
+
 ## Direccion v2
 
 La direccion tecnica para una futura v2 esta documentada en
@@ -121,6 +132,10 @@ La direccion tecnica para una futura v2 esta documentada en
 sigue siendo la interfaz adecuada para consolidar la v1, mientras
 `src/application/` prepara el camino para una posible API FastAPI y un frontend
 Angular mas adelante.
+
+Antes de implementar FastAPI, los contratos previstos de lectura/escritura viven
+en `docs/api_contracts.md`. Sirven para estabilizar que datos necesita una UI
+futura y que casos de uso deben existir en `src/application/`.
 
 ## Agentes
 

@@ -7,6 +7,11 @@ financieros ni credenciales. La regla base es simple: el codigo, la
 documentacion y los ejemplos sinteticos pueden versionarse; los datos reales y
 las salidas privadas se quedan en rutas locales ignoradas por Git.
 
+La version actual es la **v1 local con Streamlit**. Esto significa que la
+aplicacion se ejecuta en el ordenador del usuario y no necesita backend remoto
+ni base de datos externa para funcionar. Aun asi, los agentes pueden enviar
+contexto a proveedores externos si se configuran proveedores reales.
+
 ## Datos sensibles
 
 Trata como privados, aunque no contengan contrasenas:
@@ -63,6 +68,14 @@ archivo no contiene secretos y apunta a `demo/local_data/`, que esta ignorado
 por Git. Los CSV bajo `demo/synthetic_degiro_exports/` son ficticios y estan
 disenados para ensenar el flujo sin exponer cartera real.
 
+Para demos publicas, usa:
+
+```powershell
+.\scripts\run_demo.ps1
+```
+
+No uses capturas, informes ni audit trails generados desde `src/data/local/`.
+
 ## Secret scanning
 
 Antes de ensenar el repositorio, subir una rama o abrir un PR:
@@ -114,3 +127,8 @@ proveedores reales. Antes de activar un proveedor no local, revisa el payload qu
 se va a enviar y evita incluir datos personales que no sean necesarios para el
 analisis. Para pruebas publicas o demos, usa proveedores `static` o datos
 sinteticos.
+
+En la v1 local con Streamlit, la opcion segura para demo es `LLM provider:
+static` y `Search provider: null`. Los proveedores `openai`,
+`tavily` y `duckduckgo` deben tratarse como ejecuciones reales o semi-reales,
+porque pueden sacar informacion fuera del equipo local.

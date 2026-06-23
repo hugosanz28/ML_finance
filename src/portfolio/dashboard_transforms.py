@@ -9,9 +9,6 @@ from typing import Any
 import altair as alt
 import pandas as pd
 
-from src.agents import build_portfolio_metrics_snapshot
-from src.config import Settings
-from src.market_data.repository import DuckDBMarketDataRepository
 from src.portfolio import PortfolioMetricsResult
 
 
@@ -89,18 +86,6 @@ def _latest_broker_snapshot_view(snapshots: pd.DataFrame) -> dict[str, Any] | No
     }
 
 
-def _broker_snapshot_view_for_date(snapshots: pd.DataFrame, *, as_of_date: date) -> dict[str, Any] | None:
-    if snapshots is None or snapshots.empty:
-        return None
-    frame = snapshots.copy()
-    frame["snapshot_date"] = pd.to_datetime(frame["snapshot_date"], errors="coerce").dt.date
-    frame = frame.dropna(subset=["snapshot_date"])
-    eligible = frame.loc[frame["snapshot_date"] <= as_of_date].copy()
-    if eligible.empty:
-        return None
-    return _latest_broker_snapshot_view(eligible)
-
-
 def _build_broker_anchored_daily_series(daily: pd.DataFrame, snapshots: pd.DataFrame) -> tuple[pd.DataFrame, str]:
     ready = daily.copy().sort_values("valuation_date")
     ready["total_market_value_base"] = pd.to_numeric(ready["total_market_value_base"], errors="coerce")
@@ -137,177 +122,6 @@ def _build_broker_anchored_daily_series(daily: pd.DataFrame, snapshots: pd.DataF
     )
 
 
-def _external_positions_for_date(metrics: PortfolioMetricsResult, *, target_date: date) -> pd.DataFrame:
-    frame = metrics.position_metrics.copy()
-    frame["valuation_date"] = pd.to_datetime(frame["valuation_date"], errors="coerce").dt.date
-    frame["cost_basis_base"] = pd.to_numeric(frame["cost_basis_base"], errors="coerce")
-    frame["unrealized_pnl_base"] = pd.to_numeric(frame["unrealized_pnl_base"], errors="coerce")
-    frame["unrealized_return_pct"] = pd.to_numeric(frame["unrealized_return_pct"], errors="coerce")
-    frame = frame.dropna(subset=["valuation_date", "asset_id"])
-    if frame.empty:
-        return pd.DataFrame(columns=["asset_id", "cost_basis_base", "unrealized_pnl_base", "unrealized_return_pct"])
-
-    dates = sorted(frame["valuation_date"].dropna().unique().tolist())
-    if not dates:
-        return pd.DataFrame(columns=["asset_id", "cost_basis_base", "unrealized_pnl_base", "unrealized_return_pct"])
-    if target_date in set(dates):
-        chosen_date = target_date
-    else:
-        fallback_dates = [date_value for date_value in dates if date_value <= target_date]
-        if not fallback_dates:
-            return pd.DataFrame(columns=["asset_id", "cost_basis_base", "unrealized_pnl_base", "unrealized_return_pct"])
-        chosen_date = max(fallback_dates)
-    current = frame.loc[frame["valuation_date"] == chosen_date, ["asset_id", "cost_basis_base", "unrealized_pnl_base", "unrealized_return_pct"]].copy()
-    return current
-
-
-def _overlay_external_cost_metrics(
-    broker_positions: pd.DataFrame,
-    metrics: PortfolioMetricsResult,
-    *,
-    target_date: date,
-) -> pd.DataFrame:
-    if broker_positions.empty:
-        return broker_positions
-    enriched = broker_positions.copy()
-    for column in ("cost_basis_base", "unrealized_pnl_base", "unrealized_return_pct"):
-        if column not in enriched.columns:
-            enriched[column] = pd.NA
-
-    external = _external_positions_for_date(metrics, target_date=target_date)
-    if external.empty:
-        return enriched
-
-    merged = enriched.merge(
-        external.rename(
-            columns={
-                "cost_basis_base": "cost_basis_external",
-                "unrealized_pnl_base": "unrealized_external",
-                "unrealized_return_pct": "return_external",
-            }
-        ),
-        on="asset_id",
-        how="left",
-    )
-    merged["cost_basis_base"] = pd.to_numeric(merged["cost_basis_base"], errors="coerce").fillna(
-        pd.to_numeric(merged["cost_basis_external"], errors="coerce")
-    )
-    merged["unrealized_pnl_base"] = pd.to_numeric(merged["unrealized_pnl_base"], errors="coerce").fillna(
-        pd.to_numeric(merged["unrealized_external"], errors="coerce")
-    )
-    merged["unrealized_return_pct"] = pd.to_numeric(merged["unrealized_return_pct"], errors="coerce").fillna(
-        pd.to_numeric(merged["return_external"], errors="coerce")
-    )
-    return merged.drop(columns=["cost_basis_external", "unrealized_external", "return_external"])
-
-
-def _derive_totals_from_positions(
-    positions: pd.DataFrame,
-    *,
-    total_market_value_base: float,
-) -> tuple[float | None, float | None]:
-    if positions.empty:
-        return None, None
-    cost = pd.to_numeric(positions.get("cost_basis_base"), errors="coerce")
-    if cost is None or cost.notna().sum() == 0:
-        return None, None
-    total_cost = float(cost.fillna(0.0).sum())
-    total_unrealized = float(total_market_value_base - total_cost)
-    total_return = None if abs(total_cost) < 1e-9 else total_unrealized / total_cost
-    return total_unrealized, total_return
-
-
-def _derive_broker_pnl_with_external_cost_basis(
-    daily: pd.DataFrame,
-    *,
-    target_date: date,
-    total_market_value_base: float,
-) -> tuple[float | None, float | None]:
-    frame = daily.copy()
-    frame["valuation_date"] = pd.to_datetime(frame["valuation_date"], errors="coerce").dt.date
-    frame["total_cost_basis_base"] = pd.to_numeric(frame["total_cost_basis_base"], errors="coerce")
-    frame = frame.dropna(subset=["valuation_date"]).sort_values("valuation_date")
-    if frame.empty:
-        return None, None
-
-    if target_date in set(frame["valuation_date"].tolist()):
-        row = frame.loc[frame["valuation_date"] == target_date].iloc[-1]
-    else:
-        candidates = frame.loc[frame["valuation_date"] <= target_date]
-        if candidates.empty:
-            return None, None
-        row = candidates.iloc[-1]
-
-    total_cost = float(row["total_cost_basis_base"]) if pd.notna(row["total_cost_basis_base"]) else None
-    if total_cost is None or abs(total_cost) < 1e-9:
-        return None, None
-    total_unrealized = float(total_market_value_base - total_cost)
-    total_return = total_unrealized / total_cost
-    return total_unrealized, total_return
-
-
-def _build_agent_snapshot_for_dashboard(
-    metrics: PortfolioMetricsResult,
-    *,
-    snapshots: pd.DataFrame,
-    as_of_date: date,
-) -> dict[str, Any]:
-    base_snapshot = build_portfolio_metrics_snapshot(metrics, as_of_date=as_of_date)
-    broker = _broker_snapshot_view_for_date(snapshots, as_of_date=as_of_date)
-    if broker is None:
-        return base_snapshot
-
-    positions = _overlay_external_cost_metrics(
-        broker["positions"],
-        metrics,
-        target_date=broker["snapshot_date"],
-    )
-    total_value = float(broker["total_market_value_base"])
-    total_unrealized, total_return = _derive_broker_pnl_with_external_cost_basis(
-        _daily_metrics(metrics),
-        target_date=broker["snapshot_date"],
-        total_market_value_base=total_value,
-    )
-    if total_unrealized is None or total_return is None:
-        total_unrealized, total_return = _derive_totals_from_positions(
-            positions,
-            total_market_value_base=total_value,
-        )
-
-    daily_payload = dict(base_snapshot.get("daily") or {})
-    daily_payload["valuation_date"] = broker["snapshot_date"].isoformat()
-    daily_payload["total_market_value_base"] = round(total_value, 8)
-    if total_unrealized is not None:
-        daily_payload["total_unrealized_pnl_base"] = round(float(total_unrealized), 8)
-    if total_return is not None:
-        daily_payload["portfolio_return_pct"] = round(float(total_return), 8)
-
-    selected_columns = [
-        "asset_id",
-        "asset_name",
-        "asset_type",
-        "isin",
-        "quantity",
-        "market_value_base",
-        "cost_basis_base",
-        "unrealized_pnl_base",
-        "unrealized_return_pct",
-        "weight",
-        "valuation_status",
-    ]
-    for column in selected_columns:
-        if column not in positions.columns:
-            positions[column] = pd.NA
-    positions_ready = positions.loc[:, selected_columns].sort_values(["weight", "asset_name"], ascending=[False, True])
-
-    return {
-        "as_of_date": broker["snapshot_date"].isoformat(),
-        "base_currency": metrics.base_currency,
-        "daily": _json_ready_value(daily_payload),
-        "positions": _json_ready_value(positions_ready.to_dict(orient="records")),
-    }
-
-
 def _parse_target_weights_input(raw_text: str) -> dict[str, Any]:
     text = (raw_text or "").strip()
     if not text:
@@ -317,40 +131,6 @@ def _parse_target_weights_input(raw_text: str) -> dict[str, Any]:
     except json.JSONDecodeError:
         return {}
     return parsed if isinstance(parsed, dict) else {}
-
-
-def _json_ready_value(value: Any) -> Any:
-    if isinstance(value, dict):
-        return {str(key): _json_ready_value(item) for key, item in value.items()}
-    if isinstance(value, (tuple, list)):
-        return [_json_ready_value(item) for item in value]
-    if isinstance(value, (date, pd.Timestamp)):
-        return value.isoformat()
-    if value is None or pd.isna(value):
-        return None
-    return value
-
-
-def _net_external_contributions_until(settings: Settings, *, as_of_date: date) -> float | None:
-    repository = DuckDBMarketDataRepository(settings=settings)
-    query = """
-        SELECT SUM(
-            CASE
-                WHEN UPPER(movement_type) = 'DEPOSIT' THEN ABS(amount_base)
-                WHEN UPPER(movement_type) = 'WITHDRAWAL' THEN -ABS(amount_base)
-                ELSE 0
-            END
-        ) AS net_external
-        FROM cash_movements
-        WHERE amount_base IS NOT NULL
-          AND UPPER(movement_type) IN ('DEPOSIT', 'WITHDRAWAL')
-          AND COALESCE(value_date, movement_date) <= ?
-    """
-    with repository.connection() as connection:
-        row = connection.execute(query, [as_of_date]).fetchone()
-    if row is None or row[0] is None:
-        return None
-    return float(row[0])
 
 
 def _build_net_trade_flow_by_day(transactions: pd.DataFrame) -> pd.DataFrame:

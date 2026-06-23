@@ -24,7 +24,10 @@ que la interfaz no dependa de detalles internos de `src/portfolio/`,
 - refrescar precios de mercado;
 - generar informe mensual;
 - ejecutar agentes mensuales;
+- listar y leer auditoria persistida de agentes;
 - ejecutar quality checks antes de agentes o recomendaciones.
+- cargar read models de dashboard: metricas, snapshots, transacciones, reports,
+  brief, targets y counts de bodega local.
 
 Las migraciones deben ser progresivas: primero se anade el wrapper, despues se
 adapta el script o la vista de Streamlit correspondiente.
@@ -43,9 +46,24 @@ y devuelve un `ApplicationResult` con estado agregado, warnings y artefactos
 principales (`run_id`, `as_of_date`, `output_dir`). Scripts, Streamlit y futuras
 interfaces deben usar este caso de uso en vez de llamar directamente al pipeline.
 
+`ListAgentRunsUseCase` y `GetAgentRunAuditUseCase` exponen read models de la
+auditoria persistida en disco. Streamlit los usa para visualizar plan interno,
+acciones, fuentes, prompts, warnings, inputs y outputs sin acoplar la UI a la
+estructura fisica de carpetas.
+
 ## Relacion con v2
 
 La nota `docs/architecture_v2.md` define que una futura API FastAPI deberia
 entrar por esta capa. La v2 no esta priorizada todavia, pero cada caso de uso
 estable aqui reduce el coste de migrar desde Streamlit a una interfaz
 cliente-servidor si mas adelante compensa.
+
+Los contratos HTTP previstos antes de implementar FastAPI estan en
+`docs/api_contracts.md`. Si un contrato necesita logica que todavia no existe
+en esta capa, primero debe crearse el caso de uso correspondiente aqui y despues
+adaptar la interfaz.
+
+La v1 de Streamlit ya usa esta capa para acciones operativas y read models
+principales. Los modulos `dashboard_*` pueden mantener transformaciones visuales
+y composicion UI, pero no deberian llamar directamente a importadores, reports,
+agentes o repositorios cuando exista un caso de uso equivalente aqui.

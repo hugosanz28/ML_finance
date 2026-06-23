@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import csv
 from datetime import date
+import json
 from pathlib import Path
 import shutil
 from uuid import uuid4
@@ -12,8 +13,18 @@ from src.application import (
     ApplicationResult,
     GenerateMonthlyReportRequest,
     GenerateMonthlyReportUseCase,
+    GetAgentRunAuditRequest,
+    GetAgentRunAuditUseCase,
+    GetNetExternalContributionsUseCase,
+    GetWarehouseCountsUseCase,
     ImportDegiroRequest,
     ImportDegiroUseCase,
+    ListAgentRunsUseCase,
+    ListDashboardReportsUseCase,
+    LoadPortfolioMetricsRequest,
+    LoadPortfolioMetricsUseCase,
+    ReadInvestmentBriefUseCase,
+    ReadTargetWeightsUseCase,
     RefreshFxRequest,
     RefreshFxUseCase,
     RefreshMarketDataRequest,
@@ -50,6 +61,12 @@ def test_application_public_use_cases_are_importable() -> None:
     assert RefreshMarketDataUseCase.name == "refresh_market_data"
     assert GenerateMonthlyReportUseCase.name == "generate_monthly_report"
     assert RunMonthlyAgentsUseCase.name == "run_monthly_agents"
+    assert ListAgentRunsUseCase.name == "list_agent_runs"
+    assert GetAgentRunAuditUseCase.name == "get_agent_run_audit"
+    assert LoadPortfolioMetricsUseCase.name == "load_portfolio_metrics"
+    assert GetWarehouseCountsUseCase.name == "get_warehouse_counts"
+    assert GetNetExternalContributionsUseCase.name == "get_net_external_contributions"
+    assert ListDashboardReportsUseCase.name == "list_dashboard_reports"
 
 
 def test_application_request_defaults_are_safe_for_construction() -> None:
@@ -57,11 +74,69 @@ def test_application_request_defaults_are_safe_for_construction() -> None:
     fx_request = RefreshFxRequest()
     market_request = RefreshMarketDataRequest()
     report_request = GenerateMonthlyReportRequest()
+    metrics_request = LoadPortfolioMetricsRequest()
 
     assert import_request.load_duckdb is True
     assert fx_request.infer_from_normalized is True
     assert market_request.bootstrap_degiro_assets is True
     assert report_request.persist is True
+    assert metrics_request.persist is True
+
+
+def test_dashboard_read_use_cases_return_safe_defaults() -> None:
+    workspace = make_test_workspace()
+    try:
+        settings = load_settings(repo_root=workspace, env={}, env_file=workspace / ".env.missing")
+
+        brief = ReadInvestmentBriefUseCase(settings=settings).execute()
+        targets = ReadTargetWeightsUseCase(settings=settings).execute()
+        reports = ListDashboardReportsUseCase(settings=settings).execute()
+
+        assert brief.content == ""
+        assert targets.target_weights == {"core": 0.80, "satellite": 0.20}
+        assert reports.reports == []
+    finally:
+        shutil.rmtree(workspace, ignore_errors=True)
+
+
+def test_agent_audit_use_cases_read_persisted_run() -> None:
+    workspace = make_test_workspace()
+    try:
+        settings = load_settings(repo_root=workspace, env={}, env_file=workspace / ".env.missing")
+        run_dir = settings.data_dir / "agents" / "monthly_pipeline" / "run-001"
+        agent_dir = run_dir / "agents" / "monitor_tematico"
+        agent_dir.mkdir(parents=True)
+        _write_json(
+            run_dir / "run_metadata.json",
+            {
+                "run_id": "run-001",
+                "as_of_date": "2026-05-26",
+                "generated_at": "2026-05-26T10:00:00+02:00",
+                "agents": {
+                    "monitor_tematico": {"status": "success"},
+                    "analista_activos": {"status": "partial"},
+                    "asistente_aportacion_mensual": {"status": "success"},
+                },
+            },
+        )
+        _write_json(
+            run_dir / "input_payload.json",
+            {"inputs": [{"key": "investment_brief", "metadata": {"content": "brief"}}]},
+        )
+        _write_json(agent_dir / "parsed_output.json", {"status": "success", "metadata": {"agent_plan": ["step"]}})
+        (agent_dir / "prompt_rendered.md").write_text("# prompt\n", encoding="utf-8")
+
+        runs = ListAgentRunsUseCase(settings=settings).execute().runs
+        audit = GetAgentRunAuditUseCase(settings=settings).execute(GetAgentRunAuditRequest(run_id="run-001"))
+
+        assert len(runs) == 1
+        assert runs[0].run_id == "run-001"
+        assert runs[0].status == "partial"
+        assert audit.input_payload["inputs"][0]["key"] == "investment_brief"
+        assert audit.agents["monitor_tematico"]["parsed_output"]["metadata"]["agent_plan"] == ["step"]
+        assert audit.agents["monitor_tematico"]["prompt_rendered"] == "# prompt\n"
+    finally:
+        shutil.rmtree(workspace, ignore_errors=True)
 
 
 def test_import_degiro_use_case_is_idempotent_when_reimporting_same_exports() -> None:
@@ -221,3 +296,8 @@ def _write_csv(csv_path: Path, header: list[str], rows: list[list[str]]) -> None
         writer = csv.writer(handle)
         writer.writerow(header)
         writer.writerows(rows)
+
+
+def _write_json(path: Path, payload: dict) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")

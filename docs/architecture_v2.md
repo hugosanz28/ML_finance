@@ -42,6 +42,10 @@ Responsabilidades:
 Regla para v2: FastAPI no deberia llamar directamente a modulos profundos del
 dominio salvo que antes exista un caso de uso en `src/application/`.
 
+Los contratos HTTP previstos estan documentados en `docs/api_contracts.md`.
+Ese documento es deliberadamente previo a FastAPI: define que datos necesita la
+UI y que casos de uso deben existir antes de crear endpoints reales.
+
 ## Propuesta principal
 
 ```text
@@ -188,7 +192,8 @@ Antes de crear carpetas `frontend/`, `api/` o similares:
 1. Mantener v1 estable y demostrable.
 2. Completar la separacion publico/privado.
 3. Consolidar `src/application/` como unica entrada de interfaces.
-4. Documentar contratos de lectura/escritura que usaria la API.
+4. Mantener actualizados los contratos de lectura/escritura de
+   `docs/api_contracts.md`.
 5. Decidir si v2 sera solo local, app de escritorio o servicio web.
 
 ## Decision actual

@@ -2,13 +2,13 @@ from datetime import date
 from pathlib import Path
 from types import SimpleNamespace
 
+from src.application import extract_report_as_of_date_from_path
 from src.market_data import FxRefreshOutcome, FxRefreshSummary, PriceRefreshOutcome, PriceRefreshSummary
-from src.portfolio.dashboard import (
+from src.portfolio.dashboard_overview import refresh_market_data_to_date
+from src.portfolio.dashboard_uploads import (
     _canonical_degiro_upload_name,
     _detect_degiro_upload_kind,
-    _extract_report_as_of_date_from_path,
     _extract_dates_from_filename,
-    _refresh_market_data_to_date,
 )
 
 
@@ -66,8 +66,8 @@ def test_extract_dates_from_filename_deduplicates_and_sorts() -> None:
 
 
 def test_extract_report_as_of_date_from_path() -> None:
-    assert _extract_report_as_of_date_from_path(Path("2026-05-06-monthly-abc.md")) == date(2026, 5, 6)
-    assert _extract_report_as_of_date_from_path(Path("monthly-latest.md")) is None
+    assert extract_report_as_of_date_from_path(Path("2026-05-06-monthly-abc.md")) == date(2026, 5, 6)
+    assert extract_report_as_of_date_from_path(Path("monthly-latest.md")) is None
 
 
 def test_refresh_market_data_to_date_updates_fx_and_prices_to_target(monkeypatch) -> None:
@@ -116,10 +116,10 @@ def test_refresh_market_data_to_date_updates_fx_and_prices_to_target(monkeypatch
                 )
             )
 
-    monkeypatch.setattr("src.portfolio.dashboard.RefreshFxUseCase", FakeRefreshFxUseCase)
-    monkeypatch.setattr("src.portfolio.dashboard.RefreshMarketDataUseCase", FakeRefreshMarketDataUseCase)
+    monkeypatch.setattr("src.portfolio.dashboard_overview.RefreshFxUseCase", FakeRefreshFxUseCase)
+    monkeypatch.setattr("src.portfolio.dashboard_overview.RefreshMarketDataUseCase", FakeRefreshMarketDataUseCase)
 
-    result = _refresh_market_data_to_date(settings=settings, target_date=target_date)
+    result = refresh_market_data_to_date(settings=settings, target_date=target_date)
 
     assert result["target_date"] == target_date
     assert result["fx_summary"].total_records == 2
