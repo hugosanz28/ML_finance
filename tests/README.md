@@ -1,10 +1,21 @@
 # Tests
 
-La estrategia de tests crecerá por capas:
+La suite usa `pytest` y esta configurada en `pyproject.toml`.
 
-- tests de parsers para exportaciones DEGIRO,
-- tests de normalización y modelo de datos,
-- tests de reconstrucción histórica,
-- y tests de generación de informes.
+Ejecutar todo:
 
-Los fixtures publicos viven aqui, en `src/data/sample/` o en `demo/` cuando forman parte de la demo ejecutable, siempre anonimizados o sintetizados.
+```powershell
+.\.venv\Scripts\python.exe -m pytest
+```
+
+Wrapper equivalente:
+
+```powershell
+.\scripts\test.ps1
+```
+
+Los fixtures publicos viven en `tests/`, `src/data/sample/` o `demo/`, siempre
+anonimizados o sinteticos.
+
+Para comandos focalizados y reglas de trabajo para agentes de programacion,
+consulta `AGENTS.md`.
