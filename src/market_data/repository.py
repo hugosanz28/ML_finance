@@ -207,7 +207,7 @@ class DuckDBMarketDataRepository:
                 return None
 
             column_names = [description[0] for description in result.description]
-            return MarketAsset.from_mapping(dict(zip(column_names, row)))
+            return MarketAsset.from_mapping(dict(zip(column_names, row, strict=True)))
 
     def list_assets(
         self,
@@ -244,7 +244,7 @@ class DuckDBMarketDataRepository:
             rows = result.fetchall()
             column_names = [description[0] for description in result.description]
 
-        return [MarketAsset.from_mapping(dict(zip(column_names, row))) for row in rows]
+        return [MarketAsset.from_mapping(dict(zip(column_names, row, strict=True))) for row in rows]
 
     def upsert_daily_prices(
         self,

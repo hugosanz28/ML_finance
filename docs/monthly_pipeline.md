@@ -22,6 +22,16 @@ La pestaña `Actualizar datos` permite subir CSVs, importar, refrescar FX,
 refrescar precios y generar informes. La pestaña `Agentes` permite revisar los
 inputs y ejecutar la red mensual.
 
+Las interfaces comparten los mismos casos de uso:
+
+- uploads/importacion: `SaveDegiroUploadsUseCase` e `ImportDegiroUseCase`;
+- FX/precios: `InferFxRequirementsUseCase`, `RefreshFxUseCase` y
+  `RefreshMarketDataUseCase`;
+- informes: `GenerateMonthlyReportUseCase`;
+- cartera: `GetPortfolioStateUseCase`;
+- agentes: `RunMonthlyAgentsUseCase` y, para ejecucion aislada,
+  `RunMonitorTematicoUseCase`.
+
 Para una actualizacion rapida sin importar nuevos CSVs ni generar informe, usa
 `Vista general` -> `Actualizar a hoy`. Ese boton refresca FX y precios hasta la
 fecha actual, limpia la cache y mantiene el ultimo snapshot DEGIRO como ancla.
@@ -49,9 +59,18 @@ necesariamente la fecha del snapshot.
 - `import_degiro.py` carga por defecto los parquets normalizados a DuckDB.
 - `refresh_fx_rates.py` no reescribe los parquets; alimenta `fx_rates`.
 - `refresh_market_data.py` usa `asset_overrides.csv` para tickers manuales y exclusiones.
+- En entorno normal FX/precios usan `yfinance`. La demo usa
+  `PRICE_PROVIDER=synthetic`: conserva datos sembrados, no accede a red y no
+  fabrica nuevas series.
 - La valoracion diaria usa `broker_snapshot_anchored`: el precio local absoluto
   viene de snapshots DEGIRO y market data aporta la variacion relativa.
-- `run_monthly_agents.py` puede ejecutarse en modo demo sin red/API con `--llm-provider static --search-provider null`.
+- `run_monthly_agents.py` usa `static/null` como baseline offline y default
+  seguro. El monitor no recibe resultados de busqueda y puede devolver
+  cobertura `partial`.
+- La construccion directa de los agentes tambien usa providers offline. OpenAI
+  y cualquier busqueda web deben seleccionarse de forma explicita.
+- Para una demo offline completa, `static/static` añade resultados de busqueda
+  sinteticos y deterministas. No representan hechos de mercado reales.
 - Para una ejecucion IA real, usa `--llm-provider openai`. Para busqueda externa
   prioriza `--search-provider tavily` si tienes `TAVILY_API_KEY`; usa
   `--search-provider duckduckgo` como fallback best-effort sin API key.
@@ -76,11 +95,21 @@ necesariamente la fecha del snapshot.
   claves voluminosas como `content`, `positions`, `daily` o `findings` se
   reflejan en `omitted_metadata_keys`.
 
+## Proveedores de agentes
+
+Combinaciones recomendadas:
+
+- `static/null`: baseline y tests offline.
+- `static/static`: demo publica offline con contexto sintetico.
+- `openai/tavily`: ejecucion externa con busqueda API.
+- `openai/duckduckgo`: ejecucion externa con busqueda best-effort.
+
 ## Busqueda externa para agentes
 
-El monitor tematico soporta tres modos:
+El monitor tematico soporta cuatro modos:
 
-- `null`: no busca en la web; util para demo local o pruebas sin red.
+- `null`: no busca en la web; util como baseline o para pruebas sin red.
+- `static`: genera fixtures sinteticos locales; util solo para demo y tests.
 - `duckduckgo`: scraping HTML best-effort sin coste ni API key. Puede devolver
   cero resultados si cambia el HTML, hay bloqueo o la query no encaja.
 - `tavily`: proveedor API mas estable para agentes. Requiere `TAVILY_API_KEY`

@@ -8,6 +8,7 @@ import shutil
 from uuid import uuid4
 
 import duckdb
+import pandas as pd
 
 from src.application import (
     ApplicationResult,
@@ -16,7 +17,13 @@ from src.application import (
     GetAgentRunAuditRequest,
     GetAgentRunAuditUseCase,
     GetNetExternalContributionsUseCase,
+    GetPendingDegiroImportStatusUseCase,
+    GetPortfolioStateRequest,
+    GetPortfolioStateUseCase,
     GetWarehouseCountsUseCase,
+    FxRequirementView,
+    InferFxRequirementsResult,
+    InferFxRequirementsUseCase,
     ImportDegiroRequest,
     ImportDegiroUseCase,
     ListAgentRunsUseCase,
@@ -31,12 +38,16 @@ from src.application import (
     RefreshMarketDataUseCase,
     RunMonthlyAgentsRequest,
     RunMonthlyAgentsUseCase,
+    RunMonitorTematicoRequest,
+    RunMonitorTematicoUseCase,
+    SaveDegiroUploadsUseCase,
 )
 from src.agents import AgentResult, MonthlyAgentPipelineResult
 from src.config import default_repo_root, load_settings
 from src.degiro_exports.cash_movements import EXPECTED_ACCOUNT_HEADERS
 from src.degiro_exports.portfolio_snapshots import EXPECTED_PORTFOLIO_HEADERS
 from src.degiro_exports.transactions import EXPECTED_TRANSACTION_HEADERS
+from src.portfolio import PortfolioMetricsResult
 
 
 def make_test_workspace() -> Path:
@@ -61,10 +72,15 @@ def test_application_public_use_cases_are_importable() -> None:
     assert RefreshMarketDataUseCase.name == "refresh_market_data"
     assert GenerateMonthlyReportUseCase.name == "generate_monthly_report"
     assert RunMonthlyAgentsUseCase.name == "run_monthly_agents"
+    assert RunMonitorTematicoUseCase.name == "run_monitor_tematico"
     assert ListAgentRunsUseCase.name == "list_agent_runs"
     assert GetAgentRunAuditUseCase.name == "get_agent_run_audit"
     assert LoadPortfolioMetricsUseCase.name == "load_portfolio_metrics"
+    assert GetPortfolioStateUseCase.name == "get_portfolio_state"
+    assert InferFxRequirementsUseCase.name == "infer_fx_requirements"
+    assert SaveDegiroUploadsUseCase.name == "save_degiro_uploads"
     assert GetWarehouseCountsUseCase.name == "get_warehouse_counts"
+    assert GetPendingDegiroImportStatusUseCase.name == "get_pending_degiro_import_status"
     assert GetNetExternalContributionsUseCase.name == "get_net_external_contributions"
     assert ListDashboardReportsUseCase.name == "list_dashboard_reports"
 
@@ -75,12 +91,16 @@ def test_application_request_defaults_are_safe_for_construction() -> None:
     market_request = RefreshMarketDataRequest()
     report_request = GenerateMonthlyReportRequest()
     metrics_request = LoadPortfolioMetricsRequest()
+    state_request = GetPortfolioStateRequest()
 
     assert import_request.load_duckdb is True
     assert fx_request.infer_from_normalized is True
     assert market_request.bootstrap_degiro_assets is True
     assert report_request.persist is True
     assert metrics_request.persist is True
+    assert state_request.include_positions is True
+    assert state_request.include_history is False
+    json.dumps(state_request.to_dict())
 
 
 def test_dashboard_read_use_cases_return_safe_defaults() -> None:
@@ -91,10 +111,175 @@ def test_dashboard_read_use_cases_return_safe_defaults() -> None:
         brief = ReadInvestmentBriefUseCase(settings=settings).execute()
         targets = ReadTargetWeightsUseCase(settings=settings).execute()
         reports = ListDashboardReportsUseCase(settings=settings).execute()
+        fx_requirements = InferFxRequirementsUseCase(settings=settings).execute()
 
         assert brief.content == ""
         assert targets.target_weights == {"core": 0.80, "satellite": 0.20}
         assert reports.reports == []
+        assert fx_requirements.requirements == ()
+    finally:
+        shutil.rmtree(workspace, ignore_errors=True)
+
+
+def test_fx_requirement_result_serializes_dates_as_iso_strings() -> None:
+    result = InferFxRequirementsResult(
+        requirements=(
+            FxRequirementView(
+                pair="EUR/USD",
+                start_date=date(2026, 1, 1),
+                end_date=date(2026, 1, 31),
+                source_rows=3,
+                missing_base_rows=1,
+            ),
+        )
+    )
+
+    payload = result.to_dict()
+
+    assert payload["requirements"][0]["start_date"] == "2026-01-01"
+    assert payload["requirements"][0]["end_date"] == "2026-01-31"
+    json.dumps(payload)
+
+
+def test_monitor_use_case_is_offline_and_json_ready_in_dry_run(tmp_path) -> None:
+    settings = load_settings(repo_root=tmp_path, env={}, env_file=tmp_path / ".env.missing")
+    report_path = tmp_path / "monthly-report.md"
+    report_path.write_text("# Synthetic monthly report\n", encoding="utf-8")
+
+    use_case_result = RunMonitorTematicoUseCase(settings=settings).execute(
+        RunMonitorTematicoRequest(
+            investment_brief_text="Synthetic configurable mandate.",
+            monthly_report_path=report_path,
+            dry_run=True,
+        )
+    )
+
+    assert use_case_result.result.status == "succeeded"
+    assert use_case_result.payload["llm_provider"] == "static"
+    assert use_case_result.payload["search_provider"] == "null"
+    json.dumps(use_case_result.payload)
+
+
+def test_get_portfolio_state_returns_json_ready_read_model(monkeypatch) -> None:
+    workspace = make_test_workspace()
+    try:
+        settings = load_settings(repo_root=workspace, env={}, env_file=workspace / ".env.missing")
+        metrics = PortfolioMetricsResult(
+            start_date=date(2026, 1, 1),
+            end_date=date(2026, 1, 2),
+            base_currency="EUR",
+            position_metrics=pd.DataFrame(
+                [
+                    {
+                        "valuation_date": "2026-01-02",
+                        "asset_id": "asset-a",
+                        "asset_name": "Asset A",
+                        "asset_type": "etf",
+                        "isin": "TEST00000001",
+                        "quantity": 2.0,
+                        "market_value_base": 120.0,
+                        "weight": 1.0,
+                        "cost_basis_base": 100.0,
+                        "unrealized_pnl_base": 20.0,
+                        "unrealized_return_pct": 0.2,
+                        "valuation_status": "valued",
+                    }
+                ]
+            ),
+            portfolio_daily_metrics=pd.DataFrame(
+                [
+                    {
+                        "valuation_date": "2026-01-01",
+                        "total_market_value_base": 110.0,
+                        "total_unrealized_pnl_base": 10.0,
+                        "portfolio_return_pct": 0.1,
+                        "drawdown_pct": 0.0,
+                        "valuation_coverage_ratio": 1.0,
+                        "missing_price_positions_count": 0,
+                        "missing_fx_positions_count": 0,
+                    },
+                    {
+                        "valuation_date": "2026-01-02",
+                        "total_market_value_base": 120.0,
+                        "total_unrealized_pnl_base": 20.0,
+                        "portfolio_return_pct": 0.2,
+                        "drawdown_pct": -0.01,
+                        "valuation_coverage_ratio": 1.0,
+                        "missing_price_positions_count": 0,
+                        "missing_fx_positions_count": 0,
+                    },
+                ]
+            ),
+        )
+        snapshots = pd.DataFrame(
+            [
+                {
+                    "snapshot_date": "2026-01-01",
+                    "asset_id": "asset-a",
+                    "asset_name": "Asset A",
+                    "asset_type": "etf",
+                    "quantity": 2.0,
+                    "market_value_base": 115.0,
+                    "unrealized_pnl_base": 15.0,
+                }
+            ]
+        )
+        monkeypatch.setattr(
+            "src.application.portfolio_state.calculate_portfolio_metrics_from_normalized_degiro",
+            lambda **_kwargs: metrics,
+        )
+        monkeypatch.setattr(
+            "src.application.portfolio_state.load_normalized_degiro_snapshots",
+            lambda **_kwargs: snapshots,
+        )
+        monkeypatch.setattr(
+            "src.application.portfolio_state.net_external_contributions_until",
+            lambda *_args, **_kwargs: 80.0,
+        )
+
+        result = GetPortfolioStateUseCase(settings=settings).execute(
+            GetPortfolioStateRequest(
+                persist=False,
+                include_positions=True,
+                include_history=True,
+                as_of_date="2026-01-02",
+            )
+        )
+        payload = result.to_dict()
+
+        assert result.as_of_date == "2026-01-02"
+        assert result.summary["total_market_value_base"] == 120.0
+        assert result.summary["net_external_contributions_base"] == 80.0
+        assert result.broker_snapshot == {
+            "snapshot_date": "2026-01-01",
+            "total_market_value_base": 115.0,
+        }
+        assert result.positions[0]["asset_id"] == "asset-a"
+        assert [row["valuation_date"] for row in result.history] == ["2026-01-01", "2026-01-02"]
+        assert result.data_quality == {"warnings": []}
+        json.dumps(payload, allow_nan=False)
+    finally:
+        shutil.rmtree(workspace, ignore_errors=True)
+
+
+def test_pending_degiro_import_status_detects_newer_portfolio_csv() -> None:
+    workspace = make_test_workspace()
+    try:
+        repo_root = workspace / "repo"
+        incoming_dir = repo_root / "src" / "degiro_exports" / "local" / "incoming"
+        normalized_dir = repo_root / "src" / "data" / "local" / "normalized" / "degiro" / "portfolio_snapshots"
+        incoming_dir.mkdir(parents=True)
+        normalized_dir.mkdir(parents=True)
+        (incoming_dir / "portfolio_2026-05-26.csv").write_text("", encoding="utf-8")
+        (incoming_dir / "portfolio_2026-06-29.csv").write_text("", encoding="utf-8")
+        (normalized_dir / "portfolio_2026-05-26.parquet").write_text("", encoding="utf-8")
+
+        settings = load_settings(repo_root=repo_root, env={}, env_file=repo_root / ".env.missing")
+        status = GetPendingDegiroImportStatusUseCase(settings=settings).execute()
+
+        assert status.latest_incoming_portfolio_date == date(2026, 6, 29)
+        assert status.latest_normalized_portfolio_date == date(2026, 5, 26)
+        assert status.pending_portfolio_files == ["portfolio_2026-06-29.csv"]
     finally:
         shutil.rmtree(workspace, ignore_errors=True)
 

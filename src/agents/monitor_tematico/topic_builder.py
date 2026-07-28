@@ -113,7 +113,7 @@ def _portfolio_context_topics() -> tuple[ObservedTopic, ...]:
     """Add broad context topics even when no watchlist is configured.
 
     These defaults keep the monthly review aware of rates, inflation, and global
-    equity context, which matter for a 3-4 year housing down-payment objective.
+    equity context while the configurable brief supplies the user's objective.
     """
     return (
         ObservedTopic(

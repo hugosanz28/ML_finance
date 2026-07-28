@@ -51,4 +51,10 @@ Ficheros generados:
 - puede arrancar desde un snapshot del broker si ese snapshot cubre el inicio del rango,
 - y no intenta aun valorar posiciones ni calcular coste medio o PnL.
 
-Eso queda preparado para la siguiente capa de metricas agregadas de cartera.
+La valoracion, el coste medio y el PnL pertenecen a la capa ya implementada en
+`src/portfolio/metrics.py`; no se duplican aqui.
+
+Las interfaces no deben llamar directamente a estas funciones. El flujo
+operativo entra por `LoadPortfolioMetricsUseCase` o por
+`GetPortfolioStateUseCase`, que coordinan reconstruccion, metricas y proyeccion
+serializable segun corresponda.

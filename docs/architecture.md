@@ -30,6 +30,20 @@ read models principales del dashboard. Una futura API debe mantener la misma
 regla: endpoints finos que llamen a `src/application/`, no a detalles internos
 de `src/portfolio/`, `src/reports/` o `src/agents/`.
 
+Fronteras ya disponibles:
+
+- `GetPortfolioStateUseCase` para el read model JSON de cartera;
+- `SaveDegiroUploadsUseCase` e `ImportDegiroUseCase` para uploads e importacion;
+- `InferFxRequirementsUseCase`, `RefreshFxUseCase` y
+  `RefreshMarketDataUseCase` para market data;
+- `GenerateMonthlyReportUseCase` para informes;
+- `RunMonthlyAgentsUseCase` y `RunMonitorTematicoUseCase` para agentes.
+
+Las acciones operativas devuelven `ApplicationResult`. Los read models
+destinados a adaptadores externos, como estado de cartera y requisitos FX,
+usan resultados serializables y no exponen `DataFrame`, `Path` ni objetos
+internos de dominio a una futura API.
+
 ### `src/degiro_exports/`
 
 Contiene la entrada del sistema:
@@ -51,6 +65,10 @@ En la valoracion actual, los precios externos no sustituyen al precio del
 broker: aportan variacion relativa desde el ultimo precio local observado en
 snapshots DEGIRO.
 
+El provider normal es `yfinance`. La demo configura `synthetic`, que no accede
+a red ni genera cotizaciones: conserva los precios y FX sinteticos sembrados
+por `scripts/bootstrap_demo.py`.
+
 ### `src/portfolio/`
 Estado actual de esta capa:
 
@@ -58,6 +76,9 @@ Estado actual de esta capa:
 - reconciliacion contra `portfolio_snapshots`,
 - metricas agregadas con valor, pesos, drawdown y politica
   `broker_snapshot_anchored`,
+- proyecciones compartidas de snapshot broker, coste y PnL en
+  `state_projection.py`,
+- consultas de aportaciones externas en `contributions.py`,
 - y una base directa para reporting y Streamlit.
 
 Responsable de reconstrucción histórica de posiciones, métricas agregadas e interfaz de Streamlit.
@@ -85,9 +106,9 @@ DEGIRO exports
     -> Streamlit
 ```
 
-## Modelo de almacenamiento propuesto
+## Modelo de almacenamiento actual
 
-La propuesta inicial es:
+La implementacion actual usa:
 
 - `DuckDB` como base local principal,
 - `Parquet` para datasets intermedios o exportables,

@@ -47,6 +47,11 @@ El bootstrap importa los CSV DEGIRO sinteticos, carga DuckDB en
 `demo/local_data/portfolio.duckdb`, inserta precios sinteticos offline y genera
 un informe mensual demo en `demo/local_data/reports/`.
 
+La configuracion demo fija `PRICE_PROVIDER=synthetic`. Los botones de refresh de
+FX y precios permanecen offline: conservan las series precargadas y marcan como
+omitidos los rangos que no cubre la demo, en vez de consultar proveedores
+externos.
+
 Este es el comando recomendado para ensenar el proyecto a otra persona:
 
 ```powershell
@@ -73,7 +78,10 @@ Abre `http://localhost:8501`. En la pestana `Agentes`, usa:
 - `LLM provider`: `static`
 - `Search provider`: `static`
 
-Asi no se usan claves API ni red.
+Asi no se usan claves API ni red y el monitor recibe resultados sinteticos para
+mostrar el flujo completo. `static/null` tambien es offline, pero se reserva
+como baseline: no genera contexto de busqueda y el monitor puede quedar
+`partial`.
 
 En la demo puedes mostrar:
 
@@ -81,6 +89,10 @@ En la demo puedes mostrar:
 - evolucion y metricas;
 - informe mensual demo;
 - agentes con plan interno, acciones usadas, restricciones y trazabilidad.
+
+El repositorio no incluye actualmente capturas del dashboard. Si se anade
+material visual, debe generarse desde este workspace sintetico despues del
+bootstrap y revisarse con el checklist de `docs/privacy.md`.
 
 ## Ejecutar agentes demo por consola
 

@@ -1,5 +1,3 @@
-from pathlib import Path
-
 from src.config import default_repo_root, load_settings
 from src.degiro_exports.cash_movements import parse_degiro_cash_movements_csv
 from src.degiro_exports.portfolio_snapshots import parse_degiro_portfolio_snapshot_csv

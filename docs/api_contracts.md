@@ -45,10 +45,7 @@ Devuelve el read model principal para pintar cartera y resumen.
 
 Caso de uso base:
 
-- `LoadPortfolioMetricsUseCase`
-- `LoadPortfolioSnapshotsUseCase`
-- `LoadPortfolioTransactionsUseCase`
-- `GetNetExternalContributionsUseCase`
+- `GetPortfolioStateUseCase`
 
 Query params:
 
@@ -82,13 +79,14 @@ Respuesta:
       "asset_id": "IE00B44Z5B48",
       "asset_name": "SPDR MSCI ACWI UCITS ETF",
       "asset_type": "etf",
+      "isin": "IE00B44Z5B48",
       "quantity": 10.0,
       "market_value_base": 1000.0,
       "weight": 0.08,
       "cost_basis_base": 900.0,
       "unrealized_pnl_base": 100.0,
       "unrealized_return_pct": 0.1111,
-      "valuation_status": "broker_snapshot"
+      "valuation_status": "valued_anchored"
     }
   ],
   "history": [
@@ -108,10 +106,10 @@ Respuesta:
 Notas:
 
 - La API no debe devolver DataFrames crudos.
-- La aplicacion debe transformar los resultados de `PortfolioMetricsResult` a
-  JSON estable antes de exponerlos.
-- Si se necesita este endpoint, conviene crear un caso de uso especifico tipo
-  `GetPortfolioStateUseCase`.
+- `GetPortfolioStateUseCase` ya transforma fechas, valores no finitos y tipos
+  de pandas/numpy a un read model JSON estable.
+- `data_quality.warnings` contiene codigos estables como
+  `missing_price_positions:<count>` y `missing_fx_positions:<count>`.
 
 ## 2. Importar DEGIRO
 
@@ -160,8 +158,12 @@ Respuesta:
 Notas:
 
 - En una UI publica/demo, este endpoint debe ejecutarse contra rutas demo.
-- La API no debe aceptar uploads arbitrarios en la primera version. Primero
-  paths locales controlados; uploads se pueden valorar despues.
+- Los bytes subidos por una UI deben pasar primero por
+  `SaveDegiroUploadsUseCase`, que detecta el tipo, genera un nombre canonico y
+  solo escribe en `DEGIRO_EXPORTS_DIR/incoming`. La API no debe aceptar un path
+  de destino arbitrario.
+- `GetPendingDegiroImportStatusUseCase` permite avisar si hay snapshots de
+  cartera recibidos que todavia no se han normalizado.
 
 ## 3. Refrescar datos
 
@@ -171,6 +173,7 @@ Refresca FX y precios de mercado.
 
 Casos de uso base:
 
+- `InferFxRequirementsUseCase`
 - `RefreshFxUseCase`
 - `RefreshMarketDataUseCase`
 
@@ -184,9 +187,11 @@ Request:
   "refresh_prices": true,
   "fx_provider": null,
   "price_provider": null,
+  "fx_pairs": [],
+  "infer_fx_from_normalized": true,
   "asset_ids": [],
   "include_inactive": false,
-  "only_missing_fx": false,
+  "only_missing_base": false,
   "bootstrap_degiro_assets": true,
   "write_overrides_template": true
 }
@@ -203,7 +208,7 @@ Respuesta:
   ],
   "artifacts": {
     "fx": {
-      "provider": "ecb",
+      "provider": "yfinance",
       "updated_pairs": 2,
       "skipped_pairs": 0,
       "rows_written": 120
@@ -214,7 +219,7 @@ Respuesta:
       "updated_assets": 10,
       "skipped_assets": 2,
       "rows_written": 300,
-      "override_template_path": "src/data/local/market_data/asset_overrides.yaml"
+      "override_template_path": "src/data/local/market_data/asset_overrides.csv"
     }
   }
 }
@@ -225,6 +230,9 @@ Notas:
 - Si el refresco tarda demasiado, este contrato puede evolucionar a:
   `POST /api/v1/jobs/market-data-refresh` + `GET /api/v1/jobs/{job_id}`.
 - El frontend no debe asumir que `partial` es fallo total.
+- Los providers de FX/precios soportados son `yfinance` y `synthetic`.
+  `synthetic` es exclusivo de demo offline y conserva los datos sembrados; no
+  inventa ni descarga nuevas series.
 
 ## 4. Generar informe
 
@@ -340,10 +348,15 @@ Respuesta:
 
 Notas:
 
-- En demo, defaults seguros: `llm_provider=static` y `search_provider=null`.
+- El contrato usa defaults offline seguros:
+  `llm_provider=static` y `search_provider=null`. La demo publica puede optar
+  por `static/static` para añadir contexto de busqueda sintetico.
 - En ejecucion real, la API solo debe permitir providers configurados
   localmente. No debe exponer claves.
 - Una futura API deberia tratar este endpoint como candidato claro a job local.
+- Para ejecutar solo el monitor tematico existe
+  `RunMonitorTematicoUseCase`, con los mismos nombres de providers y defaults
+  `static/null`.
 
 ## 6. Leer auditoria de agentes
 
@@ -587,14 +600,13 @@ Notas:
 Antes de implementar servidor, faltan estos casos de uso para que la API pueda
 ser fina:
 
-- `GetPortfolioStateUseCase`: read model JSON estable para cartera.
 - `UpdateInvestmentBriefUseCase`: escribir brief con hash opcional.
 - `ReadPortfolioTargetsUseCase`: leer targets completos validados.
 - `UpdatePortfolioTargetsUseCase`: validar y escribir targets estructurados.
 
 ## Orden recomendado
 
-1. Implementar los casos de uso pendientes sin FastAPI.
+1. Implementar los casos de uso de escritura y targets pendientes sin FastAPI.
 2. Adaptar Streamlit para usar esos casos de uso cuando aplique.
 3. Anadir tests unitarios de contratos JSON sobre `src/application/`.
 4. Solo entonces montar FastAPI como wrapper fino.

@@ -2,7 +2,9 @@ from datetime import date
 from pathlib import Path
 from types import SimpleNamespace
 
+from src.application.uploads import DegiroUpload, SaveDegiroUploadsRequest, SaveDegiroUploadsUseCase
 from src.application import extract_report_as_of_date_from_path
+from src.config import load_settings
 from src.market_data import FxRefreshOutcome, FxRefreshSummary, PriceRefreshOutcome, PriceRefreshSummary
 from src.portfolio.dashboard_overview import refresh_market_data_to_date
 from src.portfolio.dashboard_uploads import (
@@ -63,6 +65,29 @@ def test_extract_dates_from_filename_deduplicates_and_sorts() -> None:
         date(2025, 11, 1),
         date(2026, 4, 12),
     ]
+
+
+def test_save_degiro_uploads_use_case_writes_only_recognized_files(tmp_path) -> None:
+    settings = load_settings(
+        repo_root=tmp_path,
+        env={"DEGIRO_EXPORTS_DIR": "synthetic_exports"},
+        env_file=tmp_path / ".env.missing",
+    )
+    result = SaveDegiroUploadsUseCase(settings=settings).execute(
+        SaveDegiroUploadsRequest(
+            uploads=(
+                DegiroUpload(filename="Cartera 29-04-2026.csv", content=b"portfolio"),
+                DegiroUpload(filename="export.csv", content=b"unknown"),
+            ),
+            uploaded_at=date(2026, 4, 30),
+        )
+    )
+
+    assert result.result.status == "partial"
+    assert [outcome.status for outcome in result.outcomes] == ["guardado", "omitido"]
+    saved_path = settings.degiro_exports_dir / "incoming" / "portfolio_2026-04-29.csv"
+    assert saved_path.read_bytes() == b"portfolio"
+    assert not (settings.degiro_exports_dir / "incoming" / "export.csv").exists()
 
 
 def test_extract_report_as_of_date_from_path() -> None:

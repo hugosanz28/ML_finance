@@ -10,6 +10,7 @@ import altair as alt
 import pandas as pd
 
 from src.portfolio import PortfolioMetricsResult
+from src.portfolio.state_projection import latest_broker_snapshot_view as _latest_broker_snapshot_view
 
 
 def _daily_metrics(metrics: PortfolioMetricsResult) -> pd.DataFrame:
@@ -22,68 +23,6 @@ def _positions_for_date(metrics: PortfolioMetricsResult, valuation_date: date) -
     frame = metrics.position_metrics.copy()
     frame["valuation_date"] = pd.to_datetime(frame["valuation_date"]).dt.date
     return frame.loc[frame["valuation_date"] == valuation_date].copy()
-
-
-def _latest_broker_snapshot_view(snapshots: pd.DataFrame) -> dict[str, Any] | None:
-    if snapshots is None or snapshots.empty:
-        return None
-    frame = snapshots.copy()
-    frame["snapshot_date"] = pd.to_datetime(frame["snapshot_date"], errors="coerce").dt.date
-    frame["market_value_base"] = pd.to_numeric(frame["market_value_base"], errors="coerce")
-    frame["unrealized_pnl_base"] = pd.to_numeric(frame.get("unrealized_pnl_base"), errors="coerce")
-    frame["quantity"] = pd.to_numeric(frame.get("quantity"), errors="coerce")
-    frame["asset_name"] = frame["asset_name"].fillna(frame["asset_id"]).astype("string")
-    frame["asset_type"] = frame["asset_type"].fillna("unknown").astype("string")
-    frame = frame.dropna(subset=["snapshot_date", "market_value_base"])
-    if frame.empty:
-        return None
-
-    latest_date = max(frame["snapshot_date"])
-    latest = frame.loc[frame["snapshot_date"] == latest_date].copy()
-    total_value = float(latest["market_value_base"].sum())
-    has_snapshot_unrealized = latest["unrealized_pnl_base"].notna().any()
-    if has_snapshot_unrealized:
-        total_unrealized = float(latest["unrealized_pnl_base"].fillna(0.0).sum())
-        total_cost = total_value - total_unrealized
-        portfolio_return_pct = None if abs(total_cost) < 1e-9 else total_unrealized / total_cost
-    else:
-        total_unrealized = None
-        portfolio_return_pct = None
-
-    latest["weight"] = 0.0 if abs(total_value) < 1e-9 else latest["market_value_base"] / total_value
-    latest["cost_basis_base"] = pd.NA
-    rows_with_unrealized = latest["unrealized_pnl_base"].notna()
-    latest.loc[rows_with_unrealized, "cost_basis_base"] = (
-        latest.loc[rows_with_unrealized, "market_value_base"] - latest.loc[rows_with_unrealized, "unrealized_pnl_base"]
-    )
-    latest["unrealized_return_pct"] = pd.to_numeric(
-        latest["unrealized_pnl_base"] / pd.to_numeric(latest["cost_basis_base"], errors="coerce").replace(0, pd.NA),
-        errors="coerce",
-    )
-    latest["valuation_status"] = "broker_snapshot"
-    positions = latest.loc[
-        :,
-        [
-            "asset_id",
-            "asset_name",
-            "asset_type",
-            "quantity",
-            "market_value_base",
-            "weight",
-            "cost_basis_base",
-            "unrealized_pnl_base",
-            "unrealized_return_pct",
-            "valuation_status",
-        ],
-    ].copy()
-
-    return {
-        "snapshot_date": latest_date,
-        "positions": positions,
-        "total_market_value_base": total_value,
-        "total_unrealized_pnl_base": total_unrealized,
-        "portfolio_return_pct": portfolio_return_pct,
-    }
 
 
 def _build_broker_anchored_daily_series(daily: pd.DataFrame, snapshots: pd.DataFrame) -> tuple[pd.DataFrame, str]:

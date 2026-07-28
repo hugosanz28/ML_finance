@@ -11,7 +11,7 @@ from src.agents.analista_activos.asset_builder import (
 from src.agents.analista_activos.llm import (
     AssetLLMProvider,
     AssetLLMProviderError,
-    OpenAIAssetLLMProvider,
+    StaticAssetLLMProvider,
 )
 from src.agents.autonomy import autonomy_metadata, skipped_action
 from src.agents.base import BaseAgent
@@ -22,7 +22,8 @@ class AnalistaActivosAgent(BaseAgent):
     """Evaluate current holdings and candidates against the account mandate."""
 
     def __init__(self, *, llm_provider: AssetLLMProvider | None = None) -> None:
-        self.llm_provider = llm_provider or OpenAIAssetLLMProvider()
+        # Keep direct construction deterministic and offline.
+        self.llm_provider = llm_provider or StaticAssetLLMProvider()
 
     @property
     def name(self) -> str:

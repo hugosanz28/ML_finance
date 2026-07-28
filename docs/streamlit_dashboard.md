@@ -17,6 +17,8 @@ $env:ML_FINANCE_ENV_FILE="demo/synthetic_config/.env.demo"
 ```
 
 Ese modo apunta a `demo/local_data/` y no a `src/data/local/`.
+Ademas usa `PRICE_PROVIDER=synthetic`: los refresh de FX y precios no acceden a
+la red y conservan las series precargadas por el bootstrap.
 
 Despues abre:
 
@@ -85,7 +87,11 @@ oficiales de DEGIRO, primero debes subir/importar las exportaciones en
 5. Pulsa `2. Refrescar FX`.
 6. Pulsa `3. Refrescar precios`.
 7. Pulsa `4. Generar informe`.
-8. Entra en `Agentes`, revisa los inputs, activa o desactiva `Enviar target_weights al pipeline`, y ejecuta la red con `static/null` para demo local. Para una ejecucion real usa `openai/tavily` si tienes `TAVILY_API_KEY`; `openai/duckduckgo` queda como fallback best-effort sin API key.
+8. Entra en `Agentes`, revisa los inputs y activa o desactiva `Enviar
+   target_weights al pipeline`. Usa `static/null` como baseline offline o
+   `static/static` para una demo completa con contexto sintetico. Para una
+   ejecucion real usa `openai/tavily` si tienes `TAVILY_API_KEY`;
+   `openai/duckduckgo` queda como fallback best-effort sin API key.
 
 La pestaña `Agentes` bloquea la ejecucion si el informe mensual seleccionado no
 corresponde a la fecha valorada actual de la cartera, o si el
@@ -94,8 +100,9 @@ un informe antiguo con metricas actuales. Si aparece el bloqueo, vuelve a
 `Actualizar datos` y genera un informe nuevo para la fecha actual antes de
 ejecutar la red.
 
-El `portfolio_metrics_snapshot` editable se prepara con `asset_overrides.csv`.
-Cuando DEGIRO trae nombres truncados, la UI conserva el valor original como
+`BuildAgentDashboardSnapshotUseCase` prepara el
+`portfolio_metrics_snapshot` editable y aplica `asset_overrides.csv`. Cuando
+DEGIRO trae nombres truncados, la UI conserva el valor original como
 `broker_asset_name` y muestra en `asset_name` el nombre normalizado que usaran
 los agentes.
 
@@ -161,22 +168,38 @@ Get-Process | Where-Object { $_.ProcessName -like "*python*" }
 
 ## Contratos usados
 
-El dashboard no calcula cartera por su cuenta. Para acciones operativas usa la
-capa `src/application/` y, para lectura/visualizacion, consume contratos de
-dominio ya existentes.
+El dashboard no calcula cartera por su cuenta. Tanto las acciones operativas
+como los read models entran por `src/application/`; los modulos
+`dashboard_*` solo mantienen composicion visual y transformaciones para
+graficas.
 
 Casos de uso operativos:
 
+- `SaveDegiroUploadsUseCase`
 - `ImportDegiroUseCase`
 - `RefreshFxUseCase`
 - `RefreshMarketDataUseCase`
 - `GenerateMonthlyReportUseCase`
 - `RunMonthlyAgentsUseCase`
 
-Contratos de dominio consumidos directamente:
+Read models usados por la UI:
 
-- `calculate_portfolio_metrics_from_normalized_degiro`
-- `get_latest_monthly_report`
+- `LoadPortfolioMetricsUseCase`
+- `LoadPortfolioSnapshotsUseCase`
+- `LoadPortfolioTransactionsUseCase`
+- `GetNetExternalContributionsUseCase`
+- `GetPendingDegiroImportStatusUseCase`
+- `GetWarehouseCountsUseCase`
+- `ListDashboardReportsUseCase`
+- `ReadInvestmentBriefUseCase`
+- `ReadTargetWeightsUseCase`
+- `BuildAgentDashboardSnapshotUseCase`
+- `ListAgentRunsUseCase`
+- `GetAgentRunAuditUseCase`
+
+`GetPortfolioStateUseCase` ofrece, ademas, un read model general serializable
+para otros adaptadores. La UI actual usa los casos de uso granulares anteriores
+para no cargar historico o posiciones cuando una vista no los necesita.
 
 El `investment_brief` editable vive por defecto en:
 

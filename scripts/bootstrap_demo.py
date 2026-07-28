@@ -6,6 +6,10 @@ from datetime import date, timedelta
 from pathlib import Path
 import os
 import sys
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from src.market_data import DailyPriceRecord, DuckDBMarketDataRepository
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 if str(REPO_ROOT) not in sys.path:

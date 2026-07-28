@@ -3,7 +3,6 @@ from __future__ import annotations
 import csv
 from pathlib import Path
 import shutil
-import uuid
 
 import pandas as pd
 
@@ -14,14 +13,6 @@ from src.degiro_exports.portfolio_snapshots import EXPECTED_PORTFOLIO_HEADERS
 from src.degiro_exports.transactions import EXPECTED_TRANSACTION_HEADERS
 
 
-def make_test_workspace() -> Path:
-    base_dir = Path("src/data/local/test_runs")
-    base_dir.mkdir(parents=True, exist_ok=True)
-    workspace = base_dir / f"degiro-importer-{uuid.uuid4().hex[:8]}"
-    workspace.mkdir(parents=True, exist_ok=False)
-    return workspace
-
-
 def test_classify_degiro_export_uses_canonical_filenames() -> None:
     assert classify_degiro_export("transactions_2025-11-01_2026-04-12.csv") == "transactions"
     assert classify_degiro_export("account_2025-11-01_2026-04-12.csv") == "cash_movements"
@@ -29,8 +20,8 @@ def test_classify_degiro_export_uses_canonical_filenames() -> None:
     assert classify_degiro_export("other.csv") == "unknown"
 
 
-def test_import_degiro_exports_imports_all_canonical_csvs() -> None:
-    workspace = make_test_workspace()
+def test_import_degiro_exports_imports_all_canonical_csvs(tmp_path: Path) -> None:
+    workspace = tmp_path
     try:
         repo_root = workspace / "repo"
         incoming_dir = repo_root / "src" / "degiro_exports" / "local" / "incoming"
@@ -66,8 +57,8 @@ def test_import_degiro_exports_imports_all_canonical_csvs() -> None:
         shutil.rmtree(workspace, ignore_errors=True)
 
 
-def test_import_degiro_exports_reports_unknown_csvs() -> None:
-    workspace = make_test_workspace()
+def test_import_degiro_exports_reports_unknown_csvs(tmp_path: Path) -> None:
+    workspace = tmp_path
     try:
         repo_root = workspace / "repo"
         incoming_dir = repo_root / "src" / "degiro_exports" / "local" / "incoming"
@@ -86,8 +77,8 @@ def test_import_degiro_exports_reports_unknown_csvs() -> None:
         shutil.rmtree(workspace, ignore_errors=True)
 
 
-def test_import_degiro_exports_dry_run_does_not_write_outputs() -> None:
-    workspace = make_test_workspace()
+def test_import_degiro_exports_dry_run_does_not_write_outputs(tmp_path: Path) -> None:
+    workspace = tmp_path
     try:
         repo_root = workspace / "repo"
         incoming_dir = repo_root / "src" / "degiro_exports" / "local" / "incoming"

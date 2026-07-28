@@ -33,6 +33,9 @@ from src.portfolio.dashboard_common import (
 )
 from src.portfolio.dashboard_transforms import _parse_target_weights_input
 
+LLM_PROVIDER_OPTIONS = ("static", "openai")
+SEARCH_PROVIDER_OPTIONS = ("null", "static", "duckduckgo", "tavily")
+
 
 def render_agents_tab(settings: Settings) -> None:
     section_header(
@@ -87,8 +90,12 @@ def render_agents_tab(settings: Settings) -> None:
             disabled=not send_target_weights,
             help="Se pasa a `asistente_aportacion_mensual` para evaluar rebalanceo con criterio cuantitativo.",
         )
-        llm_provider = st.selectbox("LLM provider", options=["static", "openai"], index=0)
-        search_provider = st.selectbox("Search provider", options=["null", "duckduckgo", "tavily"], index=0)
+        llm_provider = st.selectbox("LLM provider", options=LLM_PROVIDER_OPTIONS, index=0)
+        search_provider = st.selectbox(
+            "Search provider",
+            options=SEARCH_PROVIDER_OPTIONS,
+            index=0,
+        )
         st.caption(
             "Usa `static/null` para demo sin coste ni red. "
             "Usa `openai/tavily` para busqueda API o `openai/duckduckgo` como fallback best-effort."
@@ -212,7 +219,11 @@ def _render_persisted_agent_audit(settings: Settings) -> None:
 
     _render_run_overview(audit.run_metadata, audit.input_payload, audit.output_dir)
     agent_tabs = st.tabs(["monitor_tematico", "analista_activos", "asistente_aportacion_mensual"])
-    for tab, agent_name in zip(agent_tabs, ("monitor_tematico", "analista_activos", "asistente_aportacion_mensual")):
+    for tab, agent_name in zip(
+        agent_tabs,
+        ("monitor_tematico", "analista_activos", "asistente_aportacion_mensual"),
+        strict=True,
+    ):
         with tab:
             _render_agent_audit(agent_name, audit.agents.get(agent_name, {}))
 
@@ -233,7 +244,7 @@ def _render_run_overview(run_metadata: Mapping[str, Any], input_payload: Mapping
         st.dataframe(pd.DataFrame(agent_statuses), width="stretch", hide_index=True)
 
     with st.expander("Inputs del run", expanded=False):
-        _render_input_refs(input_payload.get("inputs") or [])
+        _render_input_refs(input_payload.get("inputs") or [], key_prefix="run")
     with st.expander("Prompt versions", expanded=False):
         st.json(run_metadata.get("prompt_versions") or {})
     st.caption(f"Directorio local: {output_dir}")
@@ -262,9 +273,9 @@ def _render_agent_audit(agent_name: str, audit: Mapping[str, Any]) -> None:
     with detail_tabs[1]:
         _render_sources(parsed)
     with detail_tabs[2]:
-        _render_prompts(prompt_refs, prompt_rendered)
+        _render_prompts(prompt_refs, prompt_rendered, key_prefix=agent_name)
     with detail_tabs[3]:
-        _render_input_refs(context.get("input_refs") or [])
+        _render_input_refs(context.get("input_refs") or [], key_prefix=agent_name)
     with detail_tabs[4]:
         st.json(request)
     with detail_tabs[5]:
@@ -315,27 +326,39 @@ def _render_sources(parsed: Mapping[str, Any]) -> None:
         st.json(all_sources)
 
 
-def _render_prompts(prompt_refs: Mapping[str, Any], prompt_rendered: str) -> None:
+def _render_prompts(prompt_refs: Mapping[str, Any], prompt_rendered: str, *, key_prefix: str) -> None:
     prompts = prompt_refs.get("prompts") or []
     if prompts:
         st.dataframe(pd.DataFrame(prompts), width="stretch", hide_index=True)
     if prompt_rendered:
-        st.text_area("Prompt renderizado", value=prompt_rendered, height=360, disabled=True)
+        st.text_area(
+            "Prompt renderizado",
+            value=prompt_rendered,
+            height=360,
+            disabled=True,
+            key=f"audit_prompt_{key_prefix}",
+        )
     else:
         st.info("No hay prompt renderizado guardado.")
 
 
-def _render_input_refs(inputs: list[Mapping[str, Any]]) -> None:
+def _render_input_refs(inputs: list[Mapping[str, Any]], *, key_prefix: str) -> None:
     if not inputs:
         st.info("No hay inputs registrados.")
         return
     st.dataframe(pd.DataFrame(_flatten_inputs(inputs)), width="stretch", hide_index=True)
-    for input_ref in inputs:
+    for index, input_ref in enumerate(inputs):
         metadata = input_ref.get("metadata") or {}
         content = metadata.get("content") or metadata.get("text")
         if content:
             with st.expander(f"Contenido: {input_ref.get('key')}", expanded=False):
-                st.text_area(str(input_ref.get("key")), value=str(content), height=220, disabled=True)
+                st.text_area(
+                    str(input_ref.get("key")),
+                    value=str(content),
+                    height=220,
+                    disabled=True,
+                    key=f"audit_input_{key_prefix}_{index}_{input_ref.get('key')}",
+                )
 
 
 def render_agent_autonomy(metadata: Mapping[str, Any]) -> None:

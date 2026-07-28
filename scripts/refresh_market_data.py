@@ -11,14 +11,7 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
-from src.config import get_settings
-from src.market_data import (
-    DuckDBMarketDataRepository,
-    PriceRefreshService,
-    build_price_provider,
-    sync_market_assets_from_normalized_degiro,
-    write_asset_overrides_template,
-)
+from src.application.market_data import RefreshMarketDataRequest, RefreshMarketDataUseCase
 
 
 def parse_args() -> argparse.Namespace:
@@ -47,38 +40,29 @@ def parse_args() -> argparse.Namespace:
 
 def main() -> int:
     args = parse_args()
-    settings = get_settings()
-    repository = DuckDBMarketDataRepository(settings=settings)
-
+    use_case_result = RefreshMarketDataUseCase().execute(
+        RefreshMarketDataRequest(
+            start_date=args.start_date,
+            end_date=args.end_date,
+            asset_ids=tuple(args.asset_ids or ()),
+            provider=args.provider,
+            bootstrap_degiro_assets=not args.no_bootstrap_degiro,
+            include_inactive=args.include_inactive,
+            write_overrides_template=not args.no_write_overrides_template,
+        )
+    )
     if not args.no_bootstrap_degiro:
-        synced_count = sync_market_assets_from_normalized_degiro(repository=repository, settings=settings)
-        print(f"Synced {synced_count} assets from normalized DEGIRO data into assets_master.")
+        print(f"Synced {use_case_result.synced_assets} assets from normalized DEGIRO data into assets_master.")
 
-    assets = repository.list_assets(asset_ids=args.asset_ids, active_only=not args.include_inactive)
-    if not assets:
-        print("No assets available for refresh.")
+    summary = use_case_result.summary
+    if summary is None:
+        print(use_case_result.result.message)
         return 1
 
-    start_date = args.start_date or _derive_start_date(assets)
-    end_date = args.end_date or date.today()
-    provider = None
-    if args.provider:
-        provider = build_price_provider(
-            args.provider,
-            cache_dir=settings.market_data_dir / "yfinance_cache",
-        )
-    service = PriceRefreshService(repository=repository, provider=provider, settings=settings)
-
-    summary = service.refresh_prices(
-        start_date=start_date,
-        end_date=end_date,
-        asset_ids=args.asset_ids,
-        active_only=not args.include_inactive,
-        bootstrap_degiro_assets=False,
-    )
-
+    start_date = use_case_result.result.artifacts["start_date"]
+    end_date = use_case_result.result.artifacts["end_date"]
     print(f"Provider: {summary.provider_name}")
-    print(f"Window: {start_date.isoformat()} -> {end_date.isoformat()}")
+    print(f"Window: {start_date} -> {end_date}")
     print(f"Assets updated: {summary.updated_assets}")
     print(f"Assets skipped: {summary.skipped_assets}")
     print(f"Rows written: {summary.total_records}")
@@ -92,23 +76,10 @@ def main() -> int:
                 f"- {outcome.asset_id}: {outcome.status} | rows={outcome.records_written} | symbol={detail}{note}"
             )
 
-    skipped_asset_ids = [outcome.asset_id for outcome in summary.outcomes if outcome.status == "skipped"]
-    if skipped_asset_ids and not args.no_write_overrides_template:
-        override_path = write_asset_overrides_template(
-            skipped_asset_ids,
-            repository=repository,
-            settings=settings,
-        )
-        print(f"\nOverride template updated: {override_path}")
+    if use_case_result.override_template_path is not None:
+        print(f"\nOverride template updated: {use_case_result.override_template_path}")
 
     return 0
-
-
-def _derive_start_date(assets) -> date:
-    dated_assets = [asset.first_seen_date for asset in assets if asset.first_seen_date is not None]
-    if dated_assets:
-        return min(dated_assets)
-    return date.today()
 
 
 if __name__ == "__main__":

@@ -11,7 +11,11 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
-from src.reports import generate_monthly_report, get_latest_monthly_report
+from src.application.reports import (
+    GenerateMonthlyReportRequest,
+    GenerateMonthlyReportUseCase,
+    GetLatestMonthlyReportUseCase,
+)
 
 
 def parse_args() -> argparse.Namespace:
@@ -47,7 +51,7 @@ def parse_args() -> argparse.Namespace:
 def main() -> int:
     args = parse_args()
     if args.latest:
-        latest = get_latest_monthly_report()
+        latest = GetLatestMonthlyReportUseCase().execute().report
         if latest is None:
             print("No monthly report metadata found.")
             return 1
@@ -57,19 +61,22 @@ def main() -> int:
         print(f"Path: {latest.report_path}")
         return 0
 
-    result = generate_monthly_report(
-        as_of_date=args.as_of_date,
-        output_dir=args.output_dir,
-        normalized_degiro_dir=args.normalized_degiro_dir,
-        persist=True,
+    result = GenerateMonthlyReportUseCase().execute(
+        GenerateMonthlyReportRequest(
+            as_of_date=args.as_of_date,
+            output_dir=args.output_dir,
+            normalized_degiro_dir=args.normalized_degiro_dir,
+            persist=True,
+        )
     )
+    report = result.report
 
-    print(f"Monthly report generated for {result.as_of_date.isoformat()}.")
-    if result.output_path is not None:
-        print(f"Output: {result.output_path}")
+    print(f"Monthly report generated for {report.as_of_date.isoformat()}.")
+    if report.output_path is not None:
+        print(f"Output: {report.output_path}")
     if args.stdout:
         print("\n---\n")
-        print(result.content)
+        print(report.content)
     return 0
 
 

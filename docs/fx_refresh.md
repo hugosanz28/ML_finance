@@ -26,6 +26,11 @@ Solo se refrescan pares donde la moneda del evento o posicion es distinta de
 `base_currency`. Con los datos actuales aparecen pares como `EUR/USD` y
 `EUR/CAD`.
 
+La inferencia serializable para scripts y futuras interfaces la expone
+`InferFxRequirementsUseCase`. El refresh se ejecuta mediante
+`RefreshFxUseCase`; las interfaces no llaman directamente al repositorio ni a
+`FxRefreshService`.
+
 ## Ejecucion
 
 ```powershell
@@ -41,6 +46,7 @@ Opciones utiles:
 - `--only-missing-base`
 - `--no-infer-from-normalized`
 - `--provider yfinance`
+- `--provider synthetic` (solo demo offline ya sembrada)
 
 Ejemplos:
 
@@ -64,12 +70,18 @@ La tabla `fx_rates` queda como fuente complementaria para:
 - recalcular metricas en moneda base cuando haga falta;
 - dejar trazabilidad por proveedor y fecha de ingesta.
 
-## Proveedor inicial
+## Providers
 
-El proveedor inicial es `yfinance`. Usa simbolos tipo:
+El provider normal y valor por defecto es `yfinance`. Usa simbolos tipo:
 
 - `EURUSD=X` para `EUR/USD`
 - `EURCAD=X` para `EUR/CAD`
 
 Si un par no devuelve datos, el resultado queda como `skipped` y no se inventa
 ningun tipo de cambio.
+
+La demo configura `PRICE_PROVIDER=synthetic`. Ese provider no descarga ni
+inventa FX: mantiene las filas `synthetic` creadas por
+`scripts/bootstrap_demo.py` y devuelve `skipped` si se intenta refrescar una
+serie externa. Por tanto, los checks de demo deben usar el bootstrap y no
+forzar red.

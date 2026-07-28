@@ -16,7 +16,6 @@ from src.portfolio.metrics_models import (
     PortfolioMetricsResult,
 )
 from src.portfolio.positions import (
-    ReconstructedPositionHistory,
     load_normalized_degiro_snapshots,
     load_normalized_degiro_transactions,
     reconstruct_positions_by_date,

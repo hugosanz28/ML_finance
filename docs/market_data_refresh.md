@@ -9,6 +9,10 @@ El refresh de precios diarios parte de los activos normalizados en:
 
 Esos activos se sincronizan en `assets_master` y despues se consulta el proveedor configurado, actualmente `yfinance`.
 
+El entrypoint de interfaces es `RefreshMarketDataUseCase`. Scripts y Streamlit
+no deben construir directamente el repositorio, el provider ni
+`PriceRefreshService`.
+
 El refresh de tipos de cambio se documenta aparte en `docs/fx_refresh.md`.
 Alimenta `fx_rates` con pares inferidos desde los normalizados de DEGIRO, por
 ejemplo `EUR/USD` o `EUR/CAD`.
@@ -33,7 +37,10 @@ Opciones utiles:
 - `--start-date YYYY-MM-DD`
 - `--end-date YYYY-MM-DD`
 - `--asset-id <asset_id>`
+- `--provider yfinance|synthetic`
+- `--no-bootstrap-degiro`
 - `--include-inactive`
+- `--no-write-overrides-template`
 
 ## Overrides manuales
 
@@ -59,8 +66,9 @@ simbolo literal `NAN`, porque eso contaminaria varias series con el mismo ticker
 
 - `cash` no se refresca con market data externa.
 - los derechos no negociables se excluyen del refresh.
-- `BITCOIN` usa `BTC-EUR`.
-- `AMUNDI PRIME EURO GOVERNMENT BOND 0-1Y UCITS ACC ETF` usa `PRAB.DE`.
 - los ETC/ETF o acciones con simbolo ambiguo se resuelven mediante
   `asset_overrides.csv`; el precio resultante solo aporta variacion relativa
   cuando la valoracion esta anclada al broker.
+- el entorno normal usa `yfinance`;
+- la demo usa `synthetic`, conserva las series sembradas por
+  `scripts/bootstrap_demo.py` y no accede a red ni genera precios nuevos.

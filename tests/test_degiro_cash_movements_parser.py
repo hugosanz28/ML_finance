@@ -3,7 +3,6 @@ from __future__ import annotations
 import csv
 from pathlib import Path
 import shutil
-import uuid
 
 import pandas as pd
 import pytest
@@ -265,16 +264,8 @@ def write_account_fixture(csv_path: Path) -> None:
         writer.writerows(rows)
 
 
-def make_test_workspace() -> Path:
-    base_dir = Path("src/data/local/test_runs")
-    base_dir.mkdir(parents=True, exist_ok=True)
-    workspace = base_dir / f"degiro-cash-{uuid.uuid4().hex[:8]}"
-    workspace.mkdir(parents=True, exist_ok=False)
-    return workspace
-
-
-def test_parse_degiro_cash_movements_csv_normalizes_cash_movements() -> None:
-    workspace = make_test_workspace()
+def test_parse_degiro_cash_movements_csv_normalizes_cash_movements(tmp_path: Path) -> None:
+    workspace = tmp_path
     try:
         csv_path = workspace / "account_2025-11-01_2026-04-12.csv"
         write_account_fixture(csv_path)
@@ -331,8 +322,8 @@ def test_parse_degiro_cash_movements_csv_normalizes_cash_movements() -> None:
         shutil.rmtree(workspace, ignore_errors=True)
 
 
-def test_parse_and_persist_degiro_cash_movements_writes_parquet_output() -> None:
-    workspace = make_test_workspace()
+def test_parse_and_persist_degiro_cash_movements_writes_parquet_output(tmp_path: Path) -> None:
+    workspace = tmp_path
     try:
         repo_root = workspace / "repo"
         source_dir = repo_root / "incoming"
@@ -354,8 +345,8 @@ def test_parse_and_persist_degiro_cash_movements_writes_parquet_output() -> None
         shutil.rmtree(workspace, ignore_errors=True)
 
 
-def test_parse_degiro_cash_movements_csv_rejects_invalid_filename() -> None:
-    workspace = make_test_workspace()
+def test_parse_degiro_cash_movements_csv_rejects_invalid_filename(tmp_path: Path) -> None:
+    workspace = tmp_path
     try:
         csv_path = workspace / "degiro_account.csv"
         write_account_fixture(csv_path)

@@ -10,9 +10,7 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
-from src.config import get_settings
-from src.degiro_exports.importer import import_degiro_exports
-from src.degiro_exports.warehouse import load_normalized_degiro_to_duckdb
+from src.application.degiro import ImportDegiroRequest, ImportDegiroUseCase
 
 
 def parse_args() -> argparse.Namespace:
@@ -54,17 +52,19 @@ def parse_args() -> argparse.Namespace:
 
 def main() -> int:
     args = parse_args()
-    settings = get_settings()
-    summary = import_degiro_exports(
-        settings=settings,
-        incoming_dir=args.incoming_dir,
-        output_dir=args.output_dir,
-        base_currency=args.base_currency,
-        account_id=args.account_id,
-        source_root=args.source_root,
-        ignore_unknown=args.ignore_unknown,
-        dry_run=args.dry_run,
+    use_case_result = ImportDegiroUseCase().execute(
+        ImportDegiroRequest(
+            incoming_dir=args.incoming_dir,
+            output_dir=args.output_dir,
+            base_currency=args.base_currency,
+            account_id=args.account_id,
+            source_root=args.source_root,
+            ignore_unknown=args.ignore_unknown,
+            dry_run=args.dry_run,
+            load_duckdb=not args.skip_duckdb_load,
+        )
     )
+    summary = use_case_result.import_summary
 
     print(f"Incoming: {summary.incoming_dir}")
     print(f"Output: {summary.output_dir}")
@@ -86,11 +86,8 @@ def main() -> int:
         for output_path in outcome.output_paths:
             print(f"  -> {output_path}")
 
-    if not args.dry_run and not args.skip_duckdb_load and not summary.failed_count:
-        warehouse_summary = load_normalized_degiro_to_duckdb(
-            settings=settings,
-            normalized_degiro_dir=summary.output_dir,
-        )
+    warehouse_summary = use_case_result.warehouse_summary
+    if warehouse_summary is not None:
         print(
             "DuckDB load: "
             f"assets={warehouse_summary.assets}, "

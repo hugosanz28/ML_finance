@@ -19,6 +19,7 @@ from .data_quality import (
     check_portfolio_metrics_quality,
     extract_snapshot_as_of_date,
 )
+from .contributions import net_external_contributions_until
 from .positions import (
     ReconstructedPositionHistory,
     load_normalized_degiro_snapshots,
@@ -48,6 +49,7 @@ __all__ = [
     "load_portfolio_targets",
     "load_fx_rates_from_duckdb",
     "load_prices_daily_from_duckdb",
+    "net_external_contributions_until",
     "persist_portfolio_metrics",
     "persist_reconstructed_positions",
     "portfolio_targets_from_mapping",

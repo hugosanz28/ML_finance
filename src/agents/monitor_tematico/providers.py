@@ -98,10 +98,11 @@ class StaticSearchProvider:
         max_results: int,
     ) -> tuple[SearchResult, ...]:
         if not self._results_by_query:
+            query_id = hashlib.sha256(query.encode("utf-8")).hexdigest()[:16]
             return (
                 SearchResult(
                     title=f"Synthetic context for {query}",
-                    url=f"synthetic://search/{abs(hash(query))}",
+                    url=f"synthetic://search/{query_id}",
                     snippet=(
                         "Resultado sintetico local para demo: resume riesgos de mercado, "
                         "valoracion y encaje con una cartera core/satellite."

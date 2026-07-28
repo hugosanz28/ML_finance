@@ -7,14 +7,14 @@ Este directorio guarda datos derivados y datasets de soporte.
 
 La demo publica ejecutable vive en `demo/`, no bajo `src/data/sample/`.
 
-Estructura prevista dentro de `local/`:
+El runtime crea bajo `local/` las rutas que necesita:
 
-- `raw/`
-- `normalized/`
-- `curated/`
-- `market_data/`
-- `reports/`
-- `legacy/`
+- `raw/`: aterrizaje reservado para datos fuente;
+- `normalized/`: Parquet normalizado, incluido `normalized/degiro/`;
+- `curated/`: posiciones y metricas derivadas;
+- `market_data/`: overrides y cache de proveedores;
+- `reports/`: informes Markdown persistidos;
+- `agents/`: runs, auditoria, caches e inputs editados desde la UI.
 
 Artefactos relevantes ya en uso:
 
@@ -26,6 +26,9 @@ Artefactos relevantes ya en uso:
   `sample/portfolio_targets.example.yaml`.
 - `investment_brief.md`: mandato narrativo privado de la cuenta. Hay un ejemplo
   versionado en `sample/investment_brief.example.md`.
+
+Las ubicaciones efectivas son configurables mediante `.env`. La demo usa
+`demo/local_data/` y no crea ni lee estos artefactos privados.
 
 DDL versionado:
 

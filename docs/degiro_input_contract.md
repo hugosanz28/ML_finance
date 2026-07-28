@@ -2,7 +2,7 @@
 
 ## Objetivo
 
-Este documento define el contrato de entrada inicial para las exportaciones de
+Este documento define el contrato de entrada vigente para las exportaciones de
 DEGIRO que alimentaran el importador del proyecto.
 
 Su finalidad es fijar:
@@ -28,10 +28,10 @@ Referencias y muestras validadas el 2026-04-12:
 - `account_2025-11-01_2026-04-12.csv`
 - `portfolio_2026-04-12.csv`
 
-## Ficheros soportados inicialmente
+## Ficheros soportados
 
 La ayuda oficial de DEGIRO indica que se pueden descargar varios informes.
-Para la primera version del importador, el alcance inicial queda limitado a:
+En la v1, el alcance queda limitado a:
 
 1. `Transacciones`
 2. `Estado de cuenta`
@@ -42,25 +42,25 @@ Para la primera version del importador, el alcance inicial queda limitado a:
 - Ubicacion en DEGIRO: `Buzon`
 - Cobertura temporal: rango de fechas configurable
 - Formatos ofrecidos por DEGIRO: Excel, PDF y CSV
-- Formato soportado inicialmente por este proyecto: `CSV`
+- Formato soportado por este proyecto: `CSV`
 
 ### `Estado de cuenta`
 
 - Ubicacion en DEGIRO: `Buzon`
 - Cobertura temporal: rango de fechas configurable
 - Formatos ofrecidos por DEGIRO: Excel, PDF y CSV
-- Formato soportado inicialmente por este proyecto: `CSV`
+- Formato soportado por este proyecto: `CSV`
 
 ### `Cartera`
 
 - Ubicacion en DEGIRO: seccion `Cartera`
 - Cobertura temporal: una fecha concreta elegida por el usuario
 - Formatos ofrecidos por DEGIRO: XLS, CSV y PDF
-- Formato soportado inicialmente por este proyecto: `CSV`
+- Formato soportado por este proyecto: `CSV`
 
-## Fuera de alcance inicial
+## Fuera de alcance
 
-Aunque DEGIRO ofrece otros documentos, no forman parte del contrato inicial del
+Aunque DEGIRO ofrece otros documentos, no forman parte del contrato actual del
 importador:
 
 - `Informe anual`
@@ -68,8 +68,8 @@ importador:
 - PDF de cualquier tipo
 - Excel o XLS de cualquier tipo
 
-Estos formatos podran documentarse o soportarse mas adelante, pero no bloquean
-las tareas `P2-02`, `P2-03` y `P2-04`.
+Estos formatos podran documentarse o soportarse mas adelante, pero no forman
+parte del importador actual.
 
 ## Ubicacion en el repositorio
 
@@ -85,6 +85,12 @@ Regla operativa:
 - los ficheros reales originales no deben editarse manualmente,
 - y cualquier fixture de ejemplo debe derivarse de una exportacion real ya
   inspeccionada.
+
+Una interfaz no escribe uploads por su cuenta. `SaveDegiroUploadsUseCase`
+detecta nombres en espanol o ingles, extrae fechas ISO/DMY cuando existen y
+guarda un nombre canonico dentro de `DEGIRO_EXPORTS_DIR/incoming`. Si faltan
+fechas usa la fecha de upload como fallback. Despues,
+`ImportDegiroUseCase` ejecuta los parsers y carga DuckDB por defecto.
 
 ## Formato común confirmado en las muestras reales
 
@@ -143,46 +149,27 @@ Ejemplo:
 
 ### Nombre original
 
-Ademas del nombre canonico, cada importacion debe conservar el nombre original
-descargado desde DEGIRO como metadato de trazabilidad.
+Durante un upload, `SaveDegiroUploadsResult` expone el nombre original y el
+canonico. Los datasets persistidos conservan el canonico en `source_file`; el
+nombre original no tiene persistencia duradera en el modelo actual.
 
-## Metadatos minimos por fichero importado
+## Metadatos y trazabilidad implementados
 
-Antes de parsear filas, cada fichero debe quedar identificado por metadatos
-minimos.
+Las filas normalizadas conservan:
 
-Obligatorios:
+- `broker = DEGIRO`;
+- `source_file` con el nombre canonico;
+- `source_path`, relativo a `source_root` en el flujo normal;
+- `source_row`;
+- fechas del evento y, para cartera, `snapshot_date` derivada del nombre.
 
-- `broker = DEGIRO`
-- `export_type = transactions | account | portfolio`
-- `source_format = csv`
-- `source_filename_original`
-- `source_filename_canonical`
-- `source_path`
+`SaveDegiroUploadsResult` conserva `original_filename`, `saved_as`, tipo
+detectado y resultado durante la operacion de upload. El nombre original no es
+una columna persistida en los Parquet actuales; una futura auditoria de uploads
+debera modelarlo explicitamente si necesita conservarlo entre ejecuciones.
 
-Obligatorios para `transactions` y `account`:
-
-- `date_from`
-- `date_to`
-
-Obligatorios para `portfolio`:
-
-- `snapshot_date`
-
-Opcionales pero recomendados:
-
-- `exported_at`
-- `account_label`
-- `account_currency`
-- `ui_locale`
-- `csv_delimiter`
-- `csv_encoding`
-
-Valores por defecto observados en la muestra validada:
-
-- `ui_locale = es`
-- `csv_delimiter = ,`
-- `csv_encoding = utf-8`
+Los CSV se leen como UTF-8 con BOM opcional. Las cabeceras observadas son
+espanolas, pero los parsers aceptan los aliases ingleses versionados.
 
 ## Contrato de contenido por tipo de fichero
 
@@ -359,20 +346,19 @@ Los ejemplos saneados no deben:
 6. Crear, si procede, un ejemplo saneado en `src/degiro_exports/example/`.
 7. Ajustar este documento con las cabeceras reales observadas.
 
-`scripts/import_degiro.py` no implementa logica de parsing propia. Detecta el tipo de export por nombre de fichero y delega en los parsers versionados:
+`scripts/import_degiro.py` es un adaptador fino sobre
+`ImportDegiroUseCase`; no implementa parsing propio. El importador detecta el
+tipo por nombre canonico y delega en los parsers versionados:
 
 - `parse_and_persist_degiro_transactions`
 - `parse_and_persist_degiro_cash_movements`
 - `parse_and_persist_degiro_portfolio_snapshots`
 
-## Estado de cierre de `P2-01`
+## Estado actual
 
-Con las tres exportaciones reales ya inspeccionadas, este contrato queda
-suficientemente definido para arrancar:
-
-- `P2-02` parser de transacciones
-- `P2-03` parser de movimientos de efectivo
-- `P2-04` parser de snapshot de cartera
+Los parsers de transacciones, movimientos de efectivo y snapshots de cartera
+estan implementados, validan contratos normalizados, persisten Parquet y pueden
+cargarse en DuckDB mediante el caso de uso de importacion.
 
 Las futuras muestras reales solo deberian ampliar alias, excepciones o nuevos
 casos de producto, no redefinir el contrato base ya observado.

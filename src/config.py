@@ -127,11 +127,12 @@ def load_settings(
     """Build settings from defaults, .env values, and environment overrides."""
     resolved_repo_root = default_repo_root() if repo_root is None else Path(repo_root).expanduser().resolve()
     env_file_override = os.environ.get("ML_FINANCE_ENV_FILE")
-    resolved_env_file = (
-        resolved_repo_root / ".env"
-        if env_file is None and not env_file_override
-        else Path(env_file_override if env_file is None else env_file).expanduser()
-    )
+    if env_file is not None:
+        resolved_env_file = Path(env_file).expanduser()
+    elif env_file_override:
+        resolved_env_file = Path(env_file_override).expanduser()
+    else:
+        resolved_env_file = resolved_repo_root / ".env"
     if not resolved_env_file.is_absolute():
         resolved_env_file = resolved_repo_root / resolved_env_file
     resolved_env_file = resolved_env_file.resolve()

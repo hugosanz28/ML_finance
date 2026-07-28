@@ -15,6 +15,7 @@ from src.config import Settings, get_settings
 from src.portfolio.dashboard_agents import render_agents_tab
 from src.portfolio.dashboard_common import (
     apply_theme,
+    clear_dashboard_caches,
     dashboard_data_fingerprint,
     friendly_table_name,
     render_hero,
@@ -57,7 +58,7 @@ def render_sidebar(settings: Settings) -> None:
         st.sidebar.metric(friendly_table_name(key), value)
 
     if st.sidebar.button("Limpiar cache de dashboard"):
-        st.cache_data.clear()
+        clear_dashboard_caches()
         st.rerun()
 
 

@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import date
 from pathlib import Path
+from typing import Sequence
 
 from src.application.types import ApplicationResult
 from src.config import Settings, get_settings
@@ -12,10 +13,12 @@ from src.market_data import (
     DuckDBMarketDataRepository,
     FxRefreshService,
     FxRefreshSummary,
+    MarketAsset,
     PriceRefreshService,
     PriceRefreshSummary,
     build_fx_provider,
     build_price_provider,
+    infer_fx_requirements_from_normalized_degiro,
     sync_market_assets_from_normalized_degiro,
     write_asset_overrides_template,
 )
@@ -35,6 +38,39 @@ class RefreshFxRequest:
 class RefreshFxResult:
     result: ApplicationResult
     summary: FxRefreshSummary
+
+
+@dataclass(frozen=True)
+class InferFxRequirementsRequest:
+    only_missing_base: bool = False
+
+
+@dataclass(frozen=True)
+class FxRequirementView:
+    pair: str
+    start_date: date
+    end_date: date
+    source_rows: int
+    missing_base_rows: int
+
+    def to_dict(self) -> dict[str, str | int]:
+        """Return JSON primitives while preserving ISO date semantics."""
+        return {
+            "pair": self.pair,
+            "start_date": self.start_date.isoformat(),
+            "end_date": self.end_date.isoformat(),
+            "source_rows": self.source_rows,
+            "missing_base_rows": self.missing_base_rows,
+        }
+
+
+@dataclass(frozen=True)
+class InferFxRequirementsResult:
+    requirements: tuple[FxRequirementView, ...]
+
+    def to_dict(self) -> dict[str, list[dict[str, str | int]]]:
+        """Return a JSON-serializable representation for interface adapters."""
+        return {"requirements": [requirement.to_dict() for requirement in self.requirements]}
 
 
 @dataclass(frozen=True)
@@ -99,6 +135,37 @@ class RefreshFxUseCase:
                 },
             ),
             summary=summary,
+        )
+
+
+class InferFxRequirementsUseCase:
+    """Return a serializable view of FX requirements inferred from DEGIRO data."""
+
+    name = "infer_fx_requirements"
+
+    def __init__(self, *, settings: Settings | None = None) -> None:
+        self.settings = get_settings() if settings is None else settings
+
+    def execute(
+        self,
+        request: InferFxRequirementsRequest | None = None,
+    ) -> InferFxRequirementsResult:
+        resolved_request = request or InferFxRequirementsRequest()
+        requirements = infer_fx_requirements_from_normalized_degiro(
+            settings=self.settings,
+            only_missing_base=resolved_request.only_missing_base,
+        )
+        return InferFxRequirementsResult(
+            requirements=tuple(
+                FxRequirementView(
+                    pair=requirement.pair,
+                    start_date=requirement.start_date,
+                    end_date=requirement.end_date,
+                    source_rows=requirement.source_rows,
+                    missing_base_rows=requirement.missing_base_rows,
+                )
+                for requirement in requirements
+            )
         )
 
 
@@ -185,7 +252,7 @@ class RefreshMarketDataUseCase:
         )
 
 
-def _derive_start_date(assets) -> date:
+def _derive_start_date(assets: Sequence[MarketAsset]) -> date:
     dated_assets = [asset.first_seen_date for asset in assets if asset.first_seen_date is not None]
     if dated_assets:
         return min(dated_assets)
@@ -193,6 +260,10 @@ def _derive_start_date(assets) -> date:
 
 
 __all__ = [
+    "FxRequirementView",
+    "InferFxRequirementsRequest",
+    "InferFxRequirementsResult",
+    "InferFxRequirementsUseCase",
     "RefreshFxRequest",
     "RefreshFxResult",
     "RefreshFxUseCase",

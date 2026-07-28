@@ -34,7 +34,9 @@ Responsabilidades:
 
 - exponer casos de uso orientados a acciones de usuario;
 - aceptar entradas estructuradas mediante dataclasses `*Request`;
-- devolver resultados estructurados con `ApplicationResult`;
+- devolver resultados estructurados; las acciones operativas incluyen
+  `ApplicationResult` y los read models destinados a API exponen primitivas
+  serializables;
 - coordinar `src/degiro_exports/`, `src/market_data/`, `src/portfolio/`,
   `src/reports/` y `src/agents/`;
 - evitar logica de Streamlit, HTTP, Angular o CLI.
@@ -45,6 +47,13 @@ dominio salvo que antes exista un caso de uso en `src/application/`.
 Los contratos HTTP previstos estan documentados en `docs/api_contracts.md`.
 Ese documento es deliberadamente previo a FastAPI: define que datos necesita la
 UI y que casos de uso deben existir antes de crear endpoints reales.
+
+La lectura principal ya dispone de `GetPortfolioStateUseCase`, que no devuelve
+DataFrames ni paths. Uploads, requisitos FX y el monitor aislado tambien tienen
+fronteras dedicadas: `SaveDegiroUploadsUseCase`,
+`InferFxRequirementsUseCase` y `RunMonitorTematicoUseCase`. Los casos de uso
+de escritura de brief/targets siguen pendientes y no deben implementarse dentro
+de futuros endpoints.
 
 ## Propuesta principal
 
@@ -132,6 +141,10 @@ personal. Aun asi, debe contemplar controles basicos:
 - separacion clara entre entorno demo y entorno real;
 - proteccion frente a publicar accidentalmente rutas privadas.
 
+El entorno demo usa market data `synthetic` ya sembrado y agentes offline
+`static/null` (o `static/static` para busqueda sintetica). Una API no debe
+activar `yfinance`, OpenAI, Tavily o DuckDuckGo de forma implicita.
+
 Si en el futuro se expone fuera del equipo local, la autenticacion deja de ser
 opcional y habria que replantear permisos, secretos, sesiones y cifrado.
 
@@ -191,7 +204,8 @@ Antes de crear carpetas `frontend/`, `api/` o similares:
 
 1. Mantener v1 estable y demostrable.
 2. Completar la separacion publico/privado.
-3. Consolidar `src/application/` como unica entrada de interfaces.
+3. Mantener `src/application/` como unica entrada de interfaces y completar
+   los casos de escritura que siguen pendientes.
 4. Mantener actualizados los contratos de lectura/escritura de
    `docs/api_contracts.md`.
 5. Decidir si v2 sera solo local, app de escritorio o servicio web.

@@ -19,6 +19,7 @@ from src.market_data import (
     PriceFetchResult,
     PriceProvider,
     PriceRefreshService,
+    SyntheticPriceProvider,
     YFinancePriceProvider,
     build_price_provider,
     load_asset_overrides_frame,
@@ -96,6 +97,23 @@ def test_build_price_provider_returns_yfinance_provider() -> None:
 
     assert isinstance(provider, YFinancePriceProvider)
     assert provider.name == "yfinance"
+
+
+def test_build_price_provider_returns_offline_synthetic_provider() -> None:
+    provider = build_price_provider("synthetic")
+
+    assert isinstance(provider, SyntheticPriceProvider)
+    with pytest.raises(PriceDataNotFoundError, match="offline"):
+        provider.fetch_daily_prices(
+            MarketAsset(
+                asset_id="synthetic-asset",
+                asset_name="Synthetic Asset",
+                asset_type="etf",
+                trading_currency="EUR",
+            ),
+            start_date=date(2026, 1, 1),
+            end_date=date(2026, 1, 2),
+        )
 
 
 def test_build_price_provider_rejects_unknown_provider() -> None:
