@@ -13,7 +13,7 @@ from src.agents.asistente_aportacion_mensual.context_builder import (
 from src.agents.asistente_aportacion_mensual.llm import (
     ContributionLLMProvider,
     ContributionLLMProviderError,
-    OpenAIContributionLLMProvider,
+    StaticContributionLLMProvider,
 )
 from src.agents.autonomy import autonomy_metadata, skipped_action
 from src.agents.base import BaseAgent
@@ -24,7 +24,8 @@ class AsistenteAportacionMensualAgent(BaseAgent):
     """Synthesize the monthly portfolio action from reports and upstream agents."""
 
     def __init__(self, *, llm_provider: ContributionLLMProvider | None = None) -> None:
-        self.llm_provider = llm_provider or OpenAIContributionLLMProvider()
+        # Keep direct construction deterministic and offline.
+        self.llm_provider = llm_provider or StaticContributionLLMProvider()
 
     @property
     def name(self) -> str:

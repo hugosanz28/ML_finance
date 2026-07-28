@@ -18,6 +18,7 @@ from src.application import (
 )
 from src.config import Settings
 from src.portfolio.dashboard_common import (
+    clear_dashboard_caches,
     dashboard_data_fingerprint,
     format_currency,
     format_pct,
@@ -26,6 +27,7 @@ from src.portfolio.dashboard_common import (
     load_transactions,
     metric_card,
     render_beginner_explainer,
+    render_pending_import_warning,
     render_quality_warnings,
     section_header,
     show_metrics_error,
@@ -46,6 +48,7 @@ def render_portfolio_tab(settings: Settings) -> None:
         "Foto actual de la cartera: valor broker DEGIRO, reparto por activo y calidad de datos analiticos.",
     )
     render_market_refresh_control(settings)
+    render_pending_import_warning(settings)
 
     data_fingerprint = dashboard_data_fingerprint(settings)
     metrics = load_metrics(settings, data_fingerprint)
@@ -171,7 +174,7 @@ def render_market_refresh_control(settings: Settings) -> None:
         st.error(f"No se pudieron actualizar los datos: {exc}")
         return
 
-    st.cache_data.clear()
+    clear_dashboard_caches()
     fx_summary = result["fx_summary"]
     price_summary = result["price_summary"]
     st.success(

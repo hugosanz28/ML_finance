@@ -4,7 +4,7 @@ Objetivo:
 
 Proponer la decision mensual de cartera con base en presupuesto, pesos objetivo, desviaciones observadas y objetivo de la cuenta.
 
-Entradas previstas:
+Entradas:
 
 - mandato de la cuenta,
 - presupuesto mensual,
@@ -13,7 +13,7 @@ Entradas previstas:
 - restricciones configurables por el usuario,
 - conclusiones de `monitor_tematico` y `analista_activos`.
 
-Salidas previstas:
+Salidas:
 
 - propuesta de compra o reparto,
 - propuesta opcional de venta, reduccion o rebalanceo,
@@ -23,16 +23,23 @@ Salidas previstas:
 
 ## Encaje con la interfaz base
 
-`asistente_aportacion_mensual` debera usar el contrato comun de `src/agents/`.
+`asistente_aportacion_mensual` implementa `BaseAgent` y devuelve el contrato
+comun `AgentResult` de `src/agents/`.
 
-Request esperado:
+Inputs requeridos:
 
-- `scope`: cartera actual, presupuesto, universo invertible y movimientos potenciales.
-- `parameters`: moneda, granularidad de propuesta, reglas de reparto y nivel de intervencion.
-- `constraints`: pesos objetivo, limites por activo, umbrales de rebalanceo y restricciones del usuario.
-- `input_refs`: `investment_brief`, informes de asignacion, metricas recientes y resultados de otros agentes.
+- `investment_brief`;
+- `latest_monthly_report`.
 
-Result esperado:
+Inputs opcionales que completan la decision:
+
+- `portfolio_metrics_snapshot`;
+- `target_weights`;
+- resultados de `monitor_tematico` y `analista_activos`;
+- `user_satellite_interest`;
+- `monthly_budget` en la peticion o metadata del contexto.
+
+Salida:
 
 - `summary`: propuesta corta de aportacion y, si aplica, de rebalanceo.
 - `findings`: recomendaciones estructuradas por activo o bloque.
@@ -51,6 +58,13 @@ Los escenarios deben usar pesos actuales frente a objetivos, desviaciones,
 limites de concentracion y rol `core`/`satellite`/`cash` cuando esos datos
 esten disponibles.
 
+El presupuesto se resuelve desde la ejecucion y, si no se proporciona, desde
+`portfolio_targets.yaml` o la configuracion general. La construccion directa usa
+`StaticContributionLLMProvider`, determinista y offline;
+`OpenAIContributionLLMProvider` debe seleccionarse explicitamente. Si falta el
+snapshot o alguno de los dos resultados anteriores, la salida queda marcada
+como `partial`.
+
 ## Papel en el flujo mensual
 
 Este es el agente decisor del flujo. Debe sintetizar el mandato de la cuenta, el informe mensual, el contexto de mercado y el analisis de activos para responder:
@@ -59,3 +73,6 @@ Este es el agente decisor del flujo. Debe sintetizar el mandato de la cuenta, el
 - si conviene no tocar ciertas posiciones,
 - si hay que reducir o vender algun activo,
 - y si la cartera se esta alejando del objetivo de forma suficiente como para justificar rebalanceo.
+
+La propuesta siempre requiere revision manual. El agente no ejecuta operaciones
+ni modifica datos de cartera.

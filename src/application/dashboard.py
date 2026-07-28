@@ -22,6 +22,8 @@ from src.portfolio import (
     load_normalized_degiro_transactions,
     load_portfolio_targets,
 )
+from src.portfolio.contributions import net_external_contributions_until
+from src.portfolio.state_projection import build_broker_snapshot_projection
 from src.reports import get_latest_monthly_report
 
 
@@ -48,6 +50,13 @@ class LoadPortfolioTransactionsResult:
 @dataclass(frozen=True)
 class GetWarehouseCountsResult:
     counts: dict[str, int]
+
+
+@dataclass(frozen=True)
+class GetPendingDegiroImportStatusResult:
+    latest_incoming_portfolio_date: date | None
+    latest_normalized_portfolio_date: date | None
+    pending_portfolio_files: list[str]
 
 
 @dataclass(frozen=True)
@@ -139,6 +148,31 @@ class GetWarehouseCountsUseCase:
         return GetWarehouseCountsResult(counts=counts)
 
 
+class GetPendingDegiroImportStatusUseCase:
+    name = "get_pending_degiro_import_status"
+
+    def __init__(self, *, settings: Settings | None = None) -> None:
+        self.settings = get_settings() if settings is None else settings
+
+    def execute(self) -> GetPendingDegiroImportStatusResult:
+        incoming_dir = self.settings.degiro_exports_dir / "incoming"
+        normalized_dir = self.settings.normalized_data_dir / "degiro" / "portfolio_snapshots"
+        incoming = _portfolio_export_dates(incoming_dir, suffix=".csv")
+        normalized = _portfolio_export_dates(normalized_dir, suffix=".parquet")
+
+        latest_normalized = max(normalized.values(), default=None)
+        pending_files = [
+            name
+            for name, snapshot_date in sorted(incoming.items())
+            if latest_normalized is None or snapshot_date > latest_normalized
+        ]
+        return GetPendingDegiroImportStatusResult(
+            latest_incoming_portfolio_date=max(incoming.values(), default=None),
+            latest_normalized_portfolio_date=latest_normalized,
+            pending_portfolio_files=pending_files,
+        )
+
+
 class GetNetExternalContributionsUseCase:
     name = "get_net_external_contributions"
 
@@ -208,28 +242,6 @@ class BuildAgentDashboardSnapshotUseCase:
         )
 
 
-def net_external_contributions_until(settings: Settings, *, as_of_date: date) -> float | None:
-    repository = DuckDBMarketDataRepository(settings=settings)
-    query = """
-        SELECT SUM(
-            CASE
-                WHEN UPPER(movement_type) = 'DEPOSIT' THEN ABS(amount_base)
-                WHEN UPPER(movement_type) = 'WITHDRAWAL' THEN -ABS(amount_base)
-                ELSE 0
-            END
-        ) AS net_external
-        FROM cash_movements
-        WHERE amount_base IS NOT NULL
-          AND UPPER(movement_type) IN ('DEPOSIT', 'WITHDRAWAL')
-          AND COALESCE(value_date, movement_date) <= ?
-    """
-    with repository.connection() as connection:
-        row = connection.execute(query, [as_of_date]).fetchone()
-    if row is None or row[0] is None:
-        return None
-    return float(row[0])
-
-
 def build_agent_dashboard_snapshot(
     metrics: PortfolioMetricsResult,
     *,
@@ -237,26 +249,19 @@ def build_agent_dashboard_snapshot(
     as_of_date: date,
 ) -> dict[str, Any]:
     base_snapshot = build_portfolio_metrics_snapshot(metrics, as_of_date=as_of_date)
-    broker = _broker_snapshot_view_for_date(snapshots, as_of_date=as_of_date)
+    broker = build_broker_snapshot_projection(
+        snapshots,
+        position_metrics=metrics.position_metrics,
+        portfolio_daily_metrics=metrics.portfolio_daily_metrics,
+        as_of_date=as_of_date,
+    )
     if broker is None:
         return base_snapshot
 
-    positions = _overlay_external_cost_metrics(
-        broker["positions"],
-        metrics,
-        target_date=broker["snapshot_date"],
-    )
+    positions = broker["positions"]
     total_value = float(broker["total_market_value_base"])
-    total_unrealized, total_return = _derive_broker_pnl_with_external_cost_basis(
-        _daily_metrics(metrics),
-        target_date=broker["snapshot_date"],
-        total_market_value_base=total_value,
-    )
-    if total_unrealized is None or total_return is None:
-        total_unrealized, total_return = _derive_totals_from_positions(
-            positions,
-            total_market_value_base=total_value,
-        )
+    total_unrealized = broker["total_unrealized_pnl_base"]
+    total_return = broker["portfolio_return_pct"]
 
     daily_payload = dict(base_snapshot.get("daily") or {})
     daily_payload["valuation_date"] = broker["snapshot_date"].isoformat()
@@ -292,175 +297,6 @@ def build_agent_dashboard_snapshot(
     }
 
 
-def _daily_metrics(metrics: PortfolioMetricsResult) -> pd.DataFrame:
-    frame = metrics.portfolio_daily_metrics.copy()
-    frame["valuation_date"] = pd.to_datetime(frame["valuation_date"]).dt.date
-    return frame.sort_values("valuation_date")
-
-
-def _latest_broker_snapshot_view(snapshots: pd.DataFrame) -> dict[str, Any] | None:
-    if snapshots is None or snapshots.empty:
-        return None
-    frame = snapshots.copy()
-    frame["snapshot_date"] = pd.to_datetime(frame["snapshot_date"], errors="coerce").dt.date
-    frame["market_value_base"] = pd.to_numeric(frame["market_value_base"], errors="coerce")
-    frame["unrealized_pnl_base"] = pd.to_numeric(frame.get("unrealized_pnl_base"), errors="coerce")
-    frame["quantity"] = pd.to_numeric(frame.get("quantity"), errors="coerce")
-    frame["asset_name"] = frame["asset_name"].fillna(frame["asset_id"]).astype("string")
-    frame["asset_type"] = frame["asset_type"].fillna("unknown").astype("string")
-    frame = frame.dropna(subset=["snapshot_date", "market_value_base"])
-    if frame.empty:
-        return None
-
-    latest_date = max(frame["snapshot_date"])
-    latest = frame.loc[frame["snapshot_date"] == latest_date].copy()
-    total_value = float(latest["market_value_base"].sum())
-    has_snapshot_unrealized = latest["unrealized_pnl_base"].notna().any()
-    if has_snapshot_unrealized:
-        total_unrealized = float(latest["unrealized_pnl_base"].fillna(0.0).sum())
-        total_cost = total_value - total_unrealized
-        portfolio_return_pct = None if abs(total_cost) < 1e-9 else total_unrealized / total_cost
-    else:
-        total_unrealized = None
-        portfolio_return_pct = None
-
-    latest["weight"] = 0.0 if abs(total_value) < 1e-9 else latest["market_value_base"] / total_value
-    latest["cost_basis_base"] = pd.NA
-    rows_with_unrealized = latest["unrealized_pnl_base"].notna()
-    latest.loc[rows_with_unrealized, "cost_basis_base"] = (
-        latest.loc[rows_with_unrealized, "market_value_base"] - latest.loc[rows_with_unrealized, "unrealized_pnl_base"]
-    )
-    latest["unrealized_return_pct"] = pd.to_numeric(
-        latest["unrealized_pnl_base"] / pd.to_numeric(latest["cost_basis_base"], errors="coerce").replace(0, pd.NA),
-        errors="coerce",
-    )
-    latest["valuation_status"] = "broker_snapshot"
-    positions = latest.loc[
-        :,
-        [
-            "asset_id",
-            "asset_name",
-            "asset_type",
-            "quantity",
-            "market_value_base",
-            "weight",
-            "cost_basis_base",
-            "unrealized_pnl_base",
-            "unrealized_return_pct",
-            "valuation_status",
-        ],
-    ].copy()
-
-    return {
-        "snapshot_date": latest_date,
-        "positions": positions,
-        "total_market_value_base": total_value,
-        "total_unrealized_pnl_base": total_unrealized,
-        "portfolio_return_pct": portfolio_return_pct,
-    }
-
-
-def _broker_snapshot_view_for_date(snapshots: pd.DataFrame, *, as_of_date: date) -> dict[str, Any] | None:
-    if snapshots is None or snapshots.empty:
-        return None
-    frame = snapshots.copy()
-    frame["snapshot_date"] = pd.to_datetime(frame["snapshot_date"], errors="coerce").dt.date
-    frame = frame.dropna(subset=["snapshot_date"])
-    eligible = frame.loc[frame["snapshot_date"] <= as_of_date].copy()
-    if eligible.empty:
-        return None
-    return _latest_broker_snapshot_view(eligible)
-
-
-def _external_positions_for_date(metrics: PortfolioMetricsResult, *, target_date: date) -> pd.DataFrame:
-    frame = metrics.position_metrics.copy()
-    frame["valuation_date"] = pd.to_datetime(frame["valuation_date"], errors="coerce").dt.date
-    frame["cost_basis_base"] = pd.to_numeric(frame["cost_basis_base"], errors="coerce")
-    frame["unrealized_pnl_base"] = pd.to_numeric(frame["unrealized_pnl_base"], errors="coerce")
-    frame["unrealized_return_pct"] = pd.to_numeric(frame["unrealized_return_pct"], errors="coerce")
-    frame = frame.dropna(subset=["valuation_date", "asset_id"])
-    if frame.empty:
-        return pd.DataFrame(columns=["asset_id", "cost_basis_base", "unrealized_pnl_base", "unrealized_return_pct"])
-    dates = sorted(frame["valuation_date"].dropna().unique().tolist())
-    if not dates:
-        return pd.DataFrame(columns=["asset_id", "cost_basis_base", "unrealized_pnl_base", "unrealized_return_pct"])
-    chosen_date = target_date if target_date in set(dates) else max([date_value for date_value in dates if date_value <= target_date], default=None)
-    if chosen_date is None:
-        return pd.DataFrame(columns=["asset_id", "cost_basis_base", "unrealized_pnl_base", "unrealized_return_pct"])
-    return frame.loc[frame["valuation_date"] == chosen_date, ["asset_id", "cost_basis_base", "unrealized_pnl_base", "unrealized_return_pct"]].copy()
-
-
-def _overlay_external_cost_metrics(
-    broker_positions: pd.DataFrame,
-    metrics: PortfolioMetricsResult,
-    *,
-    target_date: date,
-) -> pd.DataFrame:
-    if broker_positions.empty:
-        return broker_positions
-    enriched = broker_positions.copy()
-    for column in ("cost_basis_base", "unrealized_pnl_base", "unrealized_return_pct"):
-        if column not in enriched.columns:
-            enriched[column] = pd.NA
-    external = _external_positions_for_date(metrics, target_date=target_date)
-    if external.empty:
-        return enriched
-    merged = enriched.merge(
-        external.rename(
-            columns={
-                "cost_basis_base": "cost_basis_external",
-                "unrealized_pnl_base": "unrealized_external",
-                "unrealized_return_pct": "return_external",
-            }
-        ),
-        on="asset_id",
-        how="left",
-    )
-    merged["cost_basis_base"] = pd.to_numeric(merged["cost_basis_base"], errors="coerce").fillna(pd.to_numeric(merged["cost_basis_external"], errors="coerce"))
-    merged["unrealized_pnl_base"] = pd.to_numeric(merged["unrealized_pnl_base"], errors="coerce").fillna(pd.to_numeric(merged["unrealized_external"], errors="coerce"))
-    merged["unrealized_return_pct"] = pd.to_numeric(merged["unrealized_return_pct"], errors="coerce").fillna(pd.to_numeric(merged["return_external"], errors="coerce"))
-    return merged.drop(columns=["cost_basis_external", "unrealized_external", "return_external"])
-
-
-def _derive_totals_from_positions(positions: pd.DataFrame, *, total_market_value_base: float) -> tuple[float | None, float | None]:
-    if positions.empty:
-        return None, None
-    cost = pd.to_numeric(positions.get("cost_basis_base"), errors="coerce")
-    if cost is None or cost.notna().sum() == 0:
-        return None, None
-    total_cost = float(cost.fillna(0.0).sum())
-    total_unrealized = float(total_market_value_base - total_cost)
-    total_return = None if abs(total_cost) < 1e-9 else total_unrealized / total_cost
-    return total_unrealized, total_return
-
-
-def _derive_broker_pnl_with_external_cost_basis(
-    daily: pd.DataFrame,
-    *,
-    target_date: date,
-    total_market_value_base: float,
-) -> tuple[float | None, float | None]:
-    frame = daily.copy()
-    frame["valuation_date"] = pd.to_datetime(frame["valuation_date"], errors="coerce").dt.date
-    frame["total_cost_basis_base"] = pd.to_numeric(frame["total_cost_basis_base"], errors="coerce")
-    frame = frame.dropna(subset=["valuation_date"]).sort_values("valuation_date")
-    if frame.empty:
-        return None, None
-    if target_date in set(frame["valuation_date"].tolist()):
-        row = frame.loc[frame["valuation_date"] == target_date].iloc[-1]
-    else:
-        candidates = frame.loc[frame["valuation_date"] <= target_date]
-        if candidates.empty:
-            return None, None
-        row = candidates.iloc[-1]
-    total_cost = float(row["total_cost_basis_base"]) if pd.notna(row["total_cost_basis_base"]) else None
-    if total_cost is None or abs(total_cost) < 1e-9:
-        return None, None
-    total_unrealized = float(total_market_value_base - total_cost)
-    total_return = total_unrealized / total_cost
-    return total_unrealized, total_return
-
-
 def _json_ready_value(value: Any) -> Any:
     if isinstance(value, dict):
         return {str(key): _json_ready_value(item) for key, item in value.items()}
@@ -470,6 +306,8 @@ def _json_ready_value(value: Any) -> Any:
         return value.isoformat()
     if value is None or pd.isna(value):
         return None
+    if hasattr(value, "item") and callable(value.item):
+        return _json_ready_value(value.item())
     return value
 
 
@@ -526,6 +364,22 @@ def extract_report_as_of_date_from_path(path: Path) -> date | None:
         return None
 
 
+def _portfolio_export_dates(directory: Path, *, suffix: str) -> dict[str, date]:
+    if not directory.exists():
+        return {}
+
+    dates: dict[str, date] = {}
+    for path in sorted(directory.glob(f"portfolio_*{suffix}")):
+        match = re.fullmatch(r"portfolio_(\d{4}-\d{2}-\d{2})" + re.escape(suffix), path.name)
+        if match is None:
+            continue
+        try:
+            dates[path.name] = date.fromisoformat(match.group(1))
+        except ValueError:
+            continue
+    return dates
+
+
 __all__ = [
     "BuildAgentDashboardSnapshotRequest",
     "BuildAgentDashboardSnapshotResult",
@@ -533,6 +387,8 @@ __all__ = [
     "GetNetExternalContributionsRequest",
     "GetNetExternalContributionsResult",
     "GetNetExternalContributionsUseCase",
+    "GetPendingDegiroImportStatusResult",
+    "GetPendingDegiroImportStatusUseCase",
     "GetWarehouseCountsResult",
     "GetWarehouseCountsUseCase",
     "ListDashboardReportsResult",

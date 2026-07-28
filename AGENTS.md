@@ -12,7 +12,10 @@ Separacion publico/privado:
 
 - Versionable: codigo, docs, tests, `demo/synthetic_*`, `src/data/sample/`.
 - Privado e ignorado por Git: `src/data/local/`, `src/degiro_exports/local/`, `.env`, `demo/local_data/`.
-- Para demos/tests usa providers `static` y `null`; no uses proveedores externos salvo que la tarea lo pida.
+- Para market data de demo usa `PRICE_PROVIDER=synthetic`. Para agentes en
+  demo/tests usa `llm_provider=static` y `search_provider=null`; usa
+  `search_provider=static` solo cuando necesites fixtures de busqueda
+  sinteticos. No uses proveedores externos salvo que la tarea lo pida.
 
 La UI actual es Streamlit. Una futura API/FastAPI debe entrar casi siempre por `src/application/`, no por modulos internos de dominio.
 
@@ -23,8 +26,14 @@ La UI actual es Streamlit. Una futura API/FastAPI debe entrar casi siempre por `
 - Usa `rg` / `rg --files` para buscar codigo y referencias.
 - Manten cambios acotados. No refactorices fuera del area necesaria.
 - No versionar, imprimir ni abrir artefactos privados innecesarios de `src/data/local/`, `src/degiro_exports/local/` o `.env`.
-- No introduzcas red/proveedores externos en tests, demo o ejemplos. Para agentes, defaults seguros: `llm_provider=static`, `search_provider=null`.
+- No introduzcas red/proveedores externos en tests, demo o ejemplos. Market
+  data offline usa `synthetic`; agentes usan por defecto
+  `llm_provider=static`, `search_provider=null`.
 - `src/application/` es la frontera para scripts, Streamlit y futura API. Si una interfaz necesita dominio, crea o usa un `*UseCase`.
+- Casos de uso actuales que no deben puentearse desde interfaces:
+  `GetPortfolioStateUseCase`, `SaveDegiroUploadsUseCase`,
+  `InferFxRequirementsUseCase`, `RunMonitorTematicoUseCase` y los casos
+  operativos de importacion, refresh, informes y agentes.
 - Manten entradas como dataclasses `*Request` y salidas estructuradas. Para acciones operativas usa `ApplicationResult`.
 - No dupliques calculos financieros en `src/application/`; coordina servicios de dominio existentes.
 - `src/portfolio/dashboard.py` debe seguir siendo entrypoint fino de Streamlit. Las vistas viven en `dashboard_overview.py`, `dashboard_reports.py`, `dashboard_data_update.py` y `dashboard_agents.py`.
@@ -64,19 +73,24 @@ Tests focalizados frecuentes:
 .\.venv\Scripts\python.exe -m pytest tests\test_agent_audit_trail.py
 .\.venv\Scripts\python.exe -m pytest tests\test_streamlit_dashboard_uploads.py
 .\.venv\Scripts\python.exe -m pytest tests\test_dashboard_transforms.py
+.\.venv\Scripts\python.exe -m pytest tests\test_streamlit_dashboard_smoke.py
+.\.venv\Scripts\python.exe -m pytest tests\test_public_documentation.py
 ```
 
 Mapa rapido de tests por area:
 
 | Area | Tests recomendados |
 | --- | --- |
-| `src/application/` | `tests\test_application_layer.py` |
+| `src/application/` | `tests\test_application_layer.py`, `tests\test_interface_boundaries.py` |
 | Agentes | `tests\test_agent_*.py`, `tests\test_*agente*.py`, `tests\test_monitor_tematico.py`, `tests\test_analista_activos.py`, `tests\test_asistente_aportacion_mensual.py` |
 | Auditoria de agentes | `tests\test_agent_audit_trail.py`, `tests\test_application_layer.py` |
 | Dashboard | `tests\test_dashboard_transforms.py`, `tests\test_streamlit_dashboard_uploads.py` |
 | DEGIRO/importacion | `tests\test_degiro_*.py` |
-| Portfolio/metricas | `tests\test_portfolio_metrics.py`, `tests\test_positions.py` |
+| Portfolio/metricas | `tests\test_portfolio_metrics.py`, `tests\test_positions.py`, `tests\test_portfolio_state_projection.py`, `tests\test_portfolio_contributions.py` |
 | Market data/FX | `tests\test_market_data.py`, `tests\test_fx_refresh.py` |
+| Defaults offline | `tests\test_agent_safe_defaults.py`, `tests\test_demo_workspace.py` |
+| Documentacion/publicacion | `tests\test_public_documentation.py`, `tests\test_dev_commands.py` |
+| Smoke Streamlit | `tests\test_streamlit_dashboard_smoke.py` |
 
 Validar demo sin abrir Streamlit:
 
@@ -91,8 +105,18 @@ Checks utiles antes de publicar:
 
 ```powershell
 git diff --check
+.\.venv\Scripts\python.exe -m ruff check src scripts tests
+.\.venv\Scripts\python.exe -m mypy
+.\.venv\Scripts\python.exe -m pytest --cov=src --cov-report=term-missing
+$trackedFiles = git ls-files
+.\.venv\Scripts\detect-secrets-hook.exe --baseline .secrets.baseline $trackedFiles
 rg -n "C:\\\\Users|OPENAI_API_KEY\s*=|TAVILY_API_KEY\s*=|BEGIN .*PRIVATE KEY|password\s*=|token\s*=|secret\s*=" README.md AGENTS.md docs scripts src tests demo
 ```
+
+La cobertura minima es 70% y se configura en `pyproject.toml`. Para build,
+instalacion del wheel, `pip check` y `pip-audit`, sigue
+[CONTRIBUTING.md](CONTRIBUTING.md) y [scripts/README.md](scripts/README.md);
+no dupliques aqui el pipeline completo de CI.
 
 ## Documentacion de rutas
 

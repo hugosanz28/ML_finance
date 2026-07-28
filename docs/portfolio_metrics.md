@@ -7,6 +7,10 @@ Los contratos compartidos de salida (`PortfolioMetricsResult`,
 `POSITION_METRICS_COLUMNS` y `PORTFOLIO_DAILY_METRICS_COLUMNS`) viven en
 `src/portfolio/metrics_models.py`.
 
+La proyeccion reutilizable de snapshots broker, coste y PnL vive en
+`src/portfolio/state_projection.py`. Informes, dashboard y snapshot de agentes
+consumen esa implementacion comun para no duplicar reglas financieras.
+
 Parte de:
 
 - historico de posiciones por `asset_id` y fecha,
@@ -75,6 +79,10 @@ Campos principales:
   `missing_fx` cuando no puede valorar una posicion,
 - y calcula drawdown sobre el valor agregado efectivamente valorado.
 
+En la demo, `PRICE_PROVIDER=synthetic` conserva las series sinteticas sembradas
+y no accede a red. No sustituye la politica de valoracion ni fabrica precios
+nuevos.
+
 Columnas de auditoria relevantes:
 
 - `pricing_policy`
@@ -104,6 +112,16 @@ Ficheros generados:
 
 - `position_metrics_YYYY-MM-DD_YYYY-MM-DD.parquet`
 - `portfolio_daily_metrics_YYYY-MM-DD_YYYY-MM-DD.parquet`
+
+## Frontera de aplicacion
+
+- `LoadPortfolioMetricsUseCase` expone el resultado interno para consumidores
+  Python existentes.
+- `GetPortfolioStateUseCase` es el read model neutral para interfaces y futura
+  API: convierte fechas y escalares a primitivas JSON y no devuelve
+  `PortfolioMetricsResult`, `DataFrame` ni `Path`.
+- Las aportaciones netas usadas en el resumen se consultan mediante
+  `src/portfolio/contributions.py`.
 
 ## Alcance y limites
 

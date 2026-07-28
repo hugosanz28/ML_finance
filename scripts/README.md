@@ -3,6 +3,15 @@
 Entradas manuales para la **v1 local con Streamlit**. En Windows se recomienda
 usar los wrappers PowerShell.
 
+Requieren Python 3.11 o posterior y la instalación de ejecución:
+
+```powershell
+python -m pip install -r requirements.txt
+```
+
+Para desarrollar o ejecutar la suite usa `requirements-dev.txt`; consulta
+`CONTRIBUTING.md` para el resto de puertas de calidad.
+
 ## Comandos principales
 
 ```powershell
@@ -19,6 +28,14 @@ usar los wrappers PowerShell.
   `demo/synthetic_config/.env.demo`.
 - `refresh_market_data.ps1`: refresca FX y precios hasta `-EndDate`.
 - `test.ps1`: ejecuta la suite pytest con `.venv`.
+
+`run_dashboard.ps1` y `run_demo.ps1` dejan Streamlit activo hasta que el usuario
+lo cierre. Para una validacion automatizada de la demo ejecuta solo:
+
+```powershell
+$env:ML_FINANCE_ENV_FILE = "demo/synthetic_config/.env.demo"
+.\.venv\Scripts\python.exe scripts\bootstrap_demo.py
+```
 
 ## Scripts Python
 
@@ -40,14 +57,34 @@ Ejemplo de pipeline mensual local:
 .\.venv\Scripts\python.exe scripts\run_monthly_agents.py --llm-provider static --search-provider null
 ```
 
+`static/null` es el baseline offline: el monitor no recibe resultados de
+busqueda. Para una demo offline mas completa usa `static/static`; la busqueda
+devuelve exclusivamente fixtures sinteticos:
+
+```powershell
+.\.venv\Scripts\python.exe scripts\run_monthly_agents.py --llm-provider static --search-provider static
+```
+
 Para ejecuciones reales con proveedores externos:
 
 ```powershell
 .\.venv\Scripts\python.exe scripts\run_monthly_agents.py --llm-provider openai --search-provider tavily
 ```
 
+En Ubuntu, Linux o macOS se ejecutan los scripts Python directamente. Por
+ejemplo:
+
+```bash
+python scripts/refresh_market_data.py --end-date 2026-05-14
+ML_FINANCE_ENV_FILE=demo/synthetic_config/.env.demo python scripts/bootstrap_demo.py
+python -m streamlit run src/portfolio/dashboard.py
+```
+
 Notas:
 
 - La demo escribe en `demo/local_data/`, ignorado por Git.
 - El uso privado lee `.env`, `src/degiro_exports/local/` y `src/data/local/`.
+- `static/null` y `static/static` no usan red. `openai`, `tavily` y
+  `duckduckgo` deben seleccionarse de forma explicita y sí pueden enviar
+  consultas a servicios externos.
 - Para instrucciones operativas de agentes de programacion, consulta `AGENTS.md`.

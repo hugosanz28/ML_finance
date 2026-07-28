@@ -100,7 +100,7 @@ def parse_degiro_portfolio_snapshot_csv(
     records: list[dict[str, object]] = []
     for row_number, raw_row in enumerate(rows[1:], start=2):
         row = _normalize_row(raw_row, len(EXPECTED_PORTFOLIO_HEADERS))
-        fields = dict(zip(LOGICAL_ROW_FIELDS, row))
+        fields = dict(zip(LOGICAL_ROW_FIELDS, row, strict=True))
         records.append(
             _parse_snapshot_row(
                 fields,

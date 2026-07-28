@@ -2,14 +2,14 @@
 
 ## Objetivo
 
-Este documento define el esquema inicial de DuckDB para `ML_finance`.
-Cubre las tablas minimas pedidas en la issue `#1 [P1-01]` y deja fijado el
-contrato para las siguientes fases:
+Este documento define el esquema operativo de DuckDB para `ML_finance`.
+El esquema, importadores, metricas e informes descritos aqui ya forman parte de
+la v1 local:
 
-- importadores DEGIRO
-- reconstruccion historica de cartera
-- enriquecimiento con market data
-- generacion de informes
+- importadores DEGIRO;
+- reconstruccion historica de cartera;
+- enriquecimiento con market data;
+- generacion e historico de informes.
 
 El DDL ejecutable vive en `src/data/sql/001_initial_schema.sql`.
 
@@ -166,6 +166,10 @@ en `docs/fx_refresh.md`. Los tipos de cambio se guardan como fuente
 complementaria: no modifican los parquets normalizados, pero permiten cubrir
 huecos o recalcular importes base en metricas e informes.
 
+El provider normal de FX/precios es `yfinance`. La demo usa el identificador
+`synthetic` para las filas ya sembradas por `scripts/bootstrap_demo.py`; ese
+provider no accede a red ni genera observaciones nuevas.
+
 ### `reports_history`
 
 Metadatos de informes generados, no el contenido del informe.
@@ -233,9 +237,10 @@ La validacion ocurre antes de escribir los parquets normalizados y antes de la
 carga a DuckDB. Si falta una columna obligatoria o un tipo no se puede convertir,
 el import falla de forma explicita.
 
-## Preparacion para el importador DEGIRO
+## Integracion con el importador DEGIRO
 
-El esquema y los contratos normalizados dejan preparado el terreno para ampliar
+`ImportDegiroUseCase` valida los contratos normalizados, persiste Parquet y,
+salvo que se desactive, carga estas tablas en DuckDB. El esquema puede ampliar
 casos de exportacion sin congelar un contrato raw demasiado pronto.
 
 Puntos ya cubiertos:

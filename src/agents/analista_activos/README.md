@@ -4,37 +4,56 @@ Objetivo:
 
 Analizar las inversiones existentes y candidatas a la luz del mandato de la cuenta.
 
-Cobertura prevista:
+Cobertura:
 
 - para acciones: negocio, metricas fundamentales, valoracion, riesgos y cambios relevantes,
 - para ETFs: proveedor, indice, holdings principales, sectores, sesgos geograficos y perfil agregado de valoracion o concentracion,
 - para cualquier activo candidato: encaje con horizonte, liquidez, volatilidad esperada y rol `core` o `satellite`.
 
-Salidas previstas:
+Salidas:
 
 - ficha resumida por activo,
-- cambios respecto a revisiones anteriores,
-- observaciones utiles para seguimiento periodico,
 - juicio explicito sobre mantener, vigilar, reducir o incorporar,
-- señales de posible sobrevaloracion, sobreextension o perdida de encaje con la cuenta.
+- señales de posible sobrevaloracion, sobreextension o perdida de encaje con la
+  cuenta,
+- warnings cuando faltan metricas o contexto del monitor.
 
 ## Encaje con la interfaz base
 
-`analista_activos` debera usar el contrato comun de `src/agents/`.
+`analista_activos` implementa `BaseAgent` y devuelve el contrato comun
+`AgentResult` de `src/agents/`.
 
-Request esperado:
+Inputs requeridos:
 
-- `scope`: lista de posiciones actuales y candidatos a revisar.
-- `parameters`: profundidad de analisis, metrica, plantilla deseada y tipo de encaje a evaluar.
-- `constraints`: exclusiones, limites de cobertura, prioridades y criterio `core/satellite`.
-- `input_refs`: `investment_brief`, informes previos y datasets internos disponibles.
+- `investment_brief`;
+- `latest_monthly_report`.
 
-Result esperado:
+Inputs opcionales:
+
+- `portfolio_metrics_snapshot`;
+- `watchlist_candidates`;
+- `user_satellite_interest`;
+- resultado de `monitor_tematico`;
+- activos incluidos en `request.scope`.
+
+`request.parameters.max_assets` limita la cobertura y vale `12` por defecto. El
+agente construye un universo deduplicado y prioriza senales del monitor,
+posiciones con mas peso y candidatos de mayor riesgo antes de aplicar ese
+limite.
+
+Salida:
 
 - `summary`: lectura ejecutiva de la revision.
 - `findings`: fichas o cambios por activo en formato estructurado.
 - `artifacts`: tablas o markdown derivado si aplica.
 - `sources`: fuentes internas y externas utilizadas con fecha.
+
+La construccion directa usa `StaticAssetLLMProvider`, por lo que es
+determinista y offline. `OpenAIAssetLLMProvider` debe seleccionarse
+explicitamente. Este agente no busca fundamentales ni cotizaciones por su
+cuenta: evalua solo los inputs y hallazgos trazables que recibe. Sin universo de
+activos devuelve `failed`; sin metricas, contexto del monitor o salida
+estructurada suficiente puede devolver `partial`.
 
 ## Papel en el flujo mensual
 
@@ -60,7 +79,7 @@ Tambien debe ayudar a detectar situaciones como:
 
 En la practica, actua como una capa de evaluacion con preguntas como estas:
 
-- este ETF o esta accion encajan con una cuenta cuyo objetivo es pagar la entrada de una vivienda en 3-4 anos,
+- este ETF o esta accion encajan con el objetivo y horizonte descritos en `investment_brief`,
 - esta accion parece apoyada por fundamentales razonables o se ha inflado demasiado respecto a valoracion y riesgo,
 - este activo es demasiado volatil para ser parte importante del `core`,
 - esta idea nueva del usuario tiene sentido solo como `satellite` pequeno o no tiene sentido ahora,
@@ -90,7 +109,7 @@ Para otros activos como BTC o metales, no aplica el mismo marco empresarial, per
 - tamaño razonable de exposicion,
 - y encaje con el horizonte de la cuenta.
 
-Ejemplos:
+Ejemplos conceptuales sinteticos:
 
 - si el usuario propone un ETF global grande, `analista_activos` evalua si encaja como pieza `core`.
 - si el usuario propone BTC o una accion concreta, `analista_activos` evalua si solo deberia entrar como `satellite`, con mas cautela o incluso no entrar.

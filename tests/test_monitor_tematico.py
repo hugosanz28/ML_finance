@@ -185,6 +185,17 @@ def test_build_observed_topics_includes_optional_watchlist_and_user_interest(wor
     assert "ETF de semiconductores" in topic_names
 
 
+def test_static_search_provider_uses_a_stable_synthetic_url() -> None:
+    result = StaticSearchProvider().search(
+        "global equities market outlook",
+        start_date=date(2026, 4, 1),
+        end_date=date(2026, 4, 30),
+        max_results=1,
+    )
+
+    assert result[0].url == "synthetic://search/c46b63e8154a0688"
+
+
 def test_monitor_tematico_turns_search_results_into_prioritized_findings(workspace_tmp_path: Path) -> None:
     context = _context(workspace_tmp_path, include_interest=True)
     search_provider = StaticSearchProvider(
@@ -351,7 +362,7 @@ def test_tavily_search_provider_parses_api_results(monkeypatch: pytest.MonkeyPat
 
     monkeypatch.setattr(search_providers, "urlopen", fake_urlopen)
 
-    provider = TavilySearchProvider(api_key="tvly-test", timeout_seconds=3.0)
+    provider = TavilySearchProvider(api_key="tvly-test", timeout_seconds=3.0)  # pragma: allowlist secret
     results = provider.search(
         "ECB policy rates",
         start_date=date(2026, 5, 1),

@@ -3,7 +3,6 @@ from __future__ import annotations
 import csv
 from pathlib import Path
 import shutil
-import uuid
 
 import pandas as pd
 import pytest
@@ -40,16 +39,8 @@ def write_portfolio_fixture(csv_path: Path) -> None:
         writer.writerows(rows)
 
 
-def make_test_workspace() -> Path:
-    base_dir = Path("src/data/local/test_runs")
-    base_dir.mkdir(parents=True, exist_ok=True)
-    workspace = base_dir / f"degiro-portfolio-{uuid.uuid4().hex[:8]}"
-    workspace.mkdir(parents=True, exist_ok=False)
-    return workspace
-
-
-def test_parse_degiro_portfolio_snapshot_csv_normalizes_snapshot_rows() -> None:
-    workspace = make_test_workspace()
+def test_parse_degiro_portfolio_snapshot_csv_normalizes_snapshot_rows(tmp_path: Path) -> None:
+    workspace = tmp_path
     try:
         csv_path = workspace / "portfolio_2026-04-12.csv"
         write_portfolio_fixture(csv_path)
@@ -84,8 +75,8 @@ def test_parse_degiro_portfolio_snapshot_csv_normalizes_snapshot_rows() -> None:
         shutil.rmtree(workspace, ignore_errors=True)
 
 
-def test_parse_and_persist_degiro_portfolio_snapshots_writes_parquet_output() -> None:
-    workspace = make_test_workspace()
+def test_parse_and_persist_degiro_portfolio_snapshots_writes_parquet_output(tmp_path: Path) -> None:
+    workspace = tmp_path
     try:
         repo_root = workspace / "repo"
         source_dir = repo_root / "incoming"
@@ -107,8 +98,8 @@ def test_parse_and_persist_degiro_portfolio_snapshots_writes_parquet_output() ->
         shutil.rmtree(workspace, ignore_errors=True)
 
 
-def test_parse_degiro_portfolio_snapshot_csv_rejects_invalid_filename() -> None:
-    workspace = make_test_workspace()
+def test_parse_degiro_portfolio_snapshot_csv_rejects_invalid_filename(tmp_path: Path) -> None:
+    workspace = tmp_path
     try:
         csv_path = workspace / "portfolio_snapshot.csv"
         write_portfolio_fixture(csv_path)

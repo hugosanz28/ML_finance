@@ -1,28 +1,27 @@
-# Investment Brief de ejemplo
+# Investment brief de ejemplo
 
-Este archivo es una plantilla sintetica. No contiene datos personales ni una
-recomendacion financiera real.
+Este archivo es una plantilla sintetica. Sustituye su contenido por tu mandato
+real y guardalo en la ruta privada configurada por `INVESTMENT_BRIEF_PATH`.
 
 ## Objetivo
 
-Acumular capital para una entrada de vivienda en un horizonte aproximado de
-3-4 anos.
+Describe para que se usara el capital y como se medira el exito.
 
-## Filosofia de cartera
+## Horizonte
 
-- Priorizar preservacion de capital y volatilidad moderada.
-- Mantener un nucleo diversificado en activos amplios y liquidos.
-- Usar satellites solo como posiciones minoritarias y revisables.
-- Evitar que una idea tactica comprometa el objetivo principal.
+Indica el plazo previsto y si existe una fecha limite relevante.
 
-## Restricciones cualitativas
+## Riesgo y liquidez
 
-- No ejecutar operaciones de forma automatica.
-- Revisar manualmente cualquier recomendacion mensual.
-- Preferir aportaciones periodicas frente a rebalanceos agresivos.
-- Mantener liquidez suficiente para oportunidades o necesidades cercanas.
+Define la volatilidad tolerable, las necesidades de liquidez y las perdidas que
+obligarian a revisar el plan.
 
-## Uso esperado
+## Asignacion y restricciones
 
-Este brief se complementa con `portfolio_targets.example.yaml`, que define la
-parte numerica: aportacion mensual, pesos objetivo y limites de concentracion.
+Explica el papel del nucleo diversificado, los satelites permitidos, los limites
+de concentracion y cualquier activo o sector excluido.
+
+## Aportaciones y revision
+
+Indica el presupuesto periodico aproximado y con que frecuencia quieres revisar
+la cartera. Las salidas de los agentes requieren siempre revision manual.

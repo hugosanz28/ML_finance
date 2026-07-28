@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from datetime import date
 from pathlib import Path
 from typing import Any
 
@@ -21,6 +20,7 @@ from src.application import (
     ReadInvestmentBriefUseCase,
     ReadTargetWeightsUseCase,
 )
+from src.application.dashboard import GetPendingDegiroImportStatusUseCase
 from src.config import Settings
 from src.portfolio import PortfolioMetricsResult
 
@@ -40,10 +40,24 @@ def apply_theme() -> None:
             --mf-warning: #8a5a00;
             --mf-warning-soft: #fff6df;
         }
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --mf-bg: #101419;
+                --mf-panel: #171d24;
+                --mf-border: #303946;
+                --mf-text: #eef2f7;
+                --mf-muted: #b8c0cc;
+                --mf-accent: #2dd4bf;
+                --mf-accent-soft: #143f3a;
+                --mf-warning: #f7c56b;
+                --mf-warning-soft: #342814;
+            }
+        }
         .stApp { background: var(--mf-bg); color: var(--mf-text); }
         .block-container { padding-top: 1.25rem; padding-bottom: 3rem; max-width: 1380px; }
-        [data-testid="stSidebar"] { background: #ffffff; border-right: 1px solid var(--mf-border); }
-        h1, h2, h3 { letter-spacing: 0; }
+        [data-testid="stSidebar"] { background: var(--mf-panel); border-right: 1px solid var(--mf-border); }
+        [data-testid="stSidebar"] * { color: var(--mf-text); }
+        h1, h2, h3 { color: var(--mf-text); letter-spacing: 0; }
         div[data-testid="stMetric"] {
             background: var(--mf-panel);
             border: 1px solid var(--mf-border);
@@ -55,22 +69,27 @@ def apply_theme() -> None:
         div[data-testid="stMetricLabel"] { color: var(--mf-muted); font-size: 0.78rem; }
         div[data-testid="stMetricValue"] { font-size: 1.35rem; color: var(--mf-text); }
         .mf-hero {
-            background: #ffffff;
+            background: var(--mf-panel);
             border: 1px solid var(--mf-border);
             border-radius: 8px;
             padding: 22px 24px;
             margin-bottom: 18px;
             box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
         }
-        .mf-hero h1 { margin: 0 0 6px 0; font-size: 2rem; line-height: 1.15; }
+        .mf-hero h1 { margin: 0 0 6px 0; color: var(--mf-text); font-size: 2rem; line-height: 1.15; }
         .mf-hero p { margin: 0; color: var(--mf-muted); font-size: 1rem; max-width: 860px; }
         .mf-section { margin: 6px 0 18px 0; }
-        .mf-section h2 { margin-bottom: 4px; }
+        .mf-section h2 { margin-bottom: 4px; color: var(--mf-text); }
         .mf-section p { color: var(--mf-muted); margin-top: 0; }
         </style>
         """,
         unsafe_allow_html=True,
     )
+
+
+def clear_dashboard_caches() -> None:
+    st.cache_data.clear()
+    st.cache_resource.clear()
 
 
 def render_hero() -> None:
@@ -101,6 +120,28 @@ def section_header(title: str, description: str) -> None:
     )
 
 
+def render_pending_import_warning(settings: Settings) -> None:
+    status = GetPendingDegiroImportStatusUseCase(settings=settings).execute()
+    if not status.pending_portfolio_files:
+        return
+
+    latest_incoming = (
+        status.latest_incoming_portfolio_date.isoformat()
+        if status.latest_incoming_portfolio_date is not None
+        else "sin fecha"
+    )
+    latest_loaded = (
+        status.latest_normalized_portfolio_date.isoformat()
+        if status.latest_normalized_portfolio_date is not None
+        else "ninguno"
+    )
+    st.warning(
+        "Hay exportaciones de cartera pendientes de importar. "
+        f"Ultimo CSV en incoming: {latest_incoming}; ultimo snapshot cargado: {latest_loaded}. "
+        "En `Actualizar datos`, pulsa `1. Importar DEGIRO` para que el efectivo y las posiciones del nuevo snapshot entren en el dashboard."
+    )
+
+
 def metric_card(title: str, value: str, help_text: str) -> None:
     st.metric(title, value)
     st.caption(help_text)
@@ -120,7 +161,7 @@ def render_beginner_explainer() -> None:
         )
 
 
-@st.cache_data(show_spinner=False)
+@st.cache_resource(show_spinner=False)
 def load_metrics(_settings: Settings, data_fingerprint: tuple[tuple[str, int, int], ...]) -> PortfolioMetricsResult | None:
     try:
         return LoadPortfolioMetricsUseCase(settings=_settings).execute(

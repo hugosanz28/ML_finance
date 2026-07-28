@@ -16,13 +16,15 @@ La decision debe estar alineada con el objetivo de la cuenta.
 
 Los agentes deben trabajar a partir de un brief explicito de la cuenta, no solo desde la foto actual de posiciones.
 
-Brief actual de referencia, editable con el tiempo:
+Ejemplo publico **sintetico** de brief, solo para ilustrar el contrato:
 
-> Es una cuenta de inversión en la que aporto 1.000 € al mes con el objetivo de acumular capital para la entrada de una vivienda en 3–4 años. Dado que el objetivo tiene una fecha relativamente cercana, priorizo la preservación del capital y una volatilidad moderada. El núcleo de la cartera debe estar en activos diversificados y relativamente estables para este horizonte, combinando exposición global de calidad con una parte defensiva/liquidez. Los satélites —temáticos, BTC, acciones individuales e ideas tácticas— deben ser minoritarios y no comprometer el objetivo principal.
+> Cuenta ficticia con aportaciones periodicas y un objetivo a medio plazo. Prioriza preservacion de capital, volatilidad moderada y un nucleo diversificado; las posiciones satelite deben ser minoritarias y revisables.
 
 Este `investment_brief` debe tratarse como un texto vivo que el usuario puede ir modificando con el tiempo. No hace falta modelarlo ahora como un formulario rigido ni como campos separados.
 
 Este mandato debe condicionar el analisis de riesgo, horizonte, conveniencia de reequilibrio y encaje de nuevas ideas.
+El ejemplo anterior no es el mandato por defecto: cada ejecucion usa el
+`investment_brief` configurado por el usuario.
 
 ## Objetivos estructurados de cartera
 
@@ -47,9 +49,9 @@ pesos escritos como porcentaje (`70`) o decimal (`0.70`). El pipeline mensual
 lo expone a los agentes como `target_weights` y usa `monthly_contribution` como
 presupuesto mensual por defecto si la ejecucion no recibe uno explicito.
 
-## Flujo objetivo
+## Flujo mensual
 
-El flujo objetivo de agentes para una ejecucion mensual es:
+El pipeline implementado para una ejecucion mensual es:
 
 1. Partir del `investment_brief` o mandato de la cuenta.
 2. Consumir el estado de la cuenta desde el informe mensual con historial y metricas recientes.
@@ -160,11 +162,12 @@ Reglas:
 2. La trazabilidad de fuentes y fechas es parte del contrato, no una nota opcional.
 3. Los agentes pueden devolver `partial` cuando falta cobertura pero hay salida util.
 4. El mandato de la cuenta pesa mas que una noticia aislada o una moda puntual.
-5. La logica especifica de cada agente queda fuera de esta tarea.
+5. La logica especifica queda encapsulada en el modulo de cada agente y la
+   orquestacion mantiene un orden fijo.
 
 ## Validacion de fechas
 
-La pipeline mensual no debe mezclar un informe antiguo con metricas actuales. Al
+El pipeline mensual no mezcla un informe antiguo con metricas actuales. Al
 ejecutar `run_monthly_agent_pipeline`, el `as_of_date` del informe Markdown y el
 `as_of_date` de `portfolio_metrics_snapshot` deben coincidir. Si el informe se
 pasa por path, la fecha se extrae de `as_of_date:` en el frontmatter o del titulo
@@ -177,10 +180,12 @@ La capa `src.portfolio.data_quality` define checks deterministas que pueden
 ejecutarse antes de los agentes mediante
 `RunAgentQualityChecksUseCase` en `src.application.quality_checks`.
 
-Los checks bloquean cuando faltan metricas, posiciones valoradas, precios, FX o
-cuando las fechas de informe, metricas calculadas y `portfolio_metrics_snapshot`
-no coinciden. La cobertura de rentabilidad incompleta se trata como warning para
-permitir una salida parcial con contexto explicito.
+El caso de uso devuelve `can_run_agents=False` y estado `failed` cuando faltan
+metricas, posiciones valoradas, precios, FX o cuando las fechas de informe,
+metricas calculadas y `portfolio_metrics_snapshot` no coinciden. La cobertura de
+rentabilidad incompleta se trata como warning. Independientemente de este
+preflight opcional, el pipeline rechaza siempre la mezcla de fechas descrita en
+la seccion anterior.
 
 ## Identidad de activos
 
@@ -217,7 +222,8 @@ en `src/data/local/agents/monthly_pipeline/<run_id>/`. Ademas de
 - `agents/<agent_name>/request.json`: request estructurada enviada al agente.
 - `agents/<agent_name>/prompt_refs.json`: claves y versiones de prompts.
 - `agents/<agent_name>/prompt_rendered.md`: prompt versionado usado en esa ejecucion.
-- `agents/<agent_name>/raw_response.json`: placeholder de respuesta raw mientras el contrato LLM no la expone.
+- `agents/<agent_name>/raw_response.json`: placeholder con estado
+  `not_captured` mientras el contrato LLM no expone la respuesta bruta.
 - `agents/<agent_name>/parsed_output.json`: salida estructurada parseada.
 
 Estos artefactos viven bajo `src/data/local/`, por tanto son privados y estan
@@ -232,6 +238,27 @@ estable y version, por ejemplo `monitor_tematico.query` -> `v1`.
 Los proveedores `Static*LLMProvider` siguen siendo deterministas para tests y no
 dependen de estos archivos. Si se cambia el comportamiento esperado de un agente,
 el cambio debe quedar en el diff del prompt versionado o en una nueva version.
+
+## Modos de proveedores
+
+- `static/null`: baseline offline y default seguro; el monitor no recibe
+  resultados de busqueda y puede devolver cobertura `partial`.
+- `static/static`: demo offline completa; tanto el LLM como la busqueda
+  devuelven fixtures sinteticos y deterministas.
+- `openai/tavily`: ejecucion externa con OpenAI y Tavily configurados.
+- `openai/duckduckgo`: alternativa web best-effort sin clave de busqueda.
+
+Los dos primeros modos no usan red. Los resultados `static/static` son
+sinteticos y no deben presentarse como hechos de mercado ni recomendaciones
+reales.
+
+La construccion directa de los agentes, el pipeline y los runners parten de
+providers offline (`Static*LLMProvider` y `NullSearchProvider`). Usar OpenAI,
+Tavily o DuckDuckGo requiere seleccionarlos explicitamente.
+
+Scripts y Streamlit ejecutan la red mediante `RunMonthlyAgentsUseCase`. La
+ejecucion aislada del monitor entra por `RunMonitorTematicoUseCase`; ambos
+mantienen `static/null` como default.
 
 ## Agentes implementados
 
@@ -264,9 +291,9 @@ Permisos por agente:
   liquidez, rebalancear con aportacion o pedir revision manual, pero no ejecuta
   operaciones.
 
-La salida sigue siendo asesoramiento para revision manual. Ningun agente tiene
-permiso para ejecutar ordenes, modificar datos privados o ignorar errores de
-calidad bloqueantes.
+La salida es apoyo analitico para revision manual, no asesoramiento financiero.
+Ningun agente tiene permiso para ejecutar ordenes, modificar datos privados o
+ignorar errores de calidad bloqueantes.
 
 ## Encaje actual de los agentes
 
@@ -276,4 +303,6 @@ Con el objetivo actual del repo, los tres agentes implementados siguen siendo co
 - `analista_activos`: juzga si posiciones actuales y candidatas encajan con el mandato de la cuenta.
 - `asistente_aportacion_mensual`: sintetiza todo y emite la recomendacion final de compra, venta o rebalanceo.
 
-No veo necesario crear un cuarto agente ahora mismo. La pieza importante es mantener el mandato de la cuenta y los objetivos estructurados como inputs comunes de todos.
+No se preve un cuarto agente en la serie `v0.1.x`. La prioridad es mantener el
+mandato de la cuenta y los objetivos estructurados como inputs comunes de los
+tres agentes.

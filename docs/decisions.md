@@ -85,3 +85,48 @@ Consecuencias:
 
 - Menor riesgo de construir agentes vistosos sobre una base débil.
 - La funcionalidad útil aparece antes, aunque la capa “inteligente” llegue después.
+
+## ADR-006: Usar `src/application/` como frontera de interfaces
+
+Estado: aceptada
+
+Contexto:
+
+Streamlit, los scripts y una futura API necesitan reutilizar los mismos flujos
+sin acoplarse a parsers, repositorios, DataFrames o detalles de agentes.
+
+Decision:
+
+Toda interfaz debe entrar por casos de uso de `src/application/`. Las acciones
+operativas coordinan servicios de dominio y devuelven `ApplicationResult`; los
+read models, como `GetPortfolioStateUseCase`, devuelven contratos
+serializables. Los calculos financieros, proyecciones broker y consultas
+reutilizables permanecen en dominio/repositorios.
+
+Consecuencias:
+
+- Streamlit y los scripts comparten validaciones y defaults.
+- FastAPI puede ser un adaptador fino si se implementa mas adelante.
+- Cada nuevo flujo de interfaz requiere primero un caso de uso estable.
+
+## ADR-007: Mantener providers offline explicitos para demo y tests
+
+Estado: aceptada
+
+Contexto:
+
+La demo publica y los tests deben ser reproducibles, no depender de red y no
+confundir datos sinteticos con hechos de mercado.
+
+Decision:
+
+Market data de demo usa `PRICE_PROVIDER=synthetic`; los agentes usan
+`llm_provider=static` y `search_provider=null` por defecto. La combinacion
+`static/static` se reserva para fixtures de busqueda sinteticos. `yfinance`,
+OpenAI, Tavily y DuckDuckGo requieren seleccion explicita.
+
+Consecuencias:
+
+- Tests y demo funcionan offline.
+- El provider `synthetic` conserva datos sembrados y no inventa series nuevas.
+- Toda dependencia externa queda visible en configuracion o CLI.

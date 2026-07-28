@@ -122,7 +122,7 @@ def parse_degiro_cash_movements_csv(
     records: list[dict[str, object]] = []
     for row_number, raw_row in enumerate(rows[1:], start=2):
         row = _normalize_row(raw_row, len(EXPECTED_ACCOUNT_HEADERS))
-        fields = dict(zip(LOGICAL_ROW_FIELDS, row))
+        fields = dict(zip(LOGICAL_ROW_FIELDS, row, strict=True))
         records.append(
             _parse_cash_movement_row(
                 fields,

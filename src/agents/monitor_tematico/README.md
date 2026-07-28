@@ -26,11 +26,11 @@ El flujo esperado es:
 
 Por tanto, la salida de este agente debe ser una capa intermedia de contexto, no una recomendacion final.
 
-## Entradas previstas
+## Entradas
 
 Entradas requeridas:
 
-- `investment_brief`: mandato vivo de la cuenta, horizonte, objetivo de vivienda, filosofia `core + satellites` y restricciones.
+- `investment_brief`: mandato vivo de la cuenta, objetivo, horizonte, filosofia de cartera y restricciones.
 - `latest_monthly_report`: informe mensual mas reciente, con asignacion actual, cambios por periodo y notas de cobertura.
 
 Entradas opcionales:
@@ -56,7 +56,7 @@ Si no existe ninguno de los dos, la v1 debe funcionar igualmente usando solo car
 
 ## Alcance funcional v1
 
-La primera version debe ser acotada y mensual.
+La implementacion es acotada y mensual.
 
 - Ventana temporal principal: desde el ultimo informe mensual hasta `context.as_of_date`.
 - Ventana alternativa configurable: 30-45 dias si no hay fecha clara del informe anterior.
@@ -80,16 +80,19 @@ El agente debe buscar cambios externos relacionados con:
 
 ## Estrategia de busqueda y datos externos
 
-La v1 debe priorizar una implementacion propia y controlada antes que depender de servicios de pago.
+El agente construye primero el universo observado desde inputs internos del
+repo: informe mensual, pesos, cambios, watchlist e interes puntual. Despues el
+LLM genera queries acotadas y la busqueda se delega al proveedor seleccionado:
 
-Orden recomendado de fuentes:
+- `null`: no devuelve resultados y mantiene la ejecucion offline;
+- `static`: genera contexto sintetico determinista para tests y demo;
+- `duckduckgo`: busqueda HTML best-effort sin API key;
+- `tavily`: busqueda API opcional con `TAVILY_API_KEY`.
 
-1. Inputs internos del repo: informe mensual, historico de informes, pesos, cambios y notas de cobertura.
-2. Datos de mercado disponibles en el proyecto, especialmente precios y series descargadas con `yfinance`.
-3. Busqueda web propia, acotada por queries generadas por el LLM desde los inputs y temas observados.
-4. Tavily u otro proveedor externo solo como alternativa futura si el proveedor propio resulta insuficiente y el plan gratuito encaja.
+`null` y `static` no usan red. DuckDuckGo y Tavily solo se activan al
+seleccionarlos explicitamente.
 
-La busqueda web propia debe ser simple y reemplazable:
+La busqueda implementada es simple y reemplazable:
 
 - recibir queries concretas generadas por el LLM para activo, ETF, sector, geografia o tema,
 - limitar ventana temporal y numero de resultados,
@@ -98,23 +101,16 @@ La busqueda web propia debe ser simple y reemplazable:
 - devolver resultados normalizados para que el agente pueda convertirlos en `AgentFinding`,
 - y permitir cache local en `src/data/local/` para mejorar reproducibilidad.
 
-`yfinance` puede usarse para contexto de mercado, por ejemplo:
-
-- movimientos recientes de precio,
-- volatilidad o drawdown basico,
-- comparacion de comportamiento entre posicion y benchmark simple,
-- confirmacion de si una noticia coincide con un movimiento material.
-
-`yfinance` no debe ser la fuente principal de noticias. Si se usa informacion de noticias incluida por el proveedor, debe tratarse como una fuente mas y no como verdad unica.
-
-Para mantener el agente desacoplado, la implementacion deberia exponer una interfaz de proveedor:
+Para mantener el agente desacoplado, la implementacion expone esta interfaz de
+proveedor:
 
 ```text
 SearchProvider:
   search(query, start_date, end_date, max_results) -> SearchResult[]
 ```
 
-La primera implementacion puede incluir un proveedor propio sencillo y tests con proveedor fake. Tavily, Exa, SerpApi u otros proveedores podrian incorporarse despues sin cambiar la logica principal del agente.
+Los proveedores actuales respetan este contrato. Otros proveedores pueden
+incorporarse sin cambiar la logica principal del agente.
 
 ## Papel del LLM
 
@@ -132,7 +128,7 @@ El codigo no debe decidir semanticamente con reglas rigidas salvo como validacio
 Si importan:
 
 - decisiones o cambios de tono de bancos centrales que afecten a renta variable, bonos, liquidez o metales,
-- datos macro con implicacion clara para el horizonte de 3-4 anos,
+- datos macro con implicacion clara para el horizonte indicado en `investment_brief`,
 - eventos regulatorios que afecten a BTC, ETFs, sectores o geografias presentes en cartera,
 - resultados, guidance, profit warnings o cambios de tesis en acciones individuales candidatas o en cartera,
 - cambios relevantes en un ETF: indice, metodologia, comisiones, proveedor, replica, liquidacion o concentracion,
@@ -157,7 +153,7 @@ Los hallazgos deben ordenarse por impacto potencial sobre la cuenta, no por popu
 
 Criterios de prioridad:
 
-- impacto sobre el objetivo principal de la cuenta: entrada de vivienda en 3-4 anos,
+- impacto sobre el objetivo y horizonte definidos en `investment_brief`,
 - materialidad sobre posiciones actuales o exposiciones `core`,
 - impacto potencial sobre `satellites` de alto riesgo o alta volatilidad,
 - novedad frente al ultimo informe,
@@ -198,7 +194,8 @@ Una idea nueva del usuario no debe elevarse automaticamente a recomendacion. Sol
 
 ## Encaje con la interfaz base
 
-`monitor_tematico` debera usar el contrato comun de `src/agents/`.
+`monitor_tematico` implementa `BaseAgent` y devuelve el contrato comun
+`AgentResult` de `src/agents/`.
 
 Request esperado:
 
@@ -227,7 +224,7 @@ Result esperado:
 
 ## Formato de findings
 
-Cada `AgentFinding` deberia representar un unico hallazgo accionable para agentes posteriores.
+Cada `AgentFinding` representa un unico hallazgo util para agentes posteriores.
 
 Campos recomendados:
 
@@ -239,7 +236,7 @@ Campos recomendados:
 - `tags`: etiquetas como `core`, `satellite`, `candidate`, `macro`, `etf`, `btc`, `equity`, `rates`, `inflation`.
 - `sources`: fuentes trazables usadas en el hallazgo.
 
-Metadatos recomendados por hallazgo:
+Metadatos estructurados por hallazgo:
 
 - `impact_scope`: `core`, `satellite`, `candidate`, `portfolio` o `mixed`.
 - `change_type`: `fact`, `risk` o `catalyst`.
@@ -249,7 +246,7 @@ Metadatos recomendados por hallazgo:
 - `potential_decision_relevance`: `buy`, `do_not_buy`, `reduce`, `sell`, `rebalance`, `watch` o `analysis_needed`.
 - `downstream_hint`: `review_fit`, `watch_weight`, `consider_rebalance`, `candidate_needs_analysis` o `no_action_context`.
 
-Ejemplo conceptual:
+Ejemplo conceptual sintetico:
 
 ```text
 Finding:
@@ -304,21 +301,21 @@ Cada `AgentSource` debe incluir:
 
 Si no hay cobertura suficiente para un activo o candidato, el resultado debe ser `partial` o incluir `warnings`.
 
-## Salida minima para considerar P5-02 implementable
+## Garantias implementadas
 
-La primera implementacion puede considerarse suficiente si:
+La implementacion:
 
-- valida los inputs requeridos,
-- acepta la ausencia de `watchlist_candidates` sin fallar,
-- acepta `user_satellite_interest` de forma opcional,
-- construye una lista de temas a observar a partir de cartera, mandato, watchlist opcional e interes puntual opcional,
-- usa una interfaz LLM desacoplada para generar queries y sintetizar resultados,
-- usa una interfaz de busqueda desacoplada de proveedores concretos,
-- genera un `AgentResult` con `summary`, `findings`, `sources`, `warnings` y `metadata`,
-- diferencia `core`, `satellite` y `candidate` cuando aplique,
-- distingue hechos, riesgos y catalizadores,
-- prioriza hallazgos por impacto potencial,
-- y no emite recomendaciones directas de asignacion.
+- valida los inputs requeridos;
+- acepta la ausencia de `watchlist_candidates` y
+  `user_satellite_interest`;
+- construye temas desde cartera, mandato y candidatos opcionales;
+- desacopla generacion/sintesis LLM de los proveedores de busqueda;
+- genera `AgentResult` con `summary`, `findings`, `sources`, `warnings` y
+  `metadata`;
+- diferencia `core`, `satellite` y `candidate`, y estructura hechos, riesgos y
+  catalizadores;
+- prioriza hallazgos por impacto potencial;
+- no emite recomendaciones directas de asignacion.
 
 ## Fuera de alcance de v1
 
@@ -336,12 +333,12 @@ Queda fuera de la primera version:
 
 ## Notas de implementacion
 
-La implementacion deberia apoyarse en `BaseAgent` y devolver siempre `AgentResult`.
+La implementacion se apoya en `BaseAgent` y devuelve siempre `AgentResult`.
 
-Comportamiento esperado:
+Comportamiento:
 
 - `required_inputs()` devuelve `investment_brief` y `latest_monthly_report`.
-- `supports()` puede restringir scopes no mensuales si hace falta.
+- `supports()` acepta cadencia mensual o no especificada.
 - `run()` debe devolver `partial` si hay salida util pero falta cobertura externa.
 - `run()` debe devolver `failed` solo cuando no pueda producir contexto minimo.
 
@@ -355,7 +352,9 @@ Archivos principales:
 - `topic_builder.py`: construye el universo observado a partir del informe mensual, watchlist opcional, interes puntual opcional, `request.scope` y temas macro basicos.
 - `_types.py`: define tipos internos ligeros (`ObservedTopic` y `SearchResult`) que no sustituyen al contrato comun de agentes.
 - `providers.py`: define la interfaz `SearchProvider` y proveedores concretos para no acoplar el agente a una API externa.
-- `llm.py`: define la interfaz `ThemeLLMProvider`, el proveedor real `OpenAIThemeLLMProvider` y el proveedor fake `StaticThemeLLMProvider` para tests.
+- `llm.py`: define la interfaz `ThemeLLMProvider`, el proveedor real
+  `OpenAIThemeLLMProvider` y el proveedor determinista
+  `StaticThemeLLMProvider` para tests y demo.
 - `__init__.py`: exporta la API publica del modulo `monitor_tematico`.
 
 Flujo actual de ejecucion:
@@ -386,22 +385,32 @@ Configuracion de busqueda:
 
 Runner manual disponible:
 
-- `scripts/run_monitor_tematico.py`: permite ejecutar el agente sin instanciarlo a mano desde Python.
+- `scripts/run_monitor_tematico.py`: ejecuta `RunMonitorTematicoUseCase` sin
+  instanciar el agente desde la interfaz.
 - `--dry-run`: resuelve inputs y temas observados sin llamar al LLM ni a la web.
-- `--llm-provider openai|static`: permite dejar montada la tuberia sin llamadas reales mientras `static` no genera queries.
-- `--search-provider duckduckgo|tavily|null`: permite elegir entre busqueda
-  best-effort sin API key, Tavily con API key o ejecucion sin busqueda web.
-- cache local por defecto en `src/data/local/agents/monitor_tematico/search_cache/`, salvo que se pase `--disable-cache`.
+- `--llm-provider openai|static`: `static` genera queries sinteticas
+  deterministas sin llamadas a un LLM externo.
+- `--search-provider null|static|duckduckgo|tavily`: permite elegir entre
+  ejecucion sin busqueda, resultados sinteticos deterministas, busqueda
+  best-effort sin API key o Tavily con API key.
+- para `duckduckgo` y `tavily`, cache local por defecto en
+  `src/data/local/agents/monitor_tematico/search_cache/`, salvo que se pase
+  `--disable-cache`.
 
 Proveedores incluidos:
 
 - `NullSearchProvider`: no devuelve resultados; sirve para ejecutar el agente sin internet y comprobar comportamiento `partial`.
-- `StaticSearchProvider`: devuelve resultados fijos; se usa en tests y puede servir para fixtures manuales.
+- `StaticSearchProvider`: devuelve fixtures configurados o, si no se le pasan,
+  un resultado sintetico determinista por query.
 - `DuckDuckGoHtmlSearchProvider`: proveedor propio basico basado en la pagina HTML de DuckDuckGo, sin servicios de pago ni librerias nuevas.
 - `TavilySearchProvider`: proveedor API opcional para busqueda web mas estable
   que el scraping HTML. Requiere `TAVILY_API_KEY` y usa busqueda `basic` por
   defecto para contener consumo de creditos.
 - `CachedSearchProvider`: wrapper opcional para persistir resultados web en disco y reutilizarlos en ejecuciones posteriores.
+
+En el pipeline mensual, el dashboard y el runner individual, `static/null` es
+el baseline offline y `static/static` activa tambien resultados de busqueda
+sinteticos para una demo mas completa.
 
 Limitaciones actuales:
 
@@ -411,7 +420,8 @@ Limitaciones actuales:
   API externa y consumo de creditos. Si no hay `TAVILY_API_KEY`, el proveedor
   falla con un error explicito.
 - El cache local evita repetir busquedas, pero todavia no implementa invalidacion por antiguedad ni limpieza automatica.
-- Todavia no se usa `yfinance` dentro del agente; queda como siguiente mejora para complementar noticias con movimiento de precio, volatilidad o drawdown.
+- El agente no integra directamente series de `yfinance`; el contexto de
+  precios, volatilidad o drawdown solo existe si llega mediante sus inputs.
 
 Tests cubiertos:
 

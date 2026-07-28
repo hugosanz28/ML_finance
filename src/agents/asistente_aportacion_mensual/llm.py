@@ -111,7 +111,7 @@ def _static_monthly_decision(
         role="core",
         rationale=(
             "Propuesta sintetica local: reforzar el nucleo diversificado porque encaja mejor "
-            "con el horizonte de vivienda y reduce dependencia de satellites."
+            "con el mandato recibido y reduce dependencia de satellites."
         ),
         source_signal_ids=tuple(finding.title for finding in upstream_findings[:3]),
         tags=("demo", "core", "contribution"),

@@ -64,6 +64,26 @@ class FxProvider(ABC):
         """Fetch daily FX rates for the requested pair and date range."""
 
 
+class SyntheticFxProvider(FxProvider):
+    """Offline demo provider that keeps the pre-seeded synthetic FX unchanged."""
+
+    @property
+    def name(self) -> str:
+        return "synthetic"
+
+    def fetch_fx_rates(
+        self,
+        *,
+        base_currency: str,
+        quote_currency: str,
+        start_date: date,
+        end_date: date,
+    ) -> FxFetchResult:
+        raise FxDataNotFoundError(
+            f"Synthetic demo is offline; no external FX refresh is available for {base_currency}/{quote_currency}."
+        )
+
+
 class YFinanceFxProvider(FxProvider):
     """Daily FX provider backed by `yfinance` ticker pairs such as `EURUSD=X`."""
 
@@ -244,6 +264,8 @@ def build_fx_provider(
     normalized_name = provider_name.strip().lower()
     if normalized_name == "yfinance":
         return YFinanceFxProvider(cache_dir=cache_dir)
+    if normalized_name == "synthetic":
+        return SyntheticFxProvider()
     raise UnknownFxProviderError(f"Unsupported FX provider: {provider_name}")
 
 

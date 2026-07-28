@@ -19,12 +19,12 @@ from src.agents.monitor_tematico._types import (
     SynthesizedFinding,
 )
 from src.agents.monitor_tematico.llm import (
-    OpenAIThemeLLMProvider,
+    StaticThemeLLMProvider,
     ThemeLLMProvider,
     ThemeLLMProviderError,
 )
 from src.agents.monitor_tematico.providers import (
-    DuckDuckGoHtmlSearchProvider,
+    NullSearchProvider,
     SearchProvider,
     SearchProviderError,
 )
@@ -45,10 +45,9 @@ class MonitorTematicoAgent(BaseAgent):
         search_provider: SearchProvider | None = None,
         llm_provider: ThemeLLMProvider | None = None,
     ) -> None:
-        # The provider is injected so tests can run without network access and
-        # future providers like Tavily can be added without changing agent logic.
-        self.search_provider = search_provider or DuckDuckGoHtmlSearchProvider()
-        self.llm_provider = llm_provider or OpenAIThemeLLMProvider()
+        # Defaults are deliberately offline; real providers require an explicit choice.
+        self.search_provider = search_provider or NullSearchProvider()
+        self.llm_provider = llm_provider or StaticThemeLLMProvider()
 
     @property
     def name(self) -> str:

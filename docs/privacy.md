@@ -22,7 +22,7 @@ Trata como privados, aunque no contengan contrasenas:
 - informes mensuales, historicos, outputs de agentes y audit trails;
 - `investment_brief.md`, presupuestos, objetivos, pesos objetivo y notas
   personales de inversion;
-- capturas del dashboard, screenshots de demos y logs de ejecucion;
+- capturas del dashboard o logs de ejecucion generados con datos reales;
 - `.env`, claves de OpenAI, Tavily u otros proveedores, y secretos de
   Streamlit.
 
@@ -75,6 +75,9 @@ Para demos publicas, usa:
 ```
 
 No uses capturas, informes ni audit trails generados desde `src/data/local/`.
+El repositorio no incluye actualmente capturas del dashboard. Cualquier captura
+publica futura debe salir de la demo sintetica recien generada y revisarse para
+confirmar que no muestra rutas, terminales ni datos de una ejecucion real.
 
 ## Secret scanning
 
@@ -87,21 +90,24 @@ Antes de ensenar el repositorio, subir una rama o abrir un PR:
    git diff
    ```
 
-2. Busca patrones obvios de secretos o datos privados:
+2. Busca patrones obvios solo en archivos versionados, sin abrir rutas locales
+   ignoradas:
 
    ```powershell
-   rg -n "OPENAI_API_KEY|TAVILY_API_KEY|api[_-]?key|secret|password|token|BEGIN .*PRIVATE KEY" .
+   $trackedFiles = git ls-files
+   rg -n "OPENAI_API_KEY\s*=|TAVILY_API_KEY\s*=|api[_-]?key|password\s*=|token\s*=|secret\s*=|BEGIN .*PRIVATE KEY" -- $trackedFiles
    ```
 
-3. Ejecuta un escaner de secretos si lo tienes instalado. Ejemplos:
+3. Ejecuta el mismo escaner de secretos que usa CI:
 
    ```powershell
-   gitleaks detect --source . --redact --no-banner
-   git-secrets --scan
+   $trackedFiles = git ls-files
+   detect-secrets-hook --baseline .secrets.baseline $trackedFiles
    ```
 
-4. Comprueba en GitHub que el repositorio tiene activado secret scanning cuando
-   este disponible para la cuenta o el plan.
+4. Como defensa adicional puedes usar `gitleaks` o `git-secrets` y comprobar en
+   GitHub que el repositorio tiene activado secret scanning cuando este
+   disponible para la cuenta o el plan.
 
 Si un secreto se ha subido alguna vez, no basta con borrarlo del archivo actual:
 hay que rotarlo en el proveedor correspondiente y limpiar o invalidar el
@@ -112,7 +118,8 @@ historial afectado antes de considerar el repositorio seguro.
 - `git status --short` no muestra archivos privados.
 - `git ls-files src/degiro_exports/local src/data/local` no devuelve nada.
 - `.env` existe solo en local y `.env.example` no contiene valores reales.
-- Las capturas del dashboard no muestran nombres, importes o fechas personales.
+- No hay capturas versionadas o, si se anaden, proceden exclusivamente de una
+  demo sintetica revisada.
 - Los informes y outputs de agentes usados en demos proceden de datos sinteticos
   o saneados.
 - El diff no contiene rutas locales absolutas, claves API, tokens ni datos de
@@ -128,7 +135,13 @@ se va a enviar y evita incluir datos personales que no sean necesarios para el
 analisis. Para pruebas publicas o demos, usa proveedores `static` o datos
 sinteticos.
 
-En la v1 local con Streamlit, la opcion segura para demo es `LLM provider:
-static` y `Search provider: null`. Los proveedores `openai`,
-`tavily` y `duckduckgo` deben tratarse como ejecuciones reales o semi-reales,
-porque pueden sacar informacion fuera del equipo local.
+En la v1 local con Streamlit hay dos combinaciones offline:
+
+- `LLM provider: static` y `Search provider: null`: baseline seguro sin
+  resultados de busqueda;
+- `LLM provider: static` y `Search provider: static`: demo completa con
+  resultados locales etiquetados como sinteticos.
+
+Los proveedores `openai`, `tavily` y `duckduckgo` deben tratarse como
+ejecuciones reales o semi-reales, porque pueden sacar informacion fuera del
+equipo local.

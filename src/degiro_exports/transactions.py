@@ -148,7 +148,7 @@ def parse_degiro_transactions_csv(
     records: list[dict[str, object]] = []
     for row_number, raw_row in enumerate(rows[1:], start=2):
         row = _normalize_row(raw_row, len(header))
-        fields = dict(zip(LOGICAL_ROW_FIELDS, row))
+        fields = dict(zip(LOGICAL_ROW_FIELDS, row, strict=True))
         record = _parse_transaction_row(
             fields,
             source_path=resolved_path,

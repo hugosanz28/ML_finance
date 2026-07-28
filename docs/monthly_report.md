@@ -25,6 +25,10 @@ Los contratos compartidos del informe (`MonthlyReportResult`,
 `src/reports/monthly_models.py`. `src/reports/monthly.py` mantiene la
 orquestacion de carga, calculo, renderizado y persistencia del informe.
 
+Scripts, Streamlit y futuras interfaces entran por
+`GenerateMonthlyReportUseCase`; la lectura del ultimo informe usa
+`GetLatestMonthlyReportUseCase`.
+
 La fecha de referencia real es la ultima fecha valorada disponible, salvo que se
 pase `--as-of-date`.
 
@@ -38,7 +42,7 @@ Nombre del fichero:
 
 - `YYYY-MM-DD-monthly-YYYYMMDDTHHMMSSffffff.md`
 
-Ejemplo real:
+Ejemplo de formato:
 
 - `2026-04-12-monthly-20260414T235637794724.md`
 
@@ -57,6 +61,10 @@ Si existe snapshot de DEGIRO para la fecha de referencia (o la ultima fecha
 anterior disponible), el valor total y la asignacion actual se anclan a ese
 snapshot del broker. Las metricas de coste/PnL se completan con la serie
 recalculada cuando procede.
+
+La composicion de snapshot broker, coste y PnL se comparte con dashboard y
+agentes mediante `src/portfolio/state_projection.py`; el informe no mantiene
+una implementacion financiera paralela.
 
 La serie recalculada usa la politica `broker_snapshot_anchored`: el precio local
 absoluto viene del snapshot DEGIRO y el proveedor externo solo aporta variacion

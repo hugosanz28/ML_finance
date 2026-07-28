@@ -16,7 +16,12 @@ from src.application import (
     RefreshMarketDataUseCase,
 )
 from src.config import Settings
-from src.portfolio.dashboard_common import generate_report_action, section_header
+from src.portfolio.dashboard_common import (
+    clear_dashboard_caches,
+    generate_report_action,
+    render_pending_import_warning,
+    section_header,
+)
 from src.portfolio.dashboard_uploads import _save_uploaded_degiro_files
 
 
@@ -25,6 +30,7 @@ def render_update_tab(settings: Settings) -> None:
         "Actualizar datos",
         "Sube exportaciones de DEGIRO y ejecuta el pipeline local. Ninguna operacion se envia al broker.",
     )
+    render_pending_import_warning(settings)
 
     st.markdown("#### 1. Entrada de CSVs")
     st.caption(
@@ -61,7 +67,7 @@ def render_update_tab(settings: Settings) -> None:
                     f"Importados={summary.imported_count}; DuckDB tx={warehouse.transactions}, "
                     f"cash={warehouse.cash_movements}, snapshots={warehouse.portfolio_snapshots}"
                 )
-            st.cache_data.clear()
+            clear_dashboard_caches()
     with c2:
         st.markdown("**FX**")
         st.caption("Descarga tipos de cambio para valorar posiciones no EUR.")
@@ -72,7 +78,7 @@ def render_update_tab(settings: Settings) -> None:
                     RefreshFxRequest(only_missing_base=only_missing)
                 ).summary
             st.success(f"Pares actualizados={fx_summary.updated_pairs}; filas={fx_summary.total_records}")
-            st.cache_data.clear()
+            clear_dashboard_caches()
     with c3:
         st.markdown("**Precios**")
         st.caption("Actualiza precios diarios usando tickers y overrides.")
@@ -86,13 +92,13 @@ def render_update_tab(settings: Settings) -> None:
             else:
                 price_summary = market_result.summary
                 st.success(f"Activos actualizados={price_summary.updated_assets}; filas={price_summary.total_records}")
-            st.cache_data.clear()
+            clear_dashboard_caches()
     with c4:
         st.markdown("**Informe**")
         st.caption("Genera el informe mensual que consumen los agentes.")
         if st.button("4. Generar informe"):
             generate_report_action(settings)
-            st.cache_data.clear()
+            clear_dashboard_caches()
 
     st.divider()
     st.markdown("#### Flujo rapido")
@@ -116,4 +122,4 @@ def render_update_tab(settings: Settings) -> None:
             f"fx_rows={fx_summary.total_records}, price_rows={price_rows}, "
             f"report={report.output_path.name if report.output_path else '-'}"
         )
-        st.cache_data.clear()
+        clear_dashboard_caches()

@@ -12,22 +12,25 @@ que la interfaz no dependa de detalles internos de `src/portfolio/`,
 
 - Cada caso de uso vive en un modulo pequeno y expone una clase `*UseCase`.
 - Las entradas se agrupan en dataclasses `*Request`.
-- Las salidas incluyen `ApplicationResult` con estado, mensaje, avisos y
-  artefactos relevantes.
+- Las acciones operativas incluyen `ApplicationResult` con estado, mensaje,
+  avisos y artefactos relevantes; las lecturas devuelven read models tipados y
+  serializables.
 - Los wrappers deben delegar en servicios existentes y evitar reescrituras
   grandes de dominio.
 
-## Casos de uso objetivo
+## Casos de uso disponibles
 
 - importar exportaciones DEGIRO;
 - refrescar FX;
 - refrescar precios de mercado;
 - generar informe mensual;
 - ejecutar agentes mensuales;
+- ejecutar el monitor tematico aislado con proveedores offline por defecto;
 - listar y leer auditoria persistida de agentes;
-- ejecutar quality checks antes de agentes o recomendaciones.
-- cargar read models de dashboard: metricas, snapshots, transacciones, reports,
-  brief, targets y counts de bodega local.
+- ejecutar quality checks antes de agentes o recomendaciones;
+- cargar read models de dashboard: estado de cartera JSON, metricas, snapshots,
+  transacciones, reports, brief, targets, requisitos FX y counts de bodega local;
+- guardar uploads DEGIRO con nombres normalizados antes de importarlos.
 
 Las migraciones deben ser progresivas: primero se anade el wrapper, despues se
 adapta el script o la vista de Streamlit correspondiente.
@@ -50,6 +53,23 @@ interfaces deben usar este caso de uso en vez de llamar directamente al pipeline
 auditoria persistida en disco. Streamlit los usa para visualizar plan interno,
 acciones, fuentes, prompts, warnings, inputs y outputs sin acoplar la UI a la
 estructura fisica de carpetas.
+
+`RunMonitorTematicoUseCase` ofrece el mismo limite para ejecuciones aisladas del
+monitor. Sus defaults `static/null` no usan red.
+
+Los casos de refresh respetan el proveedor configurado. La demo usa
+`PRICE_PROVIDER=synthetic`, que mantiene FX y precios precargados sin intentar
+descargas externas.
+
+## Estado de cartera y adaptadores
+
+`GetPortfolioStateUseCase` compone las metricas, posiciones, historico,
+snapshot broker y aportaciones externas en tipos serializables. Es la frontera
+prevista para `GET /api/v1/portfolio/state`.
+
+`SaveDegiroUploadsUseCase` controla nombres y persistencia de archivos subidos;
+`InferFxRequirementsUseCase` devuelve requisitos FX con fechas ISO mediante
+`to_dict()`. Las interfaces no necesitan importar parsers ni repositorios.
 
 ## Relacion con v2
 

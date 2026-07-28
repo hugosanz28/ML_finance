@@ -16,7 +16,9 @@ from src.market_data import (
     FxProvider,
     FxRateRecord,
     FxRefreshService,
+    SyntheticFxProvider,
     YFinanceFxProvider,
+    build_fx_provider,
     infer_fx_requirements_from_normalized_degiro,
 )
 
@@ -43,6 +45,19 @@ class StubFxProvider(FxProvider):
         if isinstance(response, Exception):
             raise response
         return response
+
+
+def test_build_fx_provider_returns_offline_synthetic_provider() -> None:
+    provider = build_fx_provider("synthetic")
+
+    assert isinstance(provider, SyntheticFxProvider)
+    with pytest.raises(FxDataNotFoundError, match="offline"):
+        provider.fetch_fx_rates(
+            base_currency="EUR",
+            quote_currency="USD",
+            start_date=date(2026, 1, 1),
+            end_date=date(2026, 1, 2),
+        )
 
 
 @pytest.fixture

@@ -4,24 +4,122 @@ on:
   push:
   pull_request:
 
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
-  tests:
+  supported-python:
+    name: ${{ matrix.os }} / Python ${{ matrix.python-version }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            python-version: "3.11"
+          - os: windows-latest
+            python-version: "3.12"
+          - os: windows-latest
+            python-version: "3.13"
+          - os: windows-latest
+            python-version: "3.14"
+          - os: ubuntu-latest
+            python-version: "3.12"
+    env:
+      PYTHONUTF8: "1"
+      PYTHONIOENCODING: utf-8
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+          cache-dependency-path: |
+            pyproject.toml
+            requirements-dev.txt
+            requirements.txt
+
+      - name: Install runtime and test dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install . pytest==9.0.2
+
+      - name: Run tests
+        run: python -m pytest
+
+  quality:
+    name: Quality, security, package and offline demo
     runs-on: windows-latest
     env:
       PYTHONUTF8: "1"
       PYTHONIOENCODING: utf-8
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: "3.12"
           cache: pip
+          cache-dependency-path: |
+            pyproject.toml
+            requirements-dev.txt
+            requirements.txt
 
-      - name: Install dependencies
-        run: python -m pip install -r requirements.txt
+      - name: Install development dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements-dev.txt
 
-      - name: Run tests
-        run: python -m pytest
+      - name: Lint
+        run: python -m ruff check src scripts tests
+
+      - name: Typecheck gradual boundary
+        run: python -m mypy
+
+      - name: Scan tracked files for secrets
+        shell: pwsh
+        run: |
+          $trackedFiles = git ls-files
+          detect-secrets-hook --baseline .secrets.baseline $trackedFiles
+
+      - name: Run tests with branch coverage
+        run: python -m pytest --cov=src --cov-report=term-missing --cov-report=xml
+
+      - name: Bootstrap synthetic demo offline
+        shell: pwsh
+        run: |
+          $env:ML_FINANCE_ENV_FILE = "demo/synthetic_config/.env.demo"
+          python scripts/bootstrap_demo.py
+
+      - name: Build distributions
+        run: python -m build
+
+      - name: Install wheel and smoke-test packaged resources
+        shell: pwsh
+        run: |
+          $wheel = Get-ChildItem -Path dist -Filter *.whl | Select-Object -First 1
+          if (-not $wheel) {
+            throw "Wheel not found under dist/"
+          }
+          python -m pip install --force-reinstall --no-deps $wheel.FullName
+          Push-Location $env:RUNNER_TEMP
+          try {
+            python -I -c "from src.agents.prompts import load_prompt; assert load_prompt('monitor_tematico.query')"
+            python -I -c "from src.config import load_settings; assert load_settings(env={}).initial_schema_path.exists()"
+          }
+          finally {
+            Pop-Location
+          }
+          python -m pip check
+
+      - name: Audit runtime dependencies
+        run: python -m pip_audit . --strict --progress-spinner off --cache-dir .test_tmp/pip-audit-cache

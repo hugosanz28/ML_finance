@@ -43,6 +43,25 @@ class PriceProvider(ABC):
         """Fetch daily prices for the requested asset and date range."""
 
 
+class SyntheticPriceProvider(PriceProvider):
+    """Offline demo provider that keeps the pre-seeded synthetic prices unchanged."""
+
+    @property
+    def name(self) -> str:
+        return "synthetic"
+
+    def fetch_daily_prices(
+        self,
+        asset: MarketAsset,
+        *,
+        start_date: date,
+        end_date: date,
+    ) -> PriceFetchResult:
+        raise PriceDataNotFoundError(
+            f"Synthetic demo is offline; no external price refresh is available for {asset.asset_id}."
+        )
+
+
 class YFinancePriceProvider(PriceProvider):
     """Daily price provider backed by `yfinance`."""
 
@@ -177,4 +196,6 @@ def build_price_provider(
     normalized_name = provider_name.strip().lower()
     if normalized_name == "yfinance":
         return YFinancePriceProvider(cache_dir=cache_dir)
+    if normalized_name == "synthetic":
+        return SyntheticPriceProvider()
     raise UnknownPriceProviderError(f"Unsupported price provider: {provider_name}")

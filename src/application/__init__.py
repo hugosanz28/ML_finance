@@ -2,12 +2,23 @@
 
 from src.application.degiro import ImportDegiroRequest, ImportDegiroResult, ImportDegiroUseCase
 from src.application.market_data import (
+    FxRequirementView,
+    InferFxRequirementsRequest,
+    InferFxRequirementsResult,
+    InferFxRequirementsUseCase,
     RefreshFxRequest,
     RefreshFxResult,
     RefreshFxUseCase,
     RefreshMarketDataRequest,
     RefreshMarketDataResult,
     RefreshMarketDataUseCase,
+)
+from src.application.uploads import (
+    DegiroUpload,
+    DegiroUploadOutcome,
+    SaveDegiroUploadsRequest,
+    SaveDegiroUploadsResult,
+    SaveDegiroUploadsUseCase,
 )
 from src.application.agents import RunMonthlyAgentsRequest, RunMonthlyAgentsResult, RunMonthlyAgentsUseCase
 from src.application.agent_audit import (
@@ -37,6 +48,8 @@ from src.application.dashboard import (
     GetNetExternalContributionsRequest,
     GetNetExternalContributionsResult,
     GetNetExternalContributionsUseCase,
+    GetPendingDegiroImportStatusResult,
+    GetPendingDegiroImportStatusUseCase,
     GetWarehouseCountsResult,
     GetWarehouseCountsUseCase,
     ListDashboardReportsResult,
@@ -56,6 +69,16 @@ from src.application.dashboard import (
     extract_report_as_of_date_from_path,
     net_external_contributions_until,
 )
+from src.application.portfolio_state import (
+    GetPortfolioStateRequest,
+    GetPortfolioStateResult,
+    GetPortfolioStateUseCase,
+)
+from src.application.monitor import (
+    RunMonitorTematicoRequest,
+    RunMonitorTematicoResult,
+    RunMonitorTematicoUseCase,
+)
 from src.application.types import ApplicationResult, ApplicationStatus
 
 __all__ = [
@@ -74,8 +97,17 @@ __all__ = [
     "GetNetExternalContributionsRequest",
     "GetNetExternalContributionsResult",
     "GetNetExternalContributionsUseCase",
+    "GetPendingDegiroImportStatusResult",
+    "GetPendingDegiroImportStatusUseCase",
+    "GetPortfolioStateRequest",
+    "GetPortfolioStateResult",
+    "GetPortfolioStateUseCase",
     "GetWarehouseCountsResult",
     "GetWarehouseCountsUseCase",
+    "FxRequirementView",
+    "InferFxRequirementsRequest",
+    "InferFxRequirementsResult",
+    "InferFxRequirementsUseCase",
     "GetLatestMonthlyReportResult",
     "GetLatestMonthlyReportUseCase",
     "ImportDegiroRequest",
@@ -105,9 +137,17 @@ __all__ = [
     "RunMonthlyAgentsRequest",
     "RunMonthlyAgentsResult",
     "RunMonthlyAgentsUseCase",
+    "RunMonitorTematicoRequest",
+    "RunMonitorTematicoResult",
+    "RunMonitorTematicoUseCase",
     "RunAgentQualityChecksRequest",
     "RunAgentQualityChecksResult",
     "RunAgentQualityChecksUseCase",
+    "DegiroUpload",
+    "DegiroUploadOutcome",
+    "SaveDegiroUploadsRequest",
+    "SaveDegiroUploadsResult",
+    "SaveDegiroUploadsUseCase",
     "extract_report_as_of_date_from_path",
     "extract_monthly_report_as_of_date",
     "net_external_contributions_until",
