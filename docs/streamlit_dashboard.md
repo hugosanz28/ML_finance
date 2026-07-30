@@ -41,7 +41,12 @@ en la terminal.
 - `Evolucion`: valor historico calculado por activo. DEGIRO fija el precio local de referencia en cada snapshot y market data aporta la variacion relativa diaria, sin aplicar un segundo anclaje global.
 - `Informes`: lectura de informes mensuales generados en `reports_history` o en la carpeta de informes.
 - `Actualizar datos`: subida de CSVs DEGIRO, importacion, carga DuckDB, refresh FX, refresh precios e informe mensual.
-- `Agentes`: revision de inputs, edicion del `investment_brief`, presupuesto mensual editable (`monthly_budget`), control de envio de `target_weights`, ejecucion de la red mensual de agentes y exploracion de auditoria de runs guardados. Antes de ejecutar muestra la fecha valorada actual, la fecha del informe mensual y la fecha del snapshot que recibiran los agentes.
+- `Agentes`: revision de inputs, edicion del `investment_brief` y de los
+  `portfolio_targets` persistentes, presupuesto mensual editable
+  (`monthly_budget`), control del override `target_weights` del run, ejecucion
+  de la red mensual y exploracion de auditoria. Antes de ejecutar muestra la
+  fecha valorada actual, la fecha del informe mensual y la fecha del snapshot
+  que recibiran los agentes.
 
 ## Organizacion del codigo
 
@@ -87,8 +92,9 @@ oficiales de DEGIRO, primero debes subir/importar las exportaciones en
 5. Pulsa `2. Refrescar FX`.
 6. Pulsa `3. Refrescar precios`.
 7. Pulsa `4. Generar informe`.
-8. Entra en `Agentes`, revisa los inputs y activa o desactiva `Enviar
-   target_weights al pipeline`. Usa `static/null` como baseline offline o
+8. Entra en `Agentes`, revisa los targets persistentes y activa o desactiva
+   `Enviar target_weights al pipeline`. Ese JSON es un override solo para el
+   run actual. Usa `static/null` como baseline offline o
    `static/static` para una demo completa con contexto sintetico. Para una
    ejecucion real usa `openai/tavily` si tienes `TAVILY_API_KEY`;
    `openai/duckduckgo` queda como fallback best-effort sin API key.
@@ -198,6 +204,7 @@ Casos de uso operativos:
 - `GenerateMonthlyReportUseCase`
 - `RunMonthlyAgentsUseCase`
 - `UpdateInvestmentBriefUseCase`
+- `UpdatePortfolioTargetsUseCase`
 
 Read models usados por la UI:
 
@@ -209,7 +216,7 @@ Read models usados por la UI:
 - `GetWarehouseCountsUseCase`
 - `ListDashboardReportsUseCase`
 - `ReadInvestmentBriefUseCase`
-- `ReadTargetWeightsUseCase`
+- `ReadPortfolioTargetsUseCase`
 - `BuildAgentDashboardSnapshotUseCase`
 - `ListAgentRunsUseCase`
 - `GetAgentRunAuditUseCase`
@@ -234,7 +241,16 @@ Los objetivos estructurados de cartera viven por defecto en:
 src/data/local/portfolio_targets.yaml
 ```
 
-El dashboard usa ese archivo para pre-rellenar `target_weights` en la pestaña
-`Agentes`. Si el archivo no existe o no es valido, mantiene un valor JSON de
-fallback editable. El contrato de ejemplo esta en
+La pestaña `Agentes` lo lee mediante `ReadPortfolioTargetsUseCase` y muestra el
+contrato completo en `Portfolio targets persistentes`. El editor acepta un
+objeto JSON, nunca YAML libre. Al guardar, `UpdatePortfolioTargetsUseCase`
+valida pesos, aportacion y limites, normaliza porcentajes a decimales y
+reemplaza atomica y exclusivamente la ruta configurada.
+
+La UI conserva el hash cargado para no sobrescribir cambios realizados desde
+otra sesion. Si el archivo cambia, obliga a recargar; si ya existe pero es
+invalido, muestra el error y bloquea su escritura. Si no existe, ofrece un
+contrato inicial basado en la configuracion local. El campo `Pesos objetivo del
+run` sigue separado: permite probar un override sin modificar los targets
+persistentes. El ejemplo publico esta en
 `src/data/sample/portfolio_targets.example.yaml`.

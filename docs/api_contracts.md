@@ -563,41 +563,50 @@ Notas:
 
 Lee targets estructurados activos.
 
-Caso de uso base:
+Caso de uso:
 
-- `ReadTargetWeightsUseCase` para pesos simplificados.
-- Conviene crear `ReadPortfolioTargetsUseCase` si la UI necesita todo el YAML
-  validado, no solo `target_weights`.
+- `ReadPortfolioTargetsUseCase`.
 
 Respuesta:
 
 ```json
 {
-  "target_weights": {
-    "core": 0.8,
-    "satellite": 0.2
-  },
   "portfolio_targets": {
     "base_currency": "EUR",
     "monthly_contribution": 1500.0,
     "risk_profile": "balanced",
-    "target_weights": {
+    "target_allocation": {
       "core": 0.8,
       "satellite": 0.2
-    }
+    },
+    "max_single_asset_weight": 0.2,
+    "max_sector_weight": 0.3,
+    "rebalance_mode": "contributions_only"
+  },
+  "target_weights": {
+    "core": 0.8,
+    "satellite": 0.2
   },
   "path": "src/data/local/portfolio_targets.yaml",
-  "exists": true
+  "exists": true,
+  "content_hash": "sha256:...",
+  "validation_error": null
 }
 ```
+
+`target_weights` es la proyeccion simplificada usada por los agentes;
+`portfolio_targets` conserva el contrato completo. Si no existe archivo, la
+lectura devuelve `portfolio_targets: null`, pesos vacios y `exists: false`. Si
+existe pero no valida, conserva `exists: true`, devuelve el error en
+`validation_error` y no inventa valores de fallback.
 
 ### `PUT /api/v1/settings/portfolio-targets`
 
 Actualiza targets estructurados.
 
-Caso de uso necesario:
+Caso de uso:
 
-- Pendiente: `UpdatePortfolioTargetsUseCase`.
+- `UpdatePortfolioTargetsUseCase`.
 
 Request:
 
@@ -607,14 +616,13 @@ Request:
     "base_currency": "EUR",
     "monthly_contribution": 1500.0,
     "risk_profile": "balanced",
-    "target_weights": {
+    "target_allocation": {
       "core": 0.8,
       "satellite": 0.2
     },
-    "concentration_limits": {
-      "single_asset_max": 0.2,
-      "single_satellite_max": 0.1
-    }
+    "max_single_asset_weight": 0.2,
+    "max_sector_weight": 0.3,
+    "rebalance_mode": "contributions_only"
   },
   "expected_previous_hash": "sha256:optional"
 }
@@ -630,29 +638,43 @@ Respuesta:
   "artifacts": {
     "path": "src/data/local/portfolio_targets.yaml",
     "content_hash": "sha256:..."
-  }
+  },
+  "portfolio_targets": {
+    "base_currency": "EUR",
+    "monthly_contribution": 1500.0,
+    "risk_profile": "balanced",
+    "target_allocation": {
+      "core": 0.8,
+      "satellite": 0.2
+    },
+    "max_single_asset_weight": 0.2,
+    "max_sector_weight": 0.3,
+    "rebalance_mode": "contributions_only"
+  },
+  "target_weights": {
+    "core": 0.8,
+    "satellite": 0.2
+  },
+  "content_hash": "sha256:..."
 }
 ```
 
 Notas:
 
-- Antes de persistir, el caso de uso debe validar con el mismo modelo que usa
-  `load_portfolio_targets`.
-- No conviene aceptar YAML libre desde la API. Mejor JSON estructurado validado
-  y escritura controlada a YAML local.
+- La entrada es un objeto JSON, no YAML libre. El caso de uso valida con
+  `portfolio_targets_from_mapping`, normaliza porcentajes a decimales y exige
+  que `target_allocation` sume `1.0` o `100`.
+- `target_weights` se admite como alias al leer configuraciones antiguas, pero
+  las interfaces nuevas deben emitir `target_allocation`.
+- La persistencia serializa JSON canonico en la ruta configurada por
+  `Settings.portfolio_targets_path`; la extension `.yaml` se conserva por
+  compatibilidad con los archivos existentes.
+- El reemplazo es atomico. Una configuracion invalida o un
+  `expected_previous_hash` obsoleto devuelve `status: failed` y conserva el
+  contenido anterior.
+- `content_hash` es el SHA-256 del texto exacto almacenado. El cliente debe
+  recargar antes de reintentar si el hash ha cambiado.
+- El cliente no puede elegir una ruta de escritura.
 
-## Casos de uso pendientes antes de FastAPI
-
-Antes de implementar servidor, faltan estos casos de uso para que la API pueda
-ser fina:
-
-- `ReadPortfolioTargetsUseCase`: leer targets completos validados.
-- `UpdatePortfolioTargetsUseCase`: validar y escribir targets estructurados.
-
-## Orden recomendado
-
-1. Implementar los casos de uso de lectura/escritura de targets pendientes sin
-   FastAPI.
-2. Adaptar Streamlit para usar esos casos de uso cuando aplique.
-3. Anadir tests unitarios de contratos JSON sobre `src/application/`.
-4. Solo entonces montar FastAPI como wrapper fino.
+Con estos casos de uso, un futuro endpoint FastAPI puede ser un adaptador fino
+sin acceder directamente al archivo ni al dominio de cartera.

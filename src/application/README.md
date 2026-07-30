@@ -32,6 +32,8 @@ que la interfaz no dependa de detalles internos de `src/portfolio/`,
   transacciones, reports, brief, targets, requisitos FX y counts de bodega local;
 - leer y actualizar el `investment_brief` con escritura atomica y control
   opcional de concurrencia mediante hash;
+- leer y actualizar `portfolio_targets` completos mediante un mapping JSON
+  validado, escritura atomica y control opcional de concurrencia mediante hash;
 - guardar uploads DEGIRO con nombres normalizados antes de importarlos.
 
 Las migraciones deben ser progresivas: primero se anade el wrapper, despues se
@@ -89,6 +91,12 @@ prevista para `GET /api/v1/portfolio/state`.
 `SaveDegiroUploadsUseCase` controla nombres y persistencia de archivos subidos;
 `InferFxRequirementsUseCase` devuelve requisitos FX con fechas ISO mediante
 `to_dict()`. Las interfaces no necesitan importar parsers ni repositorios.
+
+`ReadPortfolioTargetsUseCase` expone el contrato completo, los pesos derivados,
+la ruta como texto, el hash del contenido y cualquier error de validacion.
+`UpdatePortfolioTargetsUseCase` recibe datos estructurados, valida con el mismo
+contrato del dominio y solo reemplaza atomica y controladamente la ruta
+configurada en `Settings.portfolio_targets_path`.
 
 ## Relacion con v2
 

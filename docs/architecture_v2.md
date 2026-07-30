@@ -52,9 +52,9 @@ La lectura principal ya dispone de `GetPortfolioStateUseCase`, que no devuelve
 DataFrames ni paths. Uploads, requisitos FX, el monitor aislado y la escritura
 del brief tambien tienen fronteras dedicadas: `SaveDegiroUploadsUseCase`,
 `InferFxRequirementsUseCase`, `RunMonitorTematicoUseCase` y
-`UpdateInvestmentBriefUseCase`. Los casos de uso completos de lectura/escritura
-de targets siguen pendientes y no deben implementarse dentro de futuros
-endpoints.
+`UpdateInvestmentBriefUseCase`. Los objetivos de cartera disponen tambien de
+`ReadPortfolioTargetsUseCase` y `UpdatePortfolioTargetsUseCase`; futuros
+endpoints deben reutilizarlos en vez de leer o escribir el archivo directamente.
 
 ## Propuesta principal
 
@@ -205,8 +205,8 @@ Antes de crear carpetas `frontend/`, `api/` o similares:
 
 1. Mantener v1 estable y demostrable.
 2. Completar la separacion publico/privado.
-3. Mantener `src/application/` como unica entrada de interfaces y completar
-   los casos de escritura que siguen pendientes.
+3. Mantener `src/application/` como unica entrada de interfaces y ampliar sus
+   contratos solo cuando una nueva vista lo necesite.
 4. Mantener actualizados los contratos de lectura/escritura de
    `docs/api_contracts.md`.
 5. Decidir si v2 sera solo local, app de escritorio o servicio web.

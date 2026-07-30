@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 import json
+import math
 from pathlib import Path
 from typing import Any, Mapping
 
@@ -25,6 +26,18 @@ class PortfolioTargets:
     def target_weights(self) -> dict[str, float]:
         """Return target allocation weights normalized to decimal units."""
         return dict(self.target_allocation)
+
+    def to_storage_mapping(self) -> dict[str, Any]:
+        """Return the complete canonical mapping used at application boundaries."""
+        return {
+            "base_currency": self.base_currency,
+            "target_allocation": dict(self.target_allocation),
+            "monthly_contribution": self.monthly_contribution,
+            "risk_profile": self.risk_profile,
+            "max_single_asset_weight": self.max_single_asset_weight,
+            "max_sector_weight": self.max_sector_weight,
+            "rebalance_mode": self.rebalance_mode,
+        }
 
     def to_agent_payload(self) -> dict[str, Any]:
         """Return a JSON-ready payload for agent inputs."""
@@ -69,15 +82,35 @@ def portfolio_targets_from_mapping(
     default_base_currency: str = "EUR",
 ) -> PortfolioTargets:
     """Validate a mapping into the portfolio targets contract."""
-    target_allocation = data.get("target_allocation") or data.get("target_weights")
+    target_allocation = data.get("target_allocation")
+    legacy_target_weights = data.get("target_weights")
+    if target_allocation is None:
+        target_allocation = legacy_target_weights
     if not isinstance(target_allocation, Mapping) or not target_allocation:
         raise ValueError("Portfolio targets require a non-empty target_allocation mapping.")
 
+    normalized_allocation = _normalize_weights(target_allocation, field_name="target_allocation")
+    if legacy_target_weights is not None and data.get("target_allocation") is not None:
+        if not isinstance(legacy_target_weights, Mapping):
+            raise ValueError("target_weights must be a mapping when provided.")
+        normalized_legacy = _normalize_weights(legacy_target_weights, field_name="target_weights")
+        if normalized_legacy != normalized_allocation:
+            raise ValueError("target_allocation and target_weights must contain the same weights.")
+    base_currency = str(data.get("base_currency") or default_base_currency).strip().upper()
+    if not base_currency:
+        raise ValueError("base_currency cannot be empty.")
+    monthly_contribution = _optional_float(
+        data.get("monthly_contribution"),
+        field_name="monthly_contribution",
+    )
+    if monthly_contribution is not None and monthly_contribution < 0:
+        raise ValueError("monthly_contribution cannot be negative.")
+
     return PortfolioTargets(
-        base_currency=str(data.get("base_currency") or default_base_currency).upper(),
-        monthly_contribution=_optional_float(data.get("monthly_contribution")),
+        base_currency=base_currency,
+        monthly_contribution=monthly_contribution,
         risk_profile=_optional_str(data.get("risk_profile")),
-        target_allocation=_normalize_weights(target_allocation, field_name="target_allocation"),
+        target_allocation=normalized_allocation,
         max_single_asset_weight=_optional_weight(data.get("max_single_asset_weight"), field_name="max_single_asset_weight"),
         max_sector_weight=_optional_weight(data.get("max_sector_weight"), field_name="max_sector_weight"),
         rebalance_mode=_optional_str(data.get("rebalance_mode")),
@@ -159,33 +192,49 @@ def _normalize_weights(raw_weights: Mapping[str, Any], *, field_name: str) -> di
         name = str(key).strip()
         if not name:
             raise ValueError(f"{field_name} contains an empty key.")
-        weights[name] = _required_weight(value, field_name=f"{field_name}.{name}")
-    return weights
+        if name in weights:
+            raise ValueError(f"{field_name} contains duplicate key {name!r} after normalization.")
+        parsed = _optional_float(value, field_name=f"{field_name}.{name}")
+        if parsed is None:
+            raise ValueError(f"{field_name}.{name} must be numeric.")
+        if parsed < 0:
+            raise ValueError(f"{field_name}.{name} cannot be negative.")
+        weights[name] = parsed
 
-
-def _required_weight(value: Any, *, field_name: str) -> float:
-    parsed = _optional_weight(value, field_name=field_name)
-    if parsed is None:
-        raise ValueError(f"{field_name} must be numeric.")
-    return parsed
+    total = sum(weights.values())
+    if math.isclose(total, 1.0, rel_tol=0.0, abs_tol=1e-9):
+        divisor = 1.0
+    elif math.isclose(total, 100.0, rel_tol=0.0, abs_tol=1e-9):
+        divisor = 100.0
+    else:
+        raise ValueError(f"{field_name} weights must sum to 1.0 or 100.0.")
+    return {name: value / divisor for name, value in weights.items()}
 
 
 def _optional_weight(value: Any, *, field_name: str) -> float | None:
-    parsed = _optional_float(value)
+    parsed = _optional_float(value, field_name=field_name)
     if parsed is None:
         return None
     if parsed < 0:
         raise ValueError(f"{field_name} cannot be negative.")
-    return parsed / 100.0 if parsed > 1.0 else parsed
+    normalized = parsed / 100.0 if parsed > 1.0 else parsed
+    if normalized > 1.0:
+        raise ValueError(f"{field_name} cannot exceed 1.0 (or 100).")
+    return normalized
 
 
-def _optional_float(value: Any) -> float | None:
+def _optional_float(value: Any, *, field_name: str = "value") -> float | None:
     if value is None or value == "":
         return None
+    if isinstance(value, bool):
+        raise ValueError(f"{field_name} must be numeric, not boolean.")
     try:
-        return float(value)
+        parsed = float(value)
     except (TypeError, ValueError) as exc:
-        raise ValueError(f"Expected numeric value, got {value!r}") from exc
+        raise ValueError(f"{field_name} must be numeric, got {value!r}.") from exc
+    if not math.isfinite(parsed):
+        raise ValueError(f"{field_name} must be finite.")
+    return parsed
 
 
 def _optional_str(value: Any) -> str | None:

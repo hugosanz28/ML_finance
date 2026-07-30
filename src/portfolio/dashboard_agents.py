@@ -13,14 +13,18 @@ import streamlit as st
 from src.application import (
     BuildAgentDashboardSnapshotRequest,
     BuildAgentDashboardSnapshotUseCase,
+    DEFAULT_TARGET_WEIGHTS,
     GetAgentRunAuditRequest,
     GetAgentRunAuditUseCase,
     ListAgentRunsUseCase,
     ReadInvestmentBriefUseCase,
+    ReadPortfolioTargetsUseCase,
     RunMonthlyAgentsRequest,
     RunMonthlyAgentsUseCase,
     UpdateInvestmentBriefRequest,
     UpdateInvestmentBriefUseCase,
+    UpdatePortfolioTargetsRequest,
+    UpdatePortfolioTargetsUseCase,
     extract_monthly_report_as_of_date,
 )
 from src.config import Settings
@@ -29,7 +33,6 @@ from src.portfolio.dashboard_common import (
     list_reports,
     load_metrics,
     load_snapshots,
-    read_default_target_weights,
     section_header,
     show_metrics_error,
 )
@@ -44,13 +47,6 @@ def render_agents_tab(settings: Settings) -> None:
         "Agentes",
         "Pipeline mensual: contexto tematico -> juicio por activo -> recomendacion mensual.",
     )
-    data_fingerprint = dashboard_data_fingerprint(settings)
-    metrics = load_metrics(settings, data_fingerprint)
-    if metrics is None:
-        show_metrics_error()
-        return
-    snapshots = load_snapshots(settings, data_fingerprint)
-
     st.markdown(
         """
         **Flujo entre agentes**
@@ -59,6 +55,26 @@ def render_agents_tab(settings: Settings) -> None:
         3. `asistente_aportacion_mensual`: sintetiza y propone accion mensual.
         """
     )
+
+    targets_state = ReadPortfolioTargetsUseCase(settings=settings).execute()
+    targets_hash_state_key = f"portfolio_targets_hash::{targets_state.path}"
+    if targets_hash_state_key not in st.session_state:
+        st.session_state[targets_hash_state_key] = targets_state.content_hash
+    targets_changed_since_loaded = (
+        st.session_state[targets_hash_state_key] != targets_state.content_hash
+    )
+    editable_targets = targets_state.portfolio_targets or _default_portfolio_targets(settings)
+    targets_editor_state_key = f"portfolio_targets_editor::{targets_state.path}"
+    if targets_editor_state_key not in st.session_state:
+        st.session_state[targets_editor_state_key] = json.dumps(
+            editable_targets,
+            ensure_ascii=False,
+            indent=2,
+        )
+    default_target_weights = targets_state.target_weights or dict(DEFAULT_TARGET_WEIGHTS)
+    configured_monthly_budget = editable_targets.get("monthly_contribution")
+    if configured_monthly_budget is None:
+        configured_monthly_budget = settings.monthly_contribution_eur
 
     left, right = st.columns([2, 1])
     with left:
@@ -86,7 +102,7 @@ def render_agents_tab(settings: Settings) -> None:
         monthly_budget = st.number_input(
             "Monthly budget (EUR)",
             min_value=0.0,
-            value=float(settings.monthly_contribution_eur),
+            value=float(configured_monthly_budget),
             step=50.0,
             help="Presupuesto mensual que recibira `asistente_aportacion_mensual` para proponer acciones del mes.",
         )
@@ -95,14 +111,69 @@ def render_agents_tab(settings: Settings) -> None:
             value=True,
             help="Si lo desactivas, los agentes no reciben pesos objetivo y evaluan sin esa restriccion.",
         )
-        default_target_weights = read_default_target_weights(settings)
         target_weights_text = st.text_area(
-            "Pesos objetivo (JSON opcional)",
+            "Pesos objetivo del run (JSON opcional)",
             value=json.dumps(default_target_weights, ensure_ascii=False, indent=2),
             height=110,
             disabled=not send_target_weights,
-            help="Se pasa a `asistente_aportacion_mensual` para evaluar rebalanceo con criterio cuantitativo.",
+            help=(
+                "Override solo para este run. Se pasa a `asistente_aportacion_mensual` "
+                "para evaluar rebalanceo con criterio cuantitativo."
+            ),
         )
+        with st.expander("Portfolio targets persistentes", expanded=False):
+            if targets_state.validation_error:
+                st.error(
+                    "El archivo configurado no es valido y no se sobrescribira desde la UI: "
+                    f"{targets_state.validation_error}"
+                )
+            if targets_changed_since_loaded:
+                st.warning(
+                    "El archivo cambio desde que se cargo. Recarga antes de guardar para no pisar cambios."
+                )
+            portfolio_targets_text = st.text_area(
+                "Targets estructurados (JSON)",
+                height=280,
+                disabled=targets_state.validation_error is not None,
+                help="Edita el contrato completo. La aplicacion lo valida antes de escribirlo.",
+                key=targets_editor_state_key,
+            )
+            save_portfolio_targets = st.button(
+                "Guardar portfolio targets",
+                disabled=targets_state.validation_error is not None or targets_changed_since_loaded,
+            )
+            if targets_changed_since_loaded:
+                st.button(
+                    "Recargar portfolio targets",
+                    on_click=_reload_portfolio_targets_editor,
+                    args=(
+                        targets_hash_state_key,
+                        targets_editor_state_key,
+                        targets_state.content_hash,
+                        editable_targets,
+                    ),
+                )
+            if save_portfolio_targets:
+                parsed_targets, parse_error = _parse_portfolio_targets_input(
+                    portfolio_targets_text
+                )
+                if parse_error:
+                    st.error(parse_error)
+                else:
+                    assert parsed_targets is not None
+                    update = UpdatePortfolioTargetsUseCase(settings=settings).execute(
+                        UpdatePortfolioTargetsRequest(
+                            portfolio_targets=parsed_targets,
+                            expected_previous_hash=st.session_state[
+                                targets_hash_state_key
+                            ],
+                        )
+                    )
+                    if update.result.failed:
+                        st.error(update.result.message)
+                    else:
+                        st.session_state[targets_hash_state_key] = update.content_hash
+                        st.success(f"Guardado en {update.result.artifacts['path']}")
         llm_provider = st.selectbox("LLM provider", options=LLM_PROVIDER_OPTIONS, index=0)
         search_provider = st.selectbox(
             "Search provider",
@@ -116,7 +187,17 @@ def render_agents_tab(settings: Settings) -> None:
     target_weights = _parse_target_weights_input(target_weights_text) if send_target_weights else {}
     target_weights_invalid = send_target_weights and target_weights_text.strip() and not target_weights
     if target_weights_invalid:
-        st.warning("`Pesos objetivo` no se pudo parsear como JSON valido; se ejecutara sin pesos objetivo.")
+        st.warning(
+            "`Pesos objetivo del run` no se pudo parsear como JSON valido; "
+            "la ejecucion queda bloqueada."
+        )
+
+    data_fingerprint = dashboard_data_fingerprint(settings)
+    metrics = load_metrics(settings, data_fingerprint)
+    if metrics is None:
+        show_metrics_error()
+        return
+    snapshots = load_snapshots(settings, data_fingerprint)
 
     reports = list_reports(settings)
     report_option = None
@@ -631,6 +712,58 @@ def _render_quality_preflight(preflight: Mapping[str, Any]) -> None:
     issues = preflight.get("issues") or []
     if issues:
         st.dataframe(pd.DataFrame(issues), width="stretch", hide_index=True)
+
+
+def _default_portfolio_targets(settings: Settings) -> dict[str, Any]:
+    """Build the explicit first-save value without reading domain files."""
+    return {
+        "base_currency": settings.default_currency,
+        "target_allocation": dict(DEFAULT_TARGET_WEIGHTS),
+        "monthly_contribution": settings.monthly_contribution_eur,
+        "risk_profile": None,
+        "max_single_asset_weight": None,
+        "max_sector_weight": None,
+        "rebalance_mode": "contributions_only",
+    }
+
+
+def _parse_portfolio_targets_input(raw: str) -> tuple[dict[str, Any] | None, str | None]:
+    """Accept only a structured JSON object; domain validation stays in the use case."""
+    try:
+        parsed = json.loads(raw, parse_constant=_reject_non_finite_json_constant)
+    except (TypeError, ValueError) as exc:
+        return None, f"`Targets estructurados` no es JSON valido: {exc}"
+    if not isinstance(parsed, dict):
+        return None, "`Targets estructurados` debe ser un objeto JSON."
+    return parsed, None
+
+
+def _reload_portfolio_targets_editor(
+    hash_state_key: str,
+    editor_state_key: str,
+    content_hash: str,
+    portfolio_targets: Mapping[str, Any],
+) -> None:
+    """Refresh both optimistic-lock and widget state in one Streamlit callback."""
+    st.session_state[hash_state_key] = content_hash
+    st.session_state[editor_state_key] = json.dumps(
+        portfolio_targets,
+        ensure_ascii=False,
+        indent=2,
+    )
+
+
+def _reject_non_finite_json_constant(value: str) -> None:
+    raise ValueError(f"{value} no es un numero JSON finito.")
+
+
+def _snapshot_as_of_date(portfolio_metrics_snapshot: Mapping[str, Any]) -> date | None:
+    snapshot_as_of_raw = portfolio_metrics_snapshot.get("as_of_date")
+    try:
+        return date.fromisoformat(str(snapshot_as_of_raw)[:10]) if snapshot_as_of_raw else None
+    except ValueError:
+        st.error("`portfolio_metrics_snapshot.as_of_date` no es una fecha valida.")
+        return None
 
 
 def _markdown_list(values: Any) -> str:

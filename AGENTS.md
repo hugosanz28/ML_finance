@@ -33,7 +33,8 @@ La UI actual es Streamlit. Una futura API/FastAPI debe entrar casi siempre por `
 - Casos de uso actuales que no deben puentearse desde interfaces:
   `GetPortfolioStateUseCase`, `SaveDegiroUploadsUseCase`,
   `InferFxRequirementsUseCase`, `RunMonitorTematicoUseCase`,
-  `UpdateInvestmentBriefUseCase` y los casos operativos de importacion,
+  `UpdateInvestmentBriefUseCase`, `ReadPortfolioTargetsUseCase`,
+  `UpdatePortfolioTargetsUseCase` y los casos operativos de importacion,
   refresh, informes y agentes.
 - Manten entradas como dataclasses `*Request` y salidas estructuradas. Para acciones operativas usa `ApplicationResult`.
 - No dupliques calculos financieros en `src/application/`; coordina servicios de dominio existentes.
@@ -57,6 +58,8 @@ Invariantes y errores tipicos:
   providers y audita el intento cuando la persistencia esta activa.
 - No uses `.\scripts\run_demo.ps1` en automatizacion: abre Streamlit y queda vivo.
 - No llames desde Streamlit a `src.agents`, `src.reports`, `src.market_data` o importadores si ya hay caso de uso en `src/application/`.
+- No aceptes YAML libre de targets desde interfaces: usa un mapping JSON
+  estructurado y `UpdatePortfolioTargetsUseCase`.
 - No cambies prompts/agentes sin mantener la auditoria: plan, acciones, fuentes, prompts, warnings, inputs y outputs.
 
 ## Como ejecutar tests
