@@ -500,7 +500,129 @@ Notas:
   `GET /api/v1/agents/monthly-runs/{run_id}/artifacts/{artifact_name}` con una
   allowlist estricta.
 
-## 7. Cambiar brief y targets
+## 7. Simular una aportacion
+
+### `POST /api/v1/portfolio/contribution-simulations`
+
+Calcula un reparto determinista de una aportacion sin modificar la cartera ni
+ejecutar ordenes.
+
+Caso de uso base:
+
+- `SimulateContributionUseCase`.
+
+Request:
+
+```json
+{
+  "contribution_amount": 450.0,
+  "allow_fractional_units": false,
+  "minimum_order_value": 25.0,
+  "max_orders": 4,
+  "as_of_date": null
+}
+```
+
+Todos los campos son opcionales. Si se omite `contribution_amount`, se usa
+`monthly_contribution` de los targets persistidos. La request no admite estado
+de cartera, targets ni `asset_bucket_mapping`: el caso de uso debe obtenerlos
+localmente mediante `GetPortfolioStateUseCase(persist=False)` y
+`ReadPortfolioTargetsUseCase`.
+
+Respuesta representativa:
+
+```json
+{
+  "status": "succeeded",
+  "message": "Contribution simulation completed.",
+  "warnings": [],
+  "artifacts": {
+    "as_of_date": "2026-05-31",
+    "budget": 450.0,
+    "invested_amount": 400.0,
+    "remaining_cash": 50.0,
+    "order_count": 1,
+    "targets_hash": "sha256:..."
+  },
+  "assumptions": [
+    "contributions_only_no_sales",
+    "current_positions_only",
+    "no_fees_taxes_slippage",
+    "implied_unit_price_from_market_value",
+    "deterministic_identifier_tiebreak",
+    "remaining_cash_excluded_from_after_weights",
+    "deviation_is_half_l1_bucket_distance",
+    "whole_units_only"
+  ],
+  "simulation": {
+    "as_of_date": "2026-05-31",
+    "base_currency": "EUR",
+    "targets_content_hash": "sha256:...",
+    "budget": 450.0,
+    "invested_amount": 400.0,
+    "remaining_cash": 50.0,
+    "deviation_before": 0.02,
+    "deviation_after": 0.009230769231,
+    "orders": [
+      {
+        "asset_id": "degiro:isin:IE00SYNCORE1",
+        "isin": "IE00SYNCORE1",
+        "bucket": "core",
+        "quantity": 4.0,
+        "unit_price_base": 100.0,
+        "amount_base": 400.0,
+        "weight_before": 0.72,
+        "weight_after": 0.730769230769
+      }
+    ],
+    "bucket_allocations": [
+      {
+        "bucket": "core",
+        "target_weight": 0.74,
+        "value_before": 7200.0,
+        "value_after": 7600.0,
+        "weight_before": 0.72,
+        "weight_after": 0.730769230769,
+        "deviation_before": 0.02,
+        "deviation_after": 0.009230769231,
+        "allocated_amount": 400.0
+      }
+    ],
+    "constraints": {
+      "contribution_amount": 450.0,
+      "allow_fractional_units": false,
+      "minimum_order_value": 25.0,
+      "max_orders": 4,
+      "max_single_asset_weight": 0.8
+    },
+    "constraint_events": [
+      "whole_units_unaffordable:degiro:isin:IE00SYNCORE1",
+      "budget_residual:50.0"
+    ]
+  }
+}
+```
+
+Notas:
+
+- Solo se proponen compras de posiciones actuales con valoracion, mapping
+  exacto y precio unitario utilizable. No se crean activos nuevos.
+- La simulacion es `contributions_only`: nunca devuelve ventas, cantidades
+  negativas ni ejecucion de ordenes.
+- El total propuesto no supera el presupuesto. La caja residual queda fuera
+  del denominador de los pesos posteriores y se devuelve por separado.
+- `deviation_before` y `deviation_after` son la mitad de la distancia L1 entre
+  pesos por bucket y sus objetivos.
+- No se fuerza una compra: si ninguna mejora la desviacion respetando los
+  limites, la respuesta conserva los pesos y devuelve `orders: []`.
+- Una posicion activa sin mapping, identificador o valoracion bloquea el plan
+  completo con `status: partial`, warnings y cero compras; el caso de uso no
+  inventa buckets. Un precio unitario inutilizable excluye solo ese activo,
+  conserva `status: partial` y permite proponer otros activos validos.
+- La respuesta es JSON estricto: no expone `Path`, `DataFrame`, valores no
+  finitos ni tipos de pandas/numpy.
+
+## 8. Cambiar brief y targets
 
 ### `GET /api/v1/settings/investment-brief`
 
@@ -579,6 +701,10 @@ Respuesta:
       "core": 0.8,
       "satellite": 0.2
     },
+    "asset_bucket_mapping": {
+      "degiro:isin:IE00SYNCORE1": "core",
+      "degiro:isin:NL00SYNTECH1": "satellite"
+    },
     "max_single_asset_weight": 0.2,
     "max_sector_weight": 0.3,
     "rebalance_mode": "contributions_only"
@@ -620,6 +746,10 @@ Request:
       "core": 0.8,
       "satellite": 0.2
     },
+    "asset_bucket_mapping": {
+      "degiro:isin:IE00SYNCORE1": "core",
+      "degiro:isin:NL00SYNTECH1": "satellite"
+    },
     "max_single_asset_weight": 0.2,
     "max_sector_weight": 0.3,
     "rebalance_mode": "contributions_only"
@@ -647,6 +777,10 @@ Respuesta:
       "core": 0.8,
       "satellite": 0.2
     },
+    "asset_bucket_mapping": {
+      "degiro:isin:IE00SYNCORE1": "core",
+      "degiro:isin:NL00SYNTECH1": "satellite"
+    },
     "max_single_asset_weight": 0.2,
     "max_sector_weight": 0.3,
     "rebalance_mode": "contributions_only"
@@ -664,6 +798,8 @@ Notas:
 - La entrada es un objeto JSON, no YAML libre. El caso de uso valida con
   `portfolio_targets_from_mapping`, normaliza porcentajes a decimales y exige
   que `target_allocation` sume `1.0` o `100`.
+- `asset_bucket_mapping` relaciona de forma exacta un `asset_id` o ISIN con un
+  bucket existente en `target_allocation`; no se infiere por nombres.
 - `target_weights` se admite como alias al leer configuraciones antiguas, pero
   las interfaces nuevas deben emitir `target_allocation`.
 - La persistencia serializa JSON canonico en la ruta configurada por

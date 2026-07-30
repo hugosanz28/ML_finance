@@ -42,7 +42,9 @@ Fronteras ya disponibles:
 - `ReadInvestmentBriefUseCase` y `UpdateInvestmentBriefUseCase` para leer y
   guardar el mandato local sin escribir desde la interfaz;
 - `ReadPortfolioTargetsUseCase` y `UpdatePortfolioTargetsUseCase` para leer,
-  validar y guardar objetivos estructurados con control de concurrencia.
+  validar y guardar objetivos estructurados con control de concurrencia;
+- `SimulateContributionUseCase` para combinar el estado local, los targets
+  validados y el planificador puro de aportaciones sin ejecutar ordenes.
 
 Las acciones operativas devuelven `ApplicationResult`. Los read models
 destinados a adaptadores externos, como estado de cartera y requisitos FX,
@@ -84,6 +86,9 @@ Estado actual de esta capa:
 - proyecciones compartidas de snapshot broker, coste y PnL en
   `state_projection.py`,
 - consultas de aportaciones externas en `contributions.py`,
+- planificacion determinista `contributions_only` en
+  `contribution_planner.py`, limitada a posiciones actuales valoradas y
+  mapeadas,
 - y una base directa para reporting y Streamlit.
 
 Responsable de reconstrucción histórica de posiciones, métricas agregadas e interfaz de Streamlit.
@@ -106,7 +111,7 @@ DEGIRO exports
     -> refresco de FX/precios
     -> reconstruccion historica
     -> metricas ancladas a snapshots DEGIRO
-    -> informes
+    -> simulacion de aportacion / informes
     -> agentes
     -> Streamlit
 ```
@@ -146,10 +151,10 @@ src/portfolio/dashboard.py
 ```
 
 `dashboard.py` actua como entrypoint y navegacion. Las pestanas viven en modulos
-especificos (`dashboard_overview.py`, `dashboard_reports.py`,
-`dashboard_data_update.py`, `dashboard_agents.py`) y los helpers compartidos en
-`dashboard_common.py`. Esta separacion reduce acoplamiento antes de una posible
-interfaz web futura.
+especificos (`dashboard_overview.py`, `dashboard_contribution_lab.py`,
+`dashboard_reports.py`, `dashboard_data_update.py`, `dashboard_agents.py`) y los
+helpers compartidos en `dashboard_common.py`. Esta separacion reduce
+acoplamiento antes de una posible interfaz web futura.
 
 ## Direccion v2
 

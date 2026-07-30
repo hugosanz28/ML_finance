@@ -37,10 +37,12 @@ def test_dashboard_renders_with_an_empty_isolated_workspace(tmp_path, monkeypatc
     assert not app.exception
     assert [tab.label for tab in app.tabs] == [
         "Vista general",
+        "Aportacion",
         "Evolucion",
         "Informes",
         "Actualizar datos",
         "Agentes",
     ]
+    assert any(button.label == "Simular aportacion" for button in app.button)
     assert any("No se pudieron calcular metricas" in error.value for error in app.error)
     clear_settings_cache()

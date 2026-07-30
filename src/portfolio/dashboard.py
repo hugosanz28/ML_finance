@@ -21,6 +21,7 @@ from src.portfolio.dashboard_common import (
     render_hero,
     warehouse_counts,
 )
+from src.portfolio.dashboard_contribution_lab import render_contribution_lab_tab
 from src.portfolio.dashboard_data_update import render_update_tab
 from src.portfolio.dashboard_overview import render_evolution_tab, render_portfolio_tab
 from src.portfolio.dashboard_reports import render_reports_tab
@@ -35,16 +36,27 @@ def main() -> None:
     render_hero()
     render_sidebar(settings)
 
-    tabs = st.tabs(["Vista general", "Evolucion", "Informes", "Actualizar datos", "Agentes"])
+    tabs = st.tabs(
+        [
+            "Vista general",
+            "Aportacion",
+            "Evolucion",
+            "Informes",
+            "Actualizar datos",
+            "Agentes",
+        ]
+    )
     with tabs[0]:
         render_portfolio_tab(settings)
     with tabs[1]:
-        render_evolution_tab(settings)
+        render_contribution_lab_tab(settings)
     with tabs[2]:
-        render_reports_tab(settings)
+        render_evolution_tab(settings)
     with tabs[3]:
-        render_update_tab(settings)
+        render_reports_tab(settings)
     with tabs[4]:
+        render_update_tab(settings)
+    with tabs[5]:
         render_agents_tab(settings)
 
 

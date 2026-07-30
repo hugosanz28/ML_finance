@@ -38,6 +38,9 @@ en la terminal.
 ## Vistas incluidas
 
 - `Vista general`: asignacion actual y valor total de la ultima fecha valorada. El ultimo snapshot DEGIRO se muestra como ancla, pero la fecha principal puede avanzar con market data posterior. Incluye `Actualizar a hoy` para refrescar FX y precios sin importar nuevos CSVs.
+- `Aportacion`: laboratorio determinista para repartir una aportacion entre
+  posiciones actuales valoradas y mapeadas. Compara pesos antes/despues,
+  muestra restricciones y caja residual, pero no vende ni ejecuta ordenes.
 - `Evolucion`: valor historico calculado por activo. DEGIRO fija el precio local de referencia en cada snapshot y market data aporta la variacion relativa diaria, sin aplicar un segundo anclaje global.
 - `Informes`: lectura de informes mensuales generados en `reports_history` o en la carpeta de informes.
 - `Actualizar datos`: subida de CSVs DEGIRO, importacion, carga DuckDB, refresh FX, refresh precios e informe mensual.
@@ -55,6 +58,8 @@ pagina, pinta el sidebar y conecta las pestanas. La logica visual vive en
 modulos separados:
 
 - `dashboard_overview.py`: `Vista general`, `Evolucion` y refresh a hoy.
+- `dashboard_contribution_lab.py`: formulario y resultado del laboratorio de
+  aportacion.
 - `dashboard_reports.py`: lectura y generacion de informes.
 - `dashboard_data_update.py`: subida de CSVs e import/refresh de datos.
 - `dashboard_agents.py`: inputs, ejecucion y visualizacion de agentes.
@@ -82,6 +87,30 @@ No importa nuevos CSVs ni cambia el snapshot de broker disponible. Si quieres qu
 la cartera incluya nuevas compras, ventas, movimientos de efectivo o cantidades
 oficiales de DEGIRO, primero debes subir/importar las exportaciones en
 `Actualizar datos`.
+
+## Laboratorio de aportacion
+
+La pestana `Aportacion` llama a `SimulateContributionUseCase`; no carga
+repositorios ni replica calculos financieros desde Streamlit. El formulario
+permite ajustar:
+
+- presupuesto de la aportacion, usando por defecto `monthly_contribution`;
+- unidades enteras o fraccionarias;
+- valor minimo por compra;
+- numero maximo de compras.
+
+El caso de uso obtiene el estado con `GetPortfolioStateUseCase(persist=False)` y
+lee los targets configurados. La interfaz no envia estado, targets ni mappings
+en la request. `asset_bucket_mapping` debe relacionar de forma exacta cada
+`asset_id` o ISIN activo con un bucket de `target_allocation`; nunca se infiere
+por el nombre del activo.
+
+La simulacion es exclusivamente `contributions_only`: propone como maximo
+compras de posiciones existentes, valoradas y comprables. No genera ventas, no
+modifica datos y no ejecuta ordenes. Si falta valoracion o mapping, el resultado
+es parcial y muestra warnings en lugar de inventar una asignacion. La caja no
+invertida queda fuera del denominador de los pesos posteriores y aparece como
+`Efectivo restante`.
 
 ## Flujo desde la UI
 
@@ -202,6 +231,7 @@ Casos de uso operativos:
 - `RefreshFxUseCase`
 - `RefreshMarketDataUseCase`
 - `GenerateMonthlyReportUseCase`
+- `SimulateContributionUseCase`
 - `RunMonthlyAgentsUseCase`
 - `UpdateInvestmentBriefUseCase`
 - `UpdatePortfolioTargetsUseCase`
@@ -246,6 +276,11 @@ contrato completo en `Portfolio targets persistentes`. El editor acepta un
 objeto JSON, nunca YAML libre. Al guardar, `UpdatePortfolioTargetsUseCase`
 valida pesos, aportacion y limites, normaliza porcentajes a decimales y
 reemplaza atomica y exclusivamente la ruta configurada.
+
+El contrato incluye `asset_bucket_mapping`, cuyas claves son identificadores
+exactos (`asset_id` o ISIN) y cuyos valores deben existir en
+`target_allocation`. El laboratorio bloquea una asignacion incompleta de
+posiciones activas para mantener reproducible la comparacion antes/despues.
 
 La UI conserva el hash cargado para no sobrescribir cambios realizados desde
 otra sesion. Si el archivo cambia, obliga a recargar; si ya existe pero es

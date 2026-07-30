@@ -34,11 +34,11 @@ La UI actual es Streamlit. Una futura API/FastAPI debe entrar casi siempre por `
   `GetPortfolioStateUseCase`, `SaveDegiroUploadsUseCase`,
   `InferFxRequirementsUseCase`, `RunMonitorTematicoUseCase`,
   `UpdateInvestmentBriefUseCase`, `ReadPortfolioTargetsUseCase`,
-  `UpdatePortfolioTargetsUseCase` y los casos operativos de importacion,
-  refresh, informes y agentes.
+  `UpdatePortfolioTargetsUseCase`, `SimulateContributionUseCase` y los casos
+  operativos de importacion, refresh, informes y agentes.
 - Manten entradas como dataclasses `*Request` y salidas estructuradas. Para acciones operativas usa `ApplicationResult`.
 - No dupliques calculos financieros en `src/application/`; coordina servicios de dominio existentes.
-- `src/portfolio/dashboard.py` debe seguir siendo entrypoint fino de Streamlit. Las vistas viven en `dashboard_overview.py`, `dashboard_reports.py`, `dashboard_data_update.py` y `dashboard_agents.py`.
+- `src/portfolio/dashboard.py` debe seguir siendo entrypoint fino de Streamlit. Las vistas viven en `dashboard_overview.py`, `dashboard_contribution_lab.py`, `dashboard_reports.py`, `dashboard_data_update.py` y `dashboard_agents.py`.
 - No metas logica de UI en dominio ni queries/repositorios directos en Streamlit si existe caso de uso equivalente.
 - Los datos de cartera salen de exportaciones oficiales DEGIRO y artefactos derivados validados. Los agentes no deben inventar estado de cartera.
 - Preserva auditoria de agentes: plan interno, acciones permitidas/usadas/descartadas, fuentes, prompts, warnings, inputs y outputs.
@@ -60,6 +60,12 @@ Invariantes y errores tipicos:
 - No llames desde Streamlit a `src.agents`, `src.reports`, `src.market_data` o importadores si ya hay caso de uso en `src/application/`.
 - No aceptes YAML libre de targets desde interfaces: usa un mapping JSON
   estructurado y `UpdatePortfolioTargetsUseCase`.
+- El laboratorio de aportacion es siempre `contributions_only`: solo puede
+  proponer compras de posiciones actuales valoradas y mapeadas. No vende, no
+  ejecuta ordenes y muestra la caja residual separada de los pesos posteriores.
+- No infieras buckets por nombres: `asset_bucket_mapping` debe resolver de forma
+  exacta cada `asset_id` o ISIN activo contra un bucket de
+  `target_allocation`.
 - No cambies prompts/agentes sin mantener la auditoria: plan, acciones, fuentes, prompts, warnings, inputs y outputs.
 
 ## Como ejecutar tests
@@ -85,6 +91,7 @@ Tests focalizados frecuentes:
 .\.venv\Scripts\python.exe -m pytest tests\test_dashboard_transforms.py
 .\.venv\Scripts\python.exe -m pytest tests\test_streamlit_dashboard_smoke.py
 .\.venv\Scripts\python.exe -m pytest tests\test_public_documentation.py
+.\.venv\Scripts\python.exe -m pytest tests\test_contribution_planner.py tests\test_contribution_application.py
 ```
 
 Mapa rapido de tests por area:
@@ -97,7 +104,7 @@ Mapa rapido de tests por area:
 | Preflight de agentes | `tests\test_data_quality.py`, `tests\test_application_layer.py`, `tests\test_agent_audit_trail.py`, `tests\test_run_monthly_agents_cli.py` |
 | Dashboard | `tests\test_dashboard_transforms.py`, `tests\test_streamlit_dashboard_uploads.py` |
 | DEGIRO/importacion | `tests\test_degiro_*.py` |
-| Portfolio/metricas | `tests\test_portfolio_metrics.py`, `tests\test_positions.py`, `tests\test_portfolio_state_projection.py`, `tests\test_portfolio_contributions.py` |
+| Portfolio/metricas y laboratorio | `tests\test_portfolio_metrics.py`, `tests\test_positions.py`, `tests\test_portfolio_state_projection.py`, `tests\test_portfolio_contributions.py`, `tests\test_contribution_planner.py`, `tests\test_contribution_application.py` |
 | Market data/FX | `tests\test_market_data.py`, `tests\test_fx_refresh.py` |
 | Defaults offline | `tests\test_agent_safe_defaults.py`, `tests\test_demo_workspace.py` |
 | Documentacion/publicacion | `tests\test_public_documentation.py`, `tests\test_dev_commands.py` |

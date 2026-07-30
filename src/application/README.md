@@ -34,6 +34,8 @@ que la interfaz no dependa de detalles internos de `src/portfolio/`,
   opcional de concurrencia mediante hash;
 - leer y actualizar `portfolio_targets` completos mediante un mapping JSON
   validado, escritura atomica y control opcional de concurrencia mediante hash;
+- simular una aportacion determinista con estado y targets locales validados,
+  sin aceptar esos datos desde la interfaz ni ejecutar ordenes;
 - guardar uploads DEGIRO con nombres normalizados antes de importarlos.
 
 Las migraciones deben ser progresivas: primero se anade el wrapper, despues se
@@ -97,6 +99,15 @@ la ruta como texto, el hash del contenido y cualquier error de validacion.
 `UpdatePortfolioTargetsUseCase` recibe datos estructurados, valida con el mismo
 contrato del dominio y solo reemplaza atomica y controladamente la ruta
 configurada en `Settings.portfolio_targets_path`.
+
+`SimulateContributionUseCase` carga ese contrato y
+`GetPortfolioStateUseCase(persist=False)`, adapta solo posiciones actuales
+valoradas y resuelve su bucket mediante `asset_bucket_mapping`. Delega el
+calculo al planificador puro de cartera y devuelve una respuesta JSON estricta
+con compras propuestas, pesos antes/despues, restricciones y caja residual. La
+simulacion es `contributions_only`: nunca vende ni ejecuta ordenes. El efectivo
+no invertido queda fuera del denominador de los pesos posteriores y se informa
+por separado.
 
 ## Relacion con v2
 

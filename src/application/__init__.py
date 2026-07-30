@@ -87,6 +87,11 @@ from src.application.portfolio_state import (
     GetPortfolioStateResult,
     GetPortfolioStateUseCase,
 )
+from src.application.contribution_lab import (
+    SimulateContributionRequest,
+    SimulateContributionResult,
+    SimulateContributionUseCase,
+)
 from src.application.monitor import (
     RunMonitorTematicoRequest,
     RunMonitorTematicoResult,
@@ -170,6 +175,9 @@ __all__ = [
     "SaveDegiroUploadsRequest",
     "SaveDegiroUploadsResult",
     "SaveDegiroUploadsUseCase",
+    "SimulateContributionRequest",
+    "SimulateContributionResult",
+    "SimulateContributionUseCase",
     "extract_report_as_of_date_from_path",
     "extract_monthly_report_as_of_date",
     "net_external_contributions_until",

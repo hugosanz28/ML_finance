@@ -57,6 +57,7 @@ def test_load_portfolio_targets_from_simple_yaml(workspace_tmp_path: Path) -> No
     assert targets.target_weights() == {"ETFs": 0.70, "stocks": 0.20, "cash": 0.10}
     assert targets.max_single_asset_weight == 0.15
     assert targets.max_sector_weight == 0.30
+    assert targets.asset_bucket_mapping == {}
     assert targets.to_agent_payload()["rebalance_mode"] == "contributions_only"
 
 
@@ -93,6 +94,7 @@ def test_portfolio_targets_accepts_legacy_target_weights_alias() -> None:
         "max_single_asset_weight": None,
         "max_sector_weight": None,
         "rebalance_mode": None,
+        "asset_bucket_mapping": {},
     }
 
 
@@ -104,6 +106,85 @@ def test_portfolio_targets_rejects_conflicting_allocation_aliases() -> None:
                 "target_weights": {"core": 0.70, "satellite": 0.30},
             }
         )
+
+
+def test_portfolio_targets_normalizes_valid_asset_bucket_mapping() -> None:
+    targets = portfolio_targets_from_mapping(
+        {
+            "target_allocation": {"core": 0.80, "cash": 0.20},
+            "asset_bucket_mapping": {
+                " degiro:isin:IE00TEST0001 ": " core ",
+                "degiro:cash:eur": "cash",
+            },
+        }
+    )
+
+    assert targets.asset_bucket_mapping == {
+        "degiro:isin:IE00TEST0001": "core",
+        "degiro:cash:eur": "cash",
+    }
+    assert targets.to_storage_mapping()["asset_bucket_mapping"] == targets.asset_bucket_mapping
+    assert "asset_bucket_mapping" not in targets.to_agent_payload()
+
+
+@pytest.mark.parametrize(
+    ("asset_bucket_mapping", "error"),
+    [
+        ([], "must be a mapping"),
+        ({1: "core"}, "keys and values must be strings"),
+        ({"asset": 1}, "keys and values must be strings"),
+        ({" ": "core"}, "empty identifier"),
+        ({"asset": " "}, "empty bucket"),
+        ({"asset": "satellite"}, "unknown target bucket"),
+        (
+            {"asset": "core", " asset ": "core"},
+            "duplicate identifier 'asset' after normalization",
+        ),
+    ],
+)
+def test_portfolio_targets_rejects_invalid_asset_bucket_mapping(
+    asset_bucket_mapping: object,
+    error: str,
+) -> None:
+    with pytest.raises(ValueError, match=error):
+        portfolio_targets_from_mapping(
+            {
+                "target_allocation": {"core": 1.0},
+                "asset_bucket_mapping": asset_bucket_mapping,
+            }
+        )
+
+
+def test_simple_yaml_supports_colons_in_asset_bucket_keys(workspace_tmp_path: Path) -> None:
+    targets_path = workspace_tmp_path / "portfolio_targets.yaml"
+    targets_path.write_text(
+        "\n".join(
+            [
+                "target_allocation:",
+                "  core: 80",
+                "  cash: 20",
+                "asset_bucket_mapping:",
+                "  degiro:isin:IE00TEST0001: core",
+                "  degiro:cash:eur: cash",
+                "risk_profile: medium:term",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    settings = load_settings(
+        repo_root=workspace_tmp_path,
+        env={"PORTFOLIO_TARGETS_PATH": str(targets_path)},
+        env_file=workspace_tmp_path / ".env.missing",
+    )
+
+    targets = load_portfolio_targets(settings=settings, required=True)
+
+    assert targets is not None
+    assert targets.asset_bucket_mapping == {
+        "degiro:isin:IE00TEST0001": "core",
+        "degiro:cash:eur": "cash",
+    }
+    assert targets.risk_profile == "medium:term"
 
 
 def test_portfolio_targets_applies_one_scale_to_the_complete_allocation() -> None:

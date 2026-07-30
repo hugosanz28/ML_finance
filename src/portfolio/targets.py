@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 import json
 import math
 from pathlib import Path
@@ -22,6 +22,7 @@ class PortfolioTargets:
     max_single_asset_weight: float | None = None
     max_sector_weight: float | None = None
     rebalance_mode: str | None = None
+    asset_bucket_mapping: Mapping[str, str] = field(default_factory=dict)
 
     def target_weights(self) -> dict[str, float]:
         """Return target allocation weights normalized to decimal units."""
@@ -37,6 +38,7 @@ class PortfolioTargets:
             "max_single_asset_weight": self.max_single_asset_weight,
             "max_sector_weight": self.max_sector_weight,
             "rebalance_mode": self.rebalance_mode,
+            "asset_bucket_mapping": dict(self.asset_bucket_mapping),
         }
 
     def to_agent_payload(self) -> dict[str, Any]:
@@ -114,6 +116,10 @@ def portfolio_targets_from_mapping(
         max_single_asset_weight=_optional_weight(data.get("max_single_asset_weight"), field_name="max_single_asset_weight"),
         max_sector_weight=_optional_weight(data.get("max_sector_weight"), field_name="max_sector_weight"),
         rebalance_mode=_optional_str(data.get("rebalance_mode")),
+        asset_bucket_mapping=_normalize_asset_bucket_mapping(
+            data.get("asset_bucket_mapping"),
+            valid_buckets=set(normalized_allocation),
+        ),
     )
 
 
@@ -157,9 +163,21 @@ def _parse_simple_yaml(text: str) -> dict[str, Any]:
 
 
 def _split_yaml_key_value(line: str) -> tuple[str, str]:
-    if ":" not in line:
+    separator_index = next(
+        (
+            index
+            for index, character in enumerate(line)
+            if character == ":" and (index + 1 == len(line) or line[index + 1].isspace())
+        ),
+        -1,
+    )
+    # Preserve the permissive legacy ``key:value`` syntax when no YAML-style
+    # separator exists, while allowing canonical asset IDs to contain colons.
+    if separator_index < 0:
+        separator_index = line.find(":")
+    if separator_index < 0:
         raise ValueError(f"Invalid YAML line: {line}")
-    key, value = line.split(":", 1)
+    key, value = line[:separator_index], line[separator_index + 1 :]
     key = key.strip()
     if not key:
         raise ValueError(f"Invalid empty YAML key: {line}")
@@ -209,6 +227,38 @@ def _normalize_weights(raw_weights: Mapping[str, Any], *, field_name: str) -> di
     else:
         raise ValueError(f"{field_name} weights must sum to 1.0 or 100.0.")
     return {name: value / divisor for name, value in weights.items()}
+
+
+def _normalize_asset_bucket_mapping(
+    raw_mapping: Any,
+    *,
+    valid_buckets: set[str],
+) -> dict[str, str]:
+    if raw_mapping is None:
+        return {}
+    if not isinstance(raw_mapping, Mapping):
+        raise ValueError("asset_bucket_mapping must be a mapping.")
+
+    normalized: dict[str, str] = {}
+    for raw_identifier, raw_bucket in raw_mapping.items():
+        if not isinstance(raw_identifier, str) or not isinstance(raw_bucket, str):
+            raise ValueError("asset_bucket_mapping keys and values must be strings.")
+        identifier = raw_identifier.strip()
+        bucket = raw_bucket.strip()
+        if not identifier:
+            raise ValueError("asset_bucket_mapping contains an empty identifier.")
+        if not bucket:
+            raise ValueError(f"asset_bucket_mapping[{identifier!r}] contains an empty bucket.")
+        if identifier in normalized:
+            raise ValueError(
+                f"asset_bucket_mapping contains duplicate identifier {identifier!r} after normalization."
+            )
+        if bucket not in valid_buckets:
+            raise ValueError(
+                f"asset_bucket_mapping[{identifier!r}] references unknown target bucket {bucket!r}."
+            )
+        normalized[identifier] = bucket
+    return normalized
 
 
 def _optional_weight(value: Any, *, field_name: str) -> float | None:

@@ -244,6 +244,7 @@ def test_read_portfolio_targets_returns_complete_strict_json_model() -> None:
             "max_single_asset_weight": 0.25,
             "max_sector_weight": 0.40,
             "rebalance_mode": "contributions_only",
+            "asset_bucket_mapping": {},
         }
         assert targets.content_hash.startswith("sha256:")
         json.dumps(targets.to_dict(), allow_nan=False)

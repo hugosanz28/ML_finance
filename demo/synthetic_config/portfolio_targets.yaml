@@ -6,6 +6,11 @@ target_allocation:
   defensive_bonds: 25
   satellites: 10
   cash: 10
+asset_bucket_mapping:
+  degiro:isin:IE00SYNCORE1: core_global_equity
+  degiro:isin:IE00SYNBOND1: defensive_bonds
+  degiro:isin:NL00SYNTECH1: satellites
+  degiro:cash:eur: cash
 max_single_asset_weight: 35
 max_sector_weight: 30
 rebalance_mode: contributions_only

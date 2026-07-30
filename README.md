@@ -22,7 +22,10 @@ viven en rutas locales ignoradas por Git y la demo publica usa datos sinteticos.
 - Reconstruccion diaria de posiciones y metricas agregadas de cartera.
 - Refresco de FX y precios con politica `broker_snapshot_anchored`.
 - Informe mensual en Markdown.
-- Dashboard Streamlit para cartera, evolucion, informes, actualizacion de datos y agentes.
+- Laboratorio determinista para simular aportaciones sobre posiciones actuales,
+  sin ventas ni ejecucion de ordenes.
+- Dashboard Streamlit para cartera, aportaciones, evolucion, informes,
+  actualizacion de datos y agentes.
 - Agentes mensuales con prompts versionados y auditoria visual.
 - Demo sintetica ejecutable sin exponer datos reales.
 
@@ -82,10 +85,11 @@ Guia completa: `demo/README.md`.
 
 ## Resultado sintetico reproducible
 
-Tras preparar la demo, el dashboard muestra una cartera ficticia, su evolucion,
-un informe mensual y la auditoria de los tres agentes. Los datos, el brief, los
-precios y las respuestas `static` estan etiquetados como sinteticos y no
-representan una cartera ni una recomendacion real.
+Tras preparar la demo, el dashboard muestra una cartera ficticia, una simulacion
+determinista de aportacion, su evolucion, un informe mensual y la auditoria de
+los tres agentes. Los datos, el brief, los precios y las respuestas `static`
+estan etiquetados como sinteticos y no representan una cartera ni una
+recomendacion real.
 
 La vista se genera desde `demo/synthetic_config/.env.demo` y
 `demo/local_data/`; no contiene datos de una cartera real. Puedes reproducirla
