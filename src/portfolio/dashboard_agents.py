@@ -230,7 +230,14 @@ def _render_persisted_agent_audit(settings: Settings) -> None:
         st.error(str(exc))
         return
 
-    _render_run_overview(audit.run_metadata, audit.input_payload, audit.preflight, audit.output_dir)
+    _render_run_overview(
+        audit.run_metadata,
+        audit.input_payload,
+        audit.preflight,
+        audit.output_dir,
+        schema_version=audit.schema_version,
+        compatibility_warnings=audit.compatibility_warnings,
+    )
     if audit.run_metadata.get("execution_status") == "blocked":
         st.info("Los agentes no se ejecutaron porque el preflight detecto errores bloqueantes.")
         return
@@ -249,6 +256,9 @@ def _render_run_overview(
     input_payload: Mapping[str, Any],
     preflight: Mapping[str, Any],
     output_dir: Path,
+    *,
+    schema_version: int,
+    compatibility_warnings: tuple[str, ...],
 ) -> None:
     st.markdown("#### Run")
     columns = st.columns(4)
@@ -269,6 +279,18 @@ def _render_run_overview(
         _render_input_refs(input_payload.get("inputs") or [], key_prefix="run")
     with st.expander("Prompt versions", expanded=False):
         st.json(run_metadata.get("prompt_versions") or {})
+    with st.expander("Reproducibilidad", expanded=False):
+        if compatibility_warnings:
+            st.info("\n".join(compatibility_warnings))
+        if schema_version >= 2:
+            st.json(
+                {
+                    "schema_version": schema_version,
+                    "hash_algorithm": run_metadata.get("hash_algorithm"),
+                    "input_hash": run_metadata.get("input_hash"),
+                    "output_hash": run_metadata.get("output_hash"),
+                }
+            )
     st.caption(f"Directorio local: {output_dir}")
 
 
@@ -279,7 +301,9 @@ def _render_agent_audit(agent_name: str, audit: Mapping[str, Any]) -> None:
     request = audit.get("request") or {}
     prompt_refs = audit.get("prompt_refs") or {}
     prompt_rendered = audit.get("prompt_rendered") or ""
+    provider = audit.get("provider") or {}
     raw_response = audit.get("raw_response") or {}
+    audit_metadata = audit.get("audit_metadata") or {}
 
     status = parsed.get("status") or "sin_datos"
     st.markdown(f"#### {agent_name}: `{status}`")
@@ -289,19 +313,65 @@ def _render_agent_audit(agent_name: str, audit: Mapping[str, Any]) -> None:
     _render_warning_error_blocks(parsed)
     render_agent_autonomy(metadata)
 
-    detail_tabs = st.tabs(["Outputs", "Fuentes", "Prompts", "Inputs", "Request", "Raw"])
-    with detail_tabs[0]:
+    labels = ["Outputs", "Fuentes", "Prompts", "Inputs"]
+    for label, payload in (
+        ("Request", request),
+        ("Provider", provider),
+        ("Raw", raw_response),
+        ("Hashes", audit_metadata),
+    ):
+        if payload:
+            labels.append(label)
+    detail_tabs = dict(zip(labels, st.tabs(labels), strict=True))
+    with detail_tabs["Outputs"]:
         _render_agent_outputs(parsed, metadata)
-    with detail_tabs[1]:
+    with detail_tabs["Fuentes"]:
         _render_sources(parsed)
-    with detail_tabs[2]:
+    with detail_tabs["Prompts"]:
         _render_prompts(prompt_refs, prompt_rendered, key_prefix=agent_name)
-    with detail_tabs[3]:
+    with detail_tabs["Inputs"]:
         _render_input_refs(context.get("input_refs") or [], key_prefix=agent_name)
-    with detail_tabs[4]:
-        st.json(request)
-    with detail_tabs[5]:
-        st.json(raw_response)
+    if "Request" in detail_tabs:
+        with detail_tabs["Request"]:
+            st.json(request)
+    if "Provider" in detail_tabs:
+        with detail_tabs["Provider"]:
+            st.json(provider)
+    if "Raw" in detail_tabs:
+        with detail_tabs["Raw"]:
+            st.warning(
+                "Artefacto privado: puede contener prompts, datos de cartera y salida completa del proveedor."
+            )
+            st.json(_raw_response_summary(raw_response))
+            responses = raw_response.get("responses") or []
+            if responses:
+                with st.expander("Respuestas completas", expanded=False):
+                    st.json(responses)
+    if "Hashes" in detail_tabs:
+        with detail_tabs["Hashes"]:
+            st.json(audit_metadata)
+
+
+def _raw_response_summary(raw_response: Mapping[str, Any]) -> dict[str, Any]:
+    """Hide full response bodies from the default, screenshot-prone view."""
+    summary = {
+        key: value
+        for key, value in raw_response.items()
+        if key != "responses"
+    }
+    providers = raw_response.get("providers")
+    if isinstance(providers, Mapping):
+        summary["providers"] = {
+            role: {
+                key: value
+                for key, value in audit.items()
+                if key != "responses"
+            }
+            if isinstance(audit, Mapping)
+            else audit
+            for role, audit in providers.items()
+        }
+    return summary
 
 
 def _render_warning_error_blocks(parsed: Mapping[str, Any]) -> None:

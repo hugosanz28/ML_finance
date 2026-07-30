@@ -7,6 +7,7 @@ import pandas as pd
 import pytest
 
 from src.agents import run_monthly_agent_pipeline
+from src.application import GetAgentRunAuditRequest, GetAgentRunAuditUseCase
 from src.config import default_repo_root, load_settings
 from src.portfolio import PortfolioMetricsResult
 
@@ -57,7 +58,11 @@ def test_monthly_agent_pipeline_passes_portfolio_targets_to_contribution_agent(w
         metrics=_metrics(),
         llm_provider="static",
         search_provider="null",
-        persist=False,
+        persist=True,
+        request_scope={"universe": "current_portfolio"},
+        request_parameters={"max_findings": 4},
+        request_constraints={"network": "offline"},
+        request_metadata={"origin": "test"},
     )
 
     target_ref = next(input_ref for input_ref in result.input_refs if input_ref.key == "target_weights")
@@ -65,6 +70,50 @@ def test_monthly_agent_pipeline_passes_portfolio_targets_to_contribution_agent(w
     assert target_ref.metadata["weights"] == {"core": 0.80, "satellite": 0.20}
     assert result.asistente_aportacion_mensual.metadata["monthly_budget"] == 900
     assert result.asistente_aportacion_mensual.metadata["target_weights"] == {"core": 0.80, "satellite": 0.20}
+
+    common_input_keys = tuple(input_ref.key for input_ref in result.input_refs)
+    expected_input_refs = {
+        "monitor_tematico": common_input_keys,
+        "analista_activos": (*common_input_keys, "monitor_tematico_result"),
+        "asistente_aportacion_mensual": (
+            *common_input_keys,
+            "monitor_tematico_result",
+            "analista_activos_result",
+        ),
+    }
+    for agent_name, request in result.agent_requests.items():
+        assert request.scope == {"universe": "current_portfolio"}
+        assert request.parameters == {"max_findings": 4}
+        assert request.constraints == {"network": "offline"}
+        assert request.metadata == {"origin": "test"}
+        assert request.input_refs == expected_input_refs[agent_name]
+        assert tuple(
+            input_ref["key"]
+            for input_ref in result.agent_contexts[agent_name]["input_refs"]
+        ) == expected_input_refs[agent_name]
+
+    assert result.raw_responses["monitor_tematico"]["status"] == "not_captured"
+    assert set(result.raw_responses["monitor_tematico"]["providers"]) == {"llm", "search"}
+    assert (
+        result.raw_responses["monitor_tematico"]["providers"]["search"]["reason_code"]
+        == "deterministic_provider_no_raw_response"
+    )
+    assert "api_key" not in str(result.provider_configs).lower()
+
+    audit = GetAgentRunAuditUseCase(settings=settings).execute(
+        GetAgentRunAuditRequest(run_id=result.run_id)
+    )
+    assert audit.schema_version == 2
+    assert audit.is_legacy is False
+    assert audit.run_metadata["input_hash"].startswith("sha256:")
+    for agent_name, expected_refs in expected_input_refs.items():
+        persisted = audit.agents[agent_name]
+        assert persisted["request"]["input_refs"] == list(expected_refs)
+        assert persisted["request"]["scope"] == {"universe": "current_portfolio"}
+        assert persisted["provider"]["providers"]["llm"]["provider"] == "static_llm"
+        assert persisted["audit_metadata"]["hash_projection"] == "semantic-v1"
+    monitor_raw = audit.agents["monitor_tematico"]["raw_response"]
+    assert set(monitor_raw["providers"]) == {"llm", "search"}
 
 
 def _metrics() -> PortfolioMetricsResult:

@@ -32,7 +32,10 @@ class RunMonthlyAgentsRequest:
     search_provider: str = "null"
     persist: bool = True
     output_dir: Path | None = None
+    request_scope: Mapping[str, Any] | None = None
     request_parameters: Mapping[str, Any] | None = None
+    request_constraints: Mapping[str, Any] | None = None
+    request_metadata: Mapping[str, Any] | None = None
     portfolio_metrics_snapshot: Mapping[str, Any] | None = None
     monthly_budget: float | None = None
 
@@ -89,7 +92,10 @@ class RunMonthlyAgentsUseCase:
             search_provider=resolved_request.search_provider,
             persist=resolved_request.persist,
             output_dir=resolved_request.output_dir,
+            request_scope=resolved_request.request_scope,
             request_parameters=resolved_request.request_parameters,
+            request_constraints=resolved_request.request_constraints,
+            request_metadata=resolved_request.request_metadata,
             portfolio_metrics_snapshot=resolved_request.portfolio_metrics_snapshot,
             monthly_budget=resolved_request.monthly_budget,
         )

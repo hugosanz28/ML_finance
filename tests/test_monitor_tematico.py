@@ -23,6 +23,7 @@ from src.agents.monitor_tematico import (
     build_observed_topics,
 )
 import src.agents.monitor_tematico.providers as search_providers
+from src.agents.provider_audit import provider_raw_response_audit
 from src.config import default_repo_root, load_settings
 
 
@@ -397,3 +398,6 @@ def test_tavily_search_provider_requires_api_key(monkeypatch: pytest.MonkeyPatch
             end_date=date(2026, 5, 26),
             max_results=2,
         )
+
+    audit = provider_raw_response_audit(provider, role="search")
+    assert audit["reason_code"] == "provider_configuration_missing"

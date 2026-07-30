@@ -115,6 +115,13 @@ Campos principales:
 - `parameters`: configuracion especifica del agente.
 - `constraints`: limites o reglas de usuario.
 - `input_refs`: claves de entradas del contexto que la peticion solicita consumir.
+- `metadata`: contexto adicional de la peticion que no forma parte del dominio.
+
+En una ejecucion persistida, cada `request.json` contiene la peticion efectiva
+de ese agente. Conserva `scope`, `parameters`, `constraints` y `metadata`, y
+resuelve `input_refs` contra las entradas realmente disponibles en su contexto.
+Por eso los tres agentes de un mismo run pueden tener referencias distintas:
+los agentes posteriores reciben tambien los resultados de los anteriores.
 
 ### `AgentResult`
 
@@ -217,16 +224,49 @@ Cada ejecucion persistida de la pipeline mensual escribe un directorio privado
 en `src/data/local/agents/monthly_pipeline/<run_id>/`. Ademas de
 `pipeline_result.json`, se guardan:
 
-- `run_metadata.json`: fecha, moneda base, estados por agente y versiones de prompts.
+- `run_metadata.json`: version de esquema, fecha, moneda base, estados,
+  providers, hashes agregados y versiones de prompts.
 - `preflight.json`: resultado, codigos, severidades y conteos de calidad.
-- `input_payload.json`: referencias de entrada completas usadas en el run.
+- `input_payload.json`: referencias de entrada completas y hash agregado del
+  run.
 - `agents/<agent_name>/context.json`: contexto efectivo del agente.
-- `agents/<agent_name>/request.json`: request estructurada enviada al agente.
+- `agents/<agent_name>/request.json`: request efectiva enviada al agente,
+  incluidos alcance, parametros, restricciones y referencias de entrada.
 - `agents/<agent_name>/prompt_refs.json`: claves y versiones de prompts.
 - `agents/<agent_name>/prompt_rendered.md`: prompt versionado usado en esa ejecucion.
-- `agents/<agent_name>/raw_response.json`: placeholder con estado
-  `not_captured` mientras el contrato LLM no expone la respuesta bruta.
+- `agents/<agent_name>/provider.json`: nombre, modelo y opciones operativas
+  permitidas por una lista explicita; nunca credenciales.
+- `agents/<agent_name>/raw_response.json`: respuestas que el contrato del
+  provider permite capturar y el motivo estable de cualquier ausencia.
 - `agents/<agent_name>/parsed_output.json`: salida estructurada parseada.
+- `agents/<agent_name>/audit_metadata.json`: version de esquema y hashes
+  semanticos de entrada y salida.
+
+El run y los envelopes de auditoria nuevos usan `schema_version: 2`.
+`request.json` conserva deliberadamente solo los cinco campos de
+`AgentRequest`, para permitir su round-trip directo, y hereda la version del
+run. `raw_response.json` distingue:
+
+- `captured`: se conservaron todas las respuestas raw disponibles;
+- `partial`: solo algunas operaciones o providers ofrecieron respuesta raw;
+- `not_captured`: no habia respuesta raw accesible; `reason_code` explica el
+  motivo de forma estable.
+
+La configuracion de provider es una proyeccion segura y allowlisted. Registra
+provider, modelo y opciones relevantes para reproducibilidad, pero no guarda
+API keys, tokens, cabeceras de autorizacion, variables de entorno ni el cliente
+del SDK.
+
+Los hashes usan SHA-256 sobre JSON canonico. El `input_hash` representa el
+contexto y request efectivos, prompts y configuracion no secreta del provider;
+excluye identificadores y timestamps volatiles. El `output_hash` representa la
+salida parseada. Son huellas para comparar integridad y cambios semanticos, no
+una prueba de equivalencia financiera ni un mecanismo de anonimato.
+
+Los runs anteriores sin `schema_version`, `provider.json`,
+`audit_metadata.json` o hashes se leen como auditorias legacy v1. No se
+reescriben ni migran al abrirlos; Streamlit muestra lo disponible y marca como
+ausente la metadata que la version antigua nunca persistio.
 
 Estos artefactos viven bajo `src/data/local/`, por tanto son privados y estan
 ignorados por Git. Para demos publicas deben usarse datos sinteticos.

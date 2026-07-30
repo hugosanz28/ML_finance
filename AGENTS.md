@@ -41,6 +41,9 @@ La UI actual es Streamlit. Una futura API/FastAPI debe entrar casi siempre por `
 - No metas logica de UI en dominio ni queries/repositorios directos en Streamlit si existe caso de uso equivalente.
 - Los datos de cartera salen de exportaciones oficiales DEGIRO y artefactos derivados validados. Los agentes no deben inventar estado de cartera.
 - Preserva auditoria de agentes: plan interno, acciones permitidas/usadas/descartadas, fuentes, prompts, warnings, inputs y outputs.
+- Si cambias la auditoria, conserva lectura legacy, JSON estricto, hashes
+  semanticos y provider metadata allowlisted; nunca persistas credenciales,
+  cabeceras de autorizacion, variables de entorno ni clientes SDK.
 - Si cambia comportamiento de agentes, actualiza tests y, cuando aplique, prompts versionados o documentacion de agentes.
 - Si cambias comandos documentados, valida que siguen existiendo.
 - Si tocas docs, evita duplicar manuales largos: enlaza a `docs/` o README de dominio.

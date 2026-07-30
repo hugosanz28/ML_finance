@@ -30,6 +30,34 @@ Los datos de ejemplo que se publiquen deben ser sinteticos o estar saneados de
 forma que no permitan reconstruir la cartera real, importes, fechas exactas o
 decisiones personales.
 
+## Auditoria de agentes
+
+La auditoria reproducible conserva mas detalle que un log convencional. En
+particular, `request.json`, `context.json`, `prompt_rendered.md`,
+`raw_response.json` y `parsed_output.json` pueden contener el brief, posiciones,
+presupuesto, objetivos, respuestas del provider y decisiones derivadas. Deben
+tratarse siempre como datos financieros privados.
+
+El schema v2 añade `provider.json` y hashes SHA-256. La configuracion del
+provider se construye mediante una lista permitida de campos no secretos:
+nombre, modelo y opciones operativas necesarias para interpretar el run. No
+debe persistir API keys, tokens, passwords, cookies, cabeceras de autorizacion,
+variables de entorno ni objetos cliente de un SDK.
+
+Una respuesta raw puede quedar `captured`, `partial` o `not_captured`. Cuando se
+captura, puede incluir texto completo de salida, identificadores del provider y
+metricas de uso. Que no contenga una credencial no la convierte en publica:
+puede revelar indirectamente los inputs financieros enviados.
+
+Los `input_hash` y `output_hash` sirven para detectar cambios semanticos e
+integridad entre ejecuciones. Un hash no anonimiza sus datos de origen, no
+demuestra que dos decisiones sean correctas y no hace seguro publicar el
+artefacto que lo contiene.
+
+Los runs legacy v1 siguen siendo privados aunque no incluyan provider metadata,
+hashes o respuesta raw capturable. La lectura compatible no reescribe esos
+artefactos ni elimina posibles datos sensibles que ya contengan.
+
 ## Rutas privadas
 
 Estas rutas estan disenadas para uso local y deben permanecer fuera de Git:
@@ -122,6 +150,11 @@ historial afectado antes de considerar el repositorio seguro.
   demo sintetica revisada.
 - Los informes y outputs de agentes usados en demos proceden de datos sinteticos
   o saneados.
+- Los `provider.json` revisados no contienen claves, tokens, cabeceras ni
+  variables de entorno.
+- Los `raw_response.json` y prompts usados en capturas proceden de la demo
+  sintetica y se han revisado manualmente.
+- No se considera un audit trail publicable solo porque incluya hashes.
 - El diff no contiene rutas locales absolutas, claves API, tokens ni datos de
   cartera real.
 - Si se han usado proveedores externos, los prompts y respuestas no incluyen
@@ -145,3 +178,7 @@ En la v1 local con Streamlit hay dos combinaciones offline:
 Los proveedores `openai`, `tavily` y `duckduckgo` deben tratarse como
 ejecuciones reales o semi-reales, porque pueden sacar informacion fuera del
 equipo local.
+
+Si una credencial aparece por error en un audit trail, deja de compartirlo,
+elimina la copia afectada y rota la credencial en el proveedor. Ocultarla en
+Streamlit o sustituirla solo en una captura no invalida el secreto original.
