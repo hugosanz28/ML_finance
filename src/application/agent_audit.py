@@ -7,6 +7,7 @@ import json
 from pathlib import Path
 from typing import Any
 
+from src.agents.provider_audit import redact_sensitive_audit_payload
 from src.config import Settings, get_settings
 
 
@@ -41,6 +42,9 @@ class GetAgentRunAuditResult:
     input_payload: dict[str, Any]
     agents: dict[str, dict[str, Any]]
     preflight: dict[str, Any] = field(default_factory=dict)
+    schema_version: int = 1
+    is_legacy: bool = True
+    compatibility_warnings: tuple[str, ...] = ()
 
 
 class ListAgentRunsUseCase:
@@ -80,9 +84,16 @@ class GetAgentRunAuditUseCase:
         if not output_dir.exists():
             raise FileNotFoundError(f"Agent run not found: {run_id}")
 
-        run_metadata = _read_json_or_empty(output_dir / "run_metadata.json")
-        input_payload = _read_json_or_empty(output_dir / "input_payload.json")
-        preflight = _read_json_or_empty(output_dir / "preflight.json")
+        run_metadata = redact_sensitive_audit_payload(
+            _read_json_or_empty(output_dir / "run_metadata.json")
+        )
+        input_payload = redact_sensitive_audit_payload(
+            _read_json_or_empty(output_dir / "input_payload.json")
+        )
+        preflight = redact_sensitive_audit_payload(
+            _read_json_or_empty(output_dir / "preflight.json")
+        )
+        schema_version, compatibility_warnings = _audit_schema_compatibility(run_metadata)
         agents = {
             agent_name: _read_agent_audit(output_dir / "agents" / agent_name)
             for agent_name in AGENT_NAMES
@@ -94,6 +105,9 @@ class GetAgentRunAuditUseCase:
             input_payload=input_payload,
             preflight=preflight,
             agents=agents,
+            schema_version=schema_version,
+            is_legacy=schema_version < 2,
+            compatibility_warnings=compatibility_warnings,
         )
 
 
@@ -173,14 +187,38 @@ def _safe_run_id(value: str) -> str:
 
 
 def _read_agent_audit(agent_dir: Path) -> dict[str, Any]:
-    return {
-        "context": _read_json_or_empty(agent_dir / "context.json"),
-        "request": _read_json_or_empty(agent_dir / "request.json"),
-        "prompt_refs": _read_json_or_empty(agent_dir / "prompt_refs.json"),
-        "prompt_rendered": _read_text_or_empty(agent_dir / "prompt_rendered.md"),
-        "raw_response": _read_json_or_empty(agent_dir / "raw_response.json"),
-        "parsed_output": _read_json_or_empty(agent_dir / "parsed_output.json"),
-    }
+    # Redact every JSON artifact in case a legacy/manually edited run contains credentials.
+    return redact_sensitive_audit_payload(
+        {
+            "context": _read_json_or_empty(agent_dir / "context.json"),
+            "request": _read_json_or_empty(agent_dir / "request.json"),
+            "prompt_refs": _read_json_or_empty(agent_dir / "prompt_refs.json"),
+            "prompt_rendered": _read_text_or_empty(agent_dir / "prompt_rendered.md"),
+            "provider": _read_json_or_empty(agent_dir / "provider.json"),
+            "raw_response": _read_json_or_empty(agent_dir / "raw_response.json"),
+            "parsed_output": _read_json_or_empty(agent_dir / "parsed_output.json"),
+            "audit_metadata": _read_json_or_empty(agent_dir / "audit_metadata.json"),
+        }
+    )
+
+
+def _audit_schema_compatibility(
+    run_metadata: dict[str, Any],
+) -> tuple[int, tuple[str, ...]]:
+    raw_version = run_metadata.get("schema_version", 1)
+    try:
+        schema_version = int(raw_version)
+    except (TypeError, ValueError):
+        return 1, (f"Invalid audit schema_version: {raw_version!r}; read as legacy v1.",)
+    if schema_version < 2:
+        return schema_version, (
+            "Legacy audit: provider metadata and reproducibility hashes may be unavailable.",
+        )
+    if schema_version > 2:
+        return schema_version, (
+            f"Audit schema v{schema_version} is newer than supported v2; showing raw compatible fields.",
+        )
+    return schema_version, ()
 
 
 def _summary_from_metadata(metadata: dict[str, Any], *, run_dir: Path) -> AgentRunSummary:

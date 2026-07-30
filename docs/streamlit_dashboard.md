@@ -112,9 +112,11 @@ La pestana `Agentes` incluye un bloque `Auditoria de agentes` para revisar runs
 persistidos en `src/data/local/agents/monthly_pipeline/<run_id>/` o en el
 directorio demo equivalente. Esta vista permite inspeccionar:
 
-- estado del run, preflight de calidad, fechas, inputs y versiones de prompts;
+- estado del run, version del esquema, preflight de calidad, fechas, inputs y
+  versiones de prompts;
 - plan interno, acciones permitidas, acciones usadas, acciones descartadas y
   base de decision de cada agente;
+- request efectiva, provider/modelo/opciones allowlisted y hashes SHA-256;
 - warnings y errores;
 - findings, artifacts y metadata completa;
 - fuentes citadas por agente y por finding;
@@ -122,12 +124,23 @@ directorio demo equivalente. Esta vista permite inspeccionar:
 - inputs efectivos recibidos por cada agente;
 - request y raw response guardada.
 
-La `raw_response` puede aparecer como `not_captured` porque los proveedores
-actuales devuelven objetos de dominio ya parseados. Si mas adelante interesa
-auditar la respuesta bruta del LLM, habra que ampliar el contrato de providers.
+La pestaña `Raw` diferencia `captured`, `partial` y `not_captured`; un
+`reason_code` estable explica por que falta alguna respuesta, por ejemplo cuando
+el contrato del provider solo entrega un objeto de dominio ya parseado. Aunque
+la vista muestre provider y modelo, la proyeccion excluye credenciales,
+cabeceras de autorizacion, variables de entorno y clientes SDK. La respuesta raw
+sigue siendo privada y se muestra como detalle de auditoria, no como contenido
+apto para capturas publicas.
+
 Los intentos bloqueados persistidos tambien aparecen en la lista con estado
 `blocked`. Incluyen metadata, inputs y preflight, pero no `pipeline_result.json`,
 outputs ni tabs de agentes vacios.
+
+Los hashes comparan el contenido semantico persistido: inputs efectivos,
+request, prompts y provider para entrada; salida parseada para output. No
+anonimizan la cartera. Los runs legacy v1, que no contienen todos estos campos,
+siguen abriendo sin migracion; la UI indica que la metadata ausente no estaba
+disponible en ese esquema.
 
 Al guardar desde la UI, el dashboard detecta el tipo de exportacion por el
 nombre del archivo y lo copia a `incoming` con el nombre canonico que exige el

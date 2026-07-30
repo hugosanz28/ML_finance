@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
-from dataclasses import asdict, dataclass, is_dataclass, replace
+from dataclasses import asdict, dataclass, field, is_dataclass, replace
 from datetime import date, datetime
+import hashlib
 import json
+from math import isfinite
 from pathlib import Path
 import re
 from typing import Any, Mapping
@@ -17,7 +19,12 @@ from src.agents.asistente_aportacion_mensual import (
     OpenAIContributionLLMProvider,
     StaticContributionLLMProvider,
 )
-from src.agents.models import AgentInputRef, AgentRequest, AgentResult, build_agent_context
+from src.agents.models import AgentContext, AgentInputRef, AgentRequest, AgentResult, build_agent_context
+from src.agents.provider_audit import (
+    provider_audit_config,
+    providers_raw_response_audit,
+    redact_sensitive_audit_payload,
+)
 from src.agents.prompts import load_prompt, prompt_version
 from src.agents.monitor_tematico import (
     DuckDuckGoHtmlSearchProvider,
@@ -35,6 +42,9 @@ from src.portfolio.targets import PortfolioTargets, load_portfolio_targets
 from src.reports import generate_monthly_report, get_latest_monthly_report
 
 
+AUDIT_SCHEMA_VERSION = 2
+
+
 @dataclass(frozen=True)
 class MonthlyAgentPipelineResult:
     """Results and persisted artifact paths for one monthly agent pipeline run."""
@@ -46,6 +56,11 @@ class MonthlyAgentPipelineResult:
     analista_activos: AgentResult
     asistente_aportacion_mensual: AgentResult
     output_dir: Path | None = None
+    agent_requests: Mapping[str, AgentRequest] = field(default_factory=dict)
+    agent_contexts: Mapping[str, Mapping[str, Any]] = field(default_factory=dict)
+    prompt_audits: Mapping[str, Mapping[str, Any]] = field(default_factory=dict)
+    provider_configs: Mapping[str, Mapping[str, Any]] = field(default_factory=dict)
+    raw_responses: Mapping[str, Mapping[str, Any]] = field(default_factory=dict)
 
 
 def run_monthly_agent_pipeline(
@@ -60,7 +75,10 @@ def run_monthly_agent_pipeline(
     search_provider: str = "null",
     persist: bool = True,
     output_dir: str | Path | None = None,
+    request_scope: Mapping[str, Any] | None = None,
     request_parameters: Mapping[str, Any] | None = None,
+    request_constraints: Mapping[str, Any] | None = None,
+    request_metadata: Mapping[str, Any] | None = None,
     portfolio_metrics_snapshot: Mapping[str, Any] | None = None,
     monthly_budget: float | None = None,
 ) -> MonthlyAgentPipelineResult:
@@ -105,11 +123,29 @@ def run_monthly_agent_pipeline(
         portfolio_targets=portfolio_targets,
         portfolio_targets_location=str(resolved_settings.portfolio_targets_path),
     )
-    request = AgentRequest(parameters=dict(request_parameters or {}))
+    base_request = AgentRequest(
+        scope=dict(request_scope or {}),
+        parameters=dict(request_parameters or {}),
+        constraints=dict(request_constraints or {}),
+        metadata=dict(request_metadata or {}),
+    )
+    # Snapshot prompts before execution so the audit cannot drift if files change mid-run.
+    prompt_audits = {
+        agent_name: {
+            "prompt_refs": {
+                "schema_version": AUDIT_SCHEMA_VERSION,
+                **_agent_prompt_refs(agent_name),
+            },
+            "prompt_rendered": _agent_prompt_markdown(agent_name),
+        }
+        for agent_name in _agent_prompt_keys()
+    }
 
+    monitor_search_provider = _build_search_provider(search_provider)
+    monitor_llm_provider = _build_monitor_llm_provider(llm_provider)
     monitor_agent = MonitorTematicoAgent(
-        search_provider=_build_search_provider(search_provider),
-        llm_provider=_build_monitor_llm_provider(llm_provider),
+        search_provider=monitor_search_provider,
+        llm_provider=monitor_llm_provider,
     )
     monitor_context = build_agent_context(
         agent_name=monitor_agent.name,
@@ -120,10 +156,12 @@ def run_monthly_agent_pipeline(
         input_refs=common_refs,
         run_id=run_id,
     )
-    monitor_result = monitor_agent.execute(request, monitor_context)
+    monitor_request = _request_for_context(base_request, monitor_context)
+    monitor_result = monitor_agent.execute(monitor_request, monitor_context)
 
     monitor_ref = _result_input_ref("monitor_tematico_result", "Monitor tematico result", monitor_result)
-    analista_agent = AnalistaActivosAgent(llm_provider=_build_asset_llm_provider(llm_provider))
+    analista_llm_provider = _build_asset_llm_provider(llm_provider)
+    analista_agent = AnalistaActivosAgent(llm_provider=analista_llm_provider)
     analista_context = build_agent_context(
         agent_name=analista_agent.name,
         as_of_date=as_of_date,
@@ -133,12 +171,12 @@ def run_monthly_agent_pipeline(
         input_refs=(*common_refs, monitor_ref),
         run_id=run_id,
     )
-    analista_result = analista_agent.execute(request, analista_context)
+    analista_request = _request_for_context(base_request, analista_context)
+    analista_result = analista_agent.execute(analista_request, analista_context)
 
     analista_ref = _result_input_ref("analista_activos_result", "Analista activos result", analista_result)
-    asistente_agent = AsistenteAportacionMensualAgent(
-        llm_provider=_build_contribution_llm_provider(llm_provider),
-    )
+    asistente_llm_provider = _build_contribution_llm_provider(llm_provider)
+    asistente_agent = AsistenteAportacionMensualAgent(llm_provider=asistente_llm_provider)
     asistente_context = build_agent_context(
         agent_name=asistente_agent.name,
         as_of_date=as_of_date,
@@ -159,7 +197,43 @@ def run_monthly_agent_pipeline(
         },
         run_id=run_id,
     )
-    asistente_result = asistente_agent.execute(request, asistente_context)
+    asistente_request = _request_for_context(base_request, asistente_context)
+    asistente_result = asistente_agent.execute(asistente_request, asistente_context)
+
+    agent_requests = {
+        "monitor_tematico": monitor_request,
+        "analista_activos": analista_request,
+        "asistente_aportacion_mensual": asistente_request,
+    }
+    agent_contexts = {
+        "monitor_tematico": _serialize_agent_context(monitor_context),
+        "analista_activos": _serialize_agent_context(analista_context),
+        "asistente_aportacion_mensual": _serialize_agent_context(asistente_context),
+    }
+    provider_configs = {
+        "monitor_tematico": {
+            "llm": provider_audit_config(monitor_llm_provider, role="llm"),
+            "search": provider_audit_config(monitor_search_provider, role="search"),
+        },
+        "analista_activos": {
+            "llm": provider_audit_config(analista_llm_provider, role="llm"),
+        },
+        "asistente_aportacion_mensual": {
+            "llm": provider_audit_config(asistente_llm_provider, role="llm"),
+        },
+    }
+    raw_responses = {
+        "monitor_tematico": providers_raw_response_audit(
+            {
+                "llm": monitor_llm_provider,
+                "search": monitor_search_provider,
+            }
+        ),
+        "analista_activos": providers_raw_response_audit({"llm": analista_llm_provider}),
+        "asistente_aportacion_mensual": providers_raw_response_audit(
+            {"llm": asistente_llm_provider}
+        ),
+    }
 
     resolved_output_dir = None
     result = MonthlyAgentPipelineResult(
@@ -170,6 +244,11 @@ def run_monthly_agent_pipeline(
         analista_activos=analista_result,
         asistente_aportacion_mensual=asistente_result,
         output_dir=None,
+        agent_requests=agent_requests,
+        agent_contexts=agent_contexts,
+        prompt_audits=prompt_audits,
+        provider_configs=provider_configs,
+        raw_responses=raw_responses,
     )
     if persist:
         resolved_output_dir = _persist_pipeline_result(
@@ -179,6 +258,17 @@ def run_monthly_agent_pipeline(
         )
         result = replace(result, output_dir=resolved_output_dir)
     return result
+
+
+def _request_for_context(request: AgentRequest, context: AgentContext) -> AgentRequest:
+    """Bind one request to the exact input references available to the agent."""
+    return AgentRequest(
+        scope=dict(request.scope),
+        parameters=dict(request.parameters),
+        constraints=dict(request.constraints),
+        input_refs=context.available_input_keys,
+        metadata=dict(request.metadata),
+    )
 
 
 def build_portfolio_metrics_snapshot(metrics: PortfolioMetricsResult, *, as_of_date: date) -> dict[str, Any]:
@@ -365,7 +455,10 @@ def _build_common_input_refs(
             location="derived://portfolio_metrics_snapshot",
             source_type="derived",
             as_of_date=monthly_report_date,
-            metadata={**metrics_snapshot, "content": json.dumps(metrics_snapshot, ensure_ascii=False)},
+            metadata={
+                **metrics_snapshot,
+                "content": _canonical_json_text(metrics_snapshot),
+            },
         ),
     ]
     if user_satellite_interest:
@@ -390,7 +483,7 @@ def _build_common_input_refs(
                     "weights": portfolio_targets.target_weights(),
                     "target_weights": portfolio_targets.target_weights(),
                     "portfolio_targets": payload,
-                    "content": json.dumps(payload, ensure_ascii=False),
+                    "content": _canonical_json_text(payload),
                 },
             )
         )
@@ -406,7 +499,7 @@ def _result_input_ref(key: str, label: str, result: AgentResult) -> AgentInputRe
         source_type="derived",
         metadata={
             "findings": result.findings,
-            "content": json.dumps(payload, ensure_ascii=False),
+            "content": _canonical_json_text(payload),
             "summary": result.summary,
             "status": result.status,
         },
@@ -461,11 +554,36 @@ def _persist_pipeline_result(
         else settings.data_dir / "agents" / "monthly_pipeline" / result.run_id
     )
     base_dir.mkdir(parents=True, exist_ok=True)
-    (base_dir / "pipeline_result.json").write_text(
-        json.dumps(_serialize_pipeline_result(result), ensure_ascii=False, indent=2),
-        encoding="utf-8",
+    agent_payloads = _build_agent_audit_payloads(result, settings=settings)
+    input_hash = _stable_hash(
+        {
+            name: payload["audit_metadata"]["input_hash"]
+            for name, payload in sorted(agent_payloads.items())
+        }
     )
-    _persist_pipeline_audit_trail(result, settings=settings, base_dir=base_dir)
+    output_hash = _stable_hash(
+        {
+            name: payload["audit_metadata"]["output_hash"]
+            for name, payload in sorted(agent_payloads.items())
+        }
+    )
+    _write_json(
+        base_dir / "pipeline_result.json",
+        {
+            "schema_version": AUDIT_SCHEMA_VERSION,
+            "input_hash": input_hash,
+            "output_hash": output_hash,
+            **_serialize_pipeline_result(result),
+        },
+    )
+    _persist_pipeline_audit_trail(
+        result,
+        settings=settings,
+        base_dir=base_dir,
+        agent_payloads=agent_payloads,
+        input_hash=input_hash,
+        output_hash=output_hash,
+    )
     return base_dir
 
 
@@ -474,34 +592,170 @@ def _persist_pipeline_audit_trail(
     *,
     settings: Settings,
     base_dir: Path,
+    agent_payloads: Mapping[str, Mapping[str, Any]],
+    input_hash: str,
+    output_hash: str,
 ) -> None:
-    request = AgentRequest()
     generated_at = _audit_generated_at(result)
     run_metadata = {
+        "schema_version": AUDIT_SCHEMA_VERSION,
         "run_id": result.run_id,
         "as_of_date": result.as_of_date.isoformat(),
         "generated_at": generated_at,
         "base_currency": settings.default_currency,
         "output_dir": str(base_dir),
         "pipeline_result_path": str(base_dir / "pipeline_result.json"),
+        "hash_algorithm": "sha256",
+        "input_hash": input_hash,
+        "output_hash": output_hash,
         "agents": {
-            "monitor_tematico": {"status": result.monitor_tematico.status},
-            "analista_activos": {"status": result.analista_activos.status},
-            "asistente_aportacion_mensual": {"status": result.asistente_aportacion_mensual.status},
+            agent_name: {
+                "status": payload["parsed_output"]["status"],
+                "input_hash": payload["audit_metadata"]["input_hash"],
+                "output_hash": payload["audit_metadata"]["output_hash"],
+                "providers": payload["provider"]["providers"],
+            }
+            for agent_name, payload in agent_payloads.items()
         },
-        "prompt_versions": _agent_prompt_versions(),
+        "prompt_versions": {
+            agent_name: {
+                str(prompt["key"]): str(prompt["version"])
+                for prompt in payload["prompt_refs"].get("prompts", [])
+            }
+            for agent_name, payload in agent_payloads.items()
+        },
     }
     _write_json(base_dir / "run_metadata.json", run_metadata)
     _write_json(
         base_dir / "input_payload.json",
         {
+            "schema_version": AUDIT_SCHEMA_VERSION,
             "run_id": result.run_id,
             "as_of_date": result.as_of_date.isoformat(),
+            "input_hash": input_hash,
             "inputs": [_serialize_input_ref_full(input_ref) for input_ref in result.input_refs],
         },
     )
 
-    agent_specs = (
+    for agent_name, payload in agent_payloads.items():
+        agent_dir = base_dir / "agents" / agent_name
+        agent_dir.mkdir(parents=True, exist_ok=True)
+        _write_json(agent_dir / "context.json", payload["context"])
+        _write_json(agent_dir / "request.json", payload["request"])
+        _write_json(agent_dir / "prompt_refs.json", payload["prompt_refs"])
+        _write_text(agent_dir / "prompt_rendered.md", str(payload["prompt_rendered"]))
+        _write_json(agent_dir / "provider.json", payload["provider"])
+        _write_json(agent_dir / "raw_response.json", payload["raw_response"])
+        _write_json(agent_dir / "parsed_output.json", payload["parsed_output"])
+        _write_json(agent_dir / "audit_metadata.json", payload["audit_metadata"])
+
+
+def _build_agent_audit_payloads(
+    result: MonthlyAgentPipelineResult,
+    *,
+    settings: Settings,
+) -> dict[str, dict[str, Any]]:
+    payloads: dict[str, dict[str, Any]] = {}
+    for agent_name, agent_result, input_refs, context_metadata in _agent_audit_specs(result):
+        context_snapshot = result.agent_contexts.get(agent_name)
+        context_payload = (
+            _json_ready(dict(context_snapshot))
+            if context_snapshot is not None
+            else {
+                "schema_version": AUDIT_SCHEMA_VERSION,
+                "agent_name": agent_name,
+                "run_id": result.run_id,
+                "as_of_date": result.as_of_date.isoformat(),
+                "generated_at": _audit_generated_at(result),
+                "base_currency": settings.default_currency,
+                "input_refs": [_serialize_input_ref_full(input_ref) for input_ref in input_refs],
+                "metadata": _json_ready(context_metadata),
+            }
+        )
+        context_payload = redact_sensitive_audit_payload(context_payload)
+        request = result.agent_requests.get(agent_name) or AgentRequest(
+            input_refs=tuple(input_ref.key for input_ref in input_refs)
+        )
+        # request.json intentionally stays a pure AgentRequest payload for round-trips.
+        request_payload = redact_sensitive_audit_payload(
+            _serialize_agent_request(request)
+        )
+        prompt_snapshot = result.prompt_audits.get(agent_name) or {}
+        prompt_refs = redact_sensitive_audit_payload(
+            dict(
+                prompt_snapshot.get("prompt_refs")
+                or {
+                    "schema_version": AUDIT_SCHEMA_VERSION,
+                    **_agent_prompt_refs(agent_name),
+                }
+            )
+        )
+        prompt_rendered = str(
+            prompt_snapshot.get("prompt_rendered") or _agent_prompt_markdown(agent_name)
+        )
+        provider_payload = redact_sensitive_audit_payload(
+            {
+                "schema_version": AUDIT_SCHEMA_VERSION,
+                "providers": _json_ready(
+                    dict(result.provider_configs.get(agent_name) or {})
+                ),
+            }
+        )
+        raw_response = redact_sensitive_audit_payload(
+            dict(
+                result.raw_responses.get(agent_name)
+                or {
+                    "schema_version": AUDIT_SCHEMA_VERSION,
+                    "status": "not_captured",
+                    "reason_code": "provider_contract_no_raw_response",
+                    "providers": {},
+                    "responses": [],
+                }
+            )
+        )
+        parsed_output = redact_sensitive_audit_payload(
+            {
+                "schema_version": AUDIT_SCHEMA_VERSION,
+                **_serialize_agent_result(agent_result),
+            }
+        )
+        audit_metadata = {
+            "schema_version": AUDIT_SCHEMA_VERSION,
+            "hash_algorithm": "sha256",
+            "hash_projection": "semantic-v1",
+            "input_hash": _stable_hash(
+                {
+                    "context": _context_payload_for_hash(context_payload),
+                    "request": _semantic_hash_payload(
+                        request_payload,
+                        excluded_keys=frozenset(
+                            {"run_id", "generated_at", "retrieved_at"}
+                        ),
+                    ),
+                    "prompt_refs": prompt_refs,
+                    "prompt_rendered": prompt_rendered,
+                    "provider": provider_payload,
+                }
+            ),
+            "output_hash": _stable_hash(_output_payload_for_hash(parsed_output)),
+        }
+        payloads[agent_name] = {
+            "context": context_payload,
+            "request": request_payload,
+            "prompt_refs": prompt_refs,
+            "prompt_rendered": prompt_rendered,
+            "provider": provider_payload,
+            "raw_response": raw_response,
+            "parsed_output": parsed_output,
+            "audit_metadata": audit_metadata,
+        }
+    return payloads
+
+
+def _agent_audit_specs(
+    result: MonthlyAgentPipelineResult,
+) -> tuple[tuple[str, AgentResult, tuple[AgentInputRef, ...], Mapping[str, Any]], ...]:
+    return (
         (
             "monitor_tematico",
             result.monitor_tematico,
@@ -511,7 +765,14 @@ def _persist_pipeline_audit_trail(
         (
             "analista_activos",
             result.analista_activos,
-            (*result.input_refs, _result_input_ref("monitor_tematico_result", "Monitor tematico result", result.monitor_tematico)),
+            (
+                *result.input_refs,
+                _result_input_ref(
+                    "monitor_tematico_result",
+                    "Monitor tematico result",
+                    result.monitor_tematico,
+                ),
+            ),
             {},
         ),
         (
@@ -519,53 +780,93 @@ def _persist_pipeline_audit_trail(
             result.asistente_aportacion_mensual,
             (
                 *result.input_refs,
-                _result_input_ref("monitor_tematico_result", "Monitor tematico result", result.monitor_tematico),
-                _result_input_ref("analista_activos_result", "Analista activos result", result.analista_activos),
+                _result_input_ref(
+                    "monitor_tematico_result",
+                    "Monitor tematico result",
+                    result.monitor_tematico,
+                ),
+                _result_input_ref(
+                    "analista_activos_result",
+                    "Analista activos result",
+                    result.analista_activos,
+                ),
             ),
             {},
         ),
     )
-    for agent_name, agent_result, input_refs, context_metadata in agent_specs:
-        agent_dir = base_dir / "agents" / agent_name
-        agent_dir.mkdir(parents=True, exist_ok=True)
-        context_payload = {
-            "agent_name": agent_name,
-            "run_id": result.run_id,
-            "as_of_date": result.as_of_date.isoformat(),
-            "generated_at": generated_at,
-            "base_currency": settings.default_currency,
-            "input_refs": [_serialize_input_ref_full(input_ref) for input_ref in input_refs],
-            "metadata": _json_ready(context_metadata),
-        }
-        _write_json(agent_dir / "context.json", context_payload)
-        _write_json(agent_dir / "request.json", _serialize_agent_request(request))
-        _write_json(agent_dir / "prompt_refs.json", _agent_prompt_refs(agent_name))
-        (agent_dir / "prompt_rendered.md").write_text(_agent_prompt_markdown(agent_name), encoding="utf-8")
-        _write_json(
-            agent_dir / "raw_response.json",
-            {
-                "status": "not_captured",
-                "reason": (
-                    "Current agent providers return parsed domain objects. Raw provider responses "
-                    "are not exposed by the provider contract yet."
-                ),
-            },
-        )
-        _write_json(agent_dir / "parsed_output.json", _serialize_agent_result(agent_result))
+
+
+def _serialize_agent_context(context: AgentContext) -> dict[str, Any]:
+    return {
+        "schema_version": AUDIT_SCHEMA_VERSION,
+        "agent_name": context.agent_name,
+        "run_id": context.run_id,
+        "as_of_date": context.as_of_date.isoformat(),
+        "generated_at": context.generated_at.isoformat(),
+        "base_currency": context.base_currency,
+        "input_refs": [_serialize_input_ref_full(input_ref) for input_ref in context.input_refs],
+        "metadata": _json_ready(dict(context.metadata)),
+    }
+
+
+def _context_payload_for_hash(context_payload: Mapping[str, Any]) -> dict[str, Any]:
+    return _semantic_hash_payload(
+        context_payload,
+        excluded_keys=frozenset({"run_id", "generated_at", "retrieved_at"}),
+    )
+
+
+def _output_payload_for_hash(output_payload: Mapping[str, Any]) -> dict[str, Any]:
+    return _semantic_hash_payload(
+        output_payload,
+        excluded_keys=frozenset({"run_id", "generated_at", "retrieved_at"}),
+    )
+
+
+def _semantic_hash_payload(
+    value: Any,
+    *,
+    excluded_keys: frozenset[str],
+) -> Any:
+    """Remove runtime-only data while preserving semantic content for hashing."""
+    ready = _json_ready(value)
+    if isinstance(ready, Mapping):
+        projected: dict[str, Any] = {}
+        for key, item in ready.items():
+            key_str = str(key)
+            if key_str in excluded_keys:
+                continue
+            if key_str in {"location", "path"} and _looks_like_local_path(item):
+                projected[key_str] = "<local-path>"
+            else:
+                projected[key_str] = _semantic_hash_payload(
+                    item,
+                    excluded_keys=excluded_keys,
+                )
+        return projected
+    if isinstance(ready, list):
+        return [
+            _semantic_hash_payload(item, excluded_keys=excluded_keys)
+            for item in ready
+        ]
+    return ready
+
+
+def _looks_like_local_path(value: Any) -> bool:
+    if not isinstance(value, str) or "://" in value:
+        return False
+    return bool(re.match(r"^[A-Za-z]:[\\/]", value)) or Path(value).is_absolute()
 
 
 def _audit_generated_at(result: MonthlyAgentPipelineResult) -> str | None:
+    for context in result.agent_contexts.values():
+        generated_at = context.get("generated_at")
+        if generated_at:
+            return str(generated_at)
     for input_ref in result.input_refs:
         if input_ref.generated_at is not None:
             return input_ref.generated_at.isoformat()
     return None
-
-
-def _agent_prompt_versions() -> dict[str, dict[str, str]]:
-    return {
-        agent_name: {key: prompt_version(key) for key in prompt_keys}
-        for agent_name, prompt_keys in _agent_prompt_keys().items()
-    }
 
 
 def _agent_prompt_refs(agent_name: str) -> dict[str, Any]:
@@ -621,7 +922,39 @@ def _serialize_agent_request(request: AgentRequest) -> dict[str, Any]:
 
 
 def _write_json(path: Path, payload: Mapping[str, Any]) -> None:
-    path.write_text(json.dumps(_json_ready(dict(payload)), ensure_ascii=False, indent=2), encoding="utf-8")
+    safe_payload = redact_sensitive_audit_payload(
+        _json_ready(dict(payload))
+    )
+    _write_text(
+        path,
+        json.dumps(
+            safe_payload,
+            ensure_ascii=False,
+            indent=2,
+            allow_nan=False,
+        ),
+    )
+
+
+def _write_text(path: Path, content: str) -> None:
+    temp_path = path.with_name(f".{path.name}.tmp")
+    temp_path.write_text(content, encoding="utf-8")
+    temp_path.replace(path)
+
+
+def _stable_hash(payload: Any) -> str:
+    canonical = _canonical_json_text(payload)
+    return f"sha256:{hashlib.sha256(canonical.encode('utf-8')).hexdigest()}"
+
+
+def _canonical_json_text(payload: Any) -> str:
+    return json.dumps(
+        redact_sensitive_audit_payload(_json_ready(payload)),
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+        allow_nan=False,
+    )
 
 
 def _serialize_pipeline_result(result: MonthlyAgentPipelineResult) -> dict[str, Any]:
@@ -662,13 +995,17 @@ def _serialize_agent_result(result: AgentResult) -> dict[str, Any]:
 
 
 def _serialize_agent_result_for_input_ref(result: AgentResult) -> dict[str, Any]:
-    return {
-        "status": result.status,
-        "summary": result.summary,
-        "warnings": list(result.warnings),
-        "errors": list(result.errors),
-        "findings": [_serialize_finding(finding) for finding in result.findings],
-    }
+    # Downstream agents receive semantic output, not retrieval timestamps or local paths.
+    return _semantic_hash_payload(
+        {
+            "status": result.status,
+            "summary": result.summary,
+            "warnings": list(result.warnings),
+            "errors": list(result.errors),
+            "findings": [_serialize_finding(finding) for finding in result.findings],
+        },
+        excluded_keys=frozenset({"run_id", "generated_at", "retrieved_at"}),
+    )
 
 
 def _serialize_finding(finding) -> dict[str, Any]:
@@ -753,7 +1090,7 @@ def _apply_asset_overrides_to_metrics_snapshot(
                 position["asset_type"] = override_type
         positions.append(position)
     updated["positions"] = _json_ready(positions)
-    updated["content"] = json.dumps(updated, ensure_ascii=False)
+    updated["content"] = _canonical_json_text(updated)
     return updated
 
 
@@ -822,10 +1159,22 @@ def _json_ready(value: Any) -> Any:
         return {str(key): _json_ready(item) for key, item in value.items()}
     if isinstance(value, (tuple, list)):
         return [_json_ready(item) for item in value]
+    if isinstance(value, (set, frozenset)):
+        return [_json_ready(item) for item in sorted(value, key=str)]
     if isinstance(value, (datetime, date)):
         return value.isoformat()
     if isinstance(value, pd.Timestamp):
         return value.isoformat()
-    if pd.isna(value):
+    if isinstance(value, Path):
+        return str(value)
+    if isinstance(value, float) and not isfinite(value):
         return None
+    try:
+        if value is None or bool(pd.isna(value)):
+            return None
+    except (TypeError, ValueError):
+        pass
+    item = getattr(value, "item", None)
+    if callable(item):
+        return _json_ready(item())
     return value

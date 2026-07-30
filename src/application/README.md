@@ -61,6 +61,18 @@ auditoria persistida en disco. Streamlit los usa para visualizar plan interno,
 acciones, fuentes, prompts, warnings, inputs y outputs sin acoplar la UI a la
 estructura fisica de carpetas.
 
+El read model de auditoria expone tambien la metadata reproducible del schema
+v2: request y contexto efectivos, provider/modelo/opciones no secretas,
+respuesta raw con estado y `reason_code`, y hashes SHA-256 de entrada/salida.
+La lectura es compatible con runs legacy v1: los archivos o campos que todavia
+no existian se devuelven como no disponibles y nunca se escriben durante una
+consulta.
+
+La capa de aplicacion no debe exponer credenciales al adaptar esta metadata para
+Streamlit o una futura API. La configuracion de provider procede de una lista
+permitida y los artefactos completos siguen siendo privados aunque contengan
+solo hashes o providers offline.
+
 `RunMonitorTematicoUseCase` ofrece el mismo limite para ejecuciones aisladas del
 monitor. Sus defaults `static/null` no usan red.
 

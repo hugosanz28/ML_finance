@@ -403,6 +403,81 @@ def test_agent_audit_use_cases_read_persisted_run() -> None:
         assert audit.input_payload["inputs"][0]["key"] == "investment_brief"
         assert audit.agents["monitor_tematico"]["parsed_output"]["metadata"]["agent_plan"] == ["step"]
         assert audit.agents["monitor_tematico"]["prompt_rendered"] == "# prompt\n"
+        assert audit.agents["monitor_tematico"]["provider"] == {}
+        assert audit.agents["monitor_tematico"]["audit_metadata"] == {}
+        assert audit.schema_version == 1
+        assert audit.is_legacy is True
+        assert audit.compatibility_warnings
+    finally:
+        shutil.rmtree(workspace, ignore_errors=True)
+
+
+def test_agent_audit_reader_redacts_credentials_defensively() -> None:
+    workspace = make_test_workspace()
+    try:
+        settings = load_settings(repo_root=workspace, env={}, env_file=workspace / ".env.missing")
+        run_dir = settings.data_dir / "agents" / "monthly_pipeline" / "run-secure"
+        agent_dir = run_dir / "agents" / "monitor_tematico"
+        _write_json(
+            run_dir / "run_metadata.json",
+            {
+                "run_id": "run-secure",
+                "schema_version": 2,
+                "token": "sentinel-run-token",  # pragma: allowlist secret
+            },
+        )
+        _write_json(
+            run_dir / "input_payload.json",
+            {
+                "metadata": {
+                    "apiKey": "sentinel-input-key",  # pragma: allowlist secret
+                }
+            },
+        )
+        _write_json(
+            agent_dir / "request.json",
+            {
+                "metadata": {
+                    "bearer_token": "sentinel-request-token",  # pragma: allowlist secret
+                }
+            },
+        )
+        _write_json(
+            agent_dir / "provider.json",
+            {"provider": "legacy", "api_key": "sentinel-provider-secret"},  # pragma: allowlist secret
+        )
+        _write_json(
+            agent_dir / "raw_response.json",
+            {
+                "status": "captured",
+                "responses": [
+                    {
+                        "Authorization": "Bearer sentinel-authorization",  # pragma: allowlist secret
+                        "output_text": "safe output",
+                    }
+                ],
+            },
+        )
+
+        audit = GetAgentRunAuditUseCase(settings=settings).execute(
+            GetAgentRunAuditRequest(run_id="run-secure")
+        )
+
+        serialized = json.dumps(
+            {
+                "run_metadata": audit.run_metadata,
+                "input_payload": audit.input_payload,
+                "agent": audit.agents["monitor_tematico"],
+            }
+        )
+        assert "sentinel-provider-secret" not in serialized
+        assert "sentinel-authorization" not in serialized
+        assert "sentinel-run-token" not in serialized
+        assert "sentinel-input-key" not in serialized
+        assert "sentinel-request-token" not in serialized
+        assert serialized.count("[REDACTED]") == 5
+        assert audit.schema_version == 2
+        assert audit.is_legacy is False
     finally:
         shutil.rmtree(workspace, ignore_errors=True)
 
@@ -470,6 +545,10 @@ def test_run_monthly_agents_use_case_wraps_pipeline(monkeypatch) -> None:
                 search_provider="null",
                 persist=False,
                 monthly_budget=1500.0,
+                request_scope={"universe": "portfolio"},
+                request_parameters={"max_findings": 4},
+                request_constraints={"network": "offline"},
+                request_metadata={"origin": "test"},
             )
         )
     finally:
@@ -481,6 +560,10 @@ def test_run_monthly_agents_use_case_wraps_pipeline(monkeypatch) -> None:
     assert captured["metrics"] is metrics
     assert captured["persist"] is False
     assert captured["monthly_budget"] == 1500.0
+    assert captured["request_scope"] == {"universe": "portfolio"}
+    assert captured["request_parameters"] == {"max_findings": 4}
+    assert captured["request_constraints"] == {"network": "offline"}
+    assert captured["request_metadata"] == {"origin": "test"}
     assert result.result.status == "partial"
     assert result.quality_result.can_run_agents is True
     assert result.result.artifacts["run_id"] == "run-001"

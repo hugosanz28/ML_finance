@@ -10,6 +10,10 @@ from typing import Any, Protocol
 
 from dotenv import dotenv_values
 
+from src.agents.provider_audit import (
+    record_provider_failure,
+    record_provider_raw_response,
+)
 from src.agents.prompts import load_prompt
 from src.agents.analista_activos._types import (
     AssetAnalysis,
@@ -210,8 +214,10 @@ class OpenAIAssetLLMProvider:
                 },
             )
         except Exception as exc:
+            record_provider_failure(self, operation=schema_name)
             raise AssetLLMProviderError(f"OpenAI request failed: {exc}") from exc
 
+        record_provider_raw_response(self, response, operation=schema_name)
         text = getattr(response, "output_text", None)
         if not text:
             raise AssetLLMProviderError("OpenAI response did not include output_text.")

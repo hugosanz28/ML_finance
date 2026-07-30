@@ -21,6 +21,8 @@ proyecto usa [versionado semántico](https://semver.org/lang/es/).
 - Providers `synthetic` de precios y FX que mantienen la demo completamente
   offline, además de búsqueda `static` determinista para agentes.
 - Auditoría `preflight.json` para runs permitidos e intentos bloqueados.
+- Auditoría reproducible de agentes con requests y contextos efectivos,
+  providers allowlisted, respuestas raw trazables y hashes semánticos.
 
 ### Cambiado
 
@@ -55,6 +57,8 @@ proyecto usa [versionado semántico](https://semver.org/lang/es/).
 
 - Actualizada la dependencia de datos de mercado `yfinance` a `1.5.2`.
 - Añadidos escaneos de archivos versionados y dependencias a la CI.
+- La auditoría de providers excluye credenciales y redacta claves sensibles
+  antes de persistir o mostrar respuestas raw.
 
 ## [0.1.0] - 2026-06-23
 

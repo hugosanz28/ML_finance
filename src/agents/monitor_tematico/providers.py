@@ -25,6 +25,7 @@ from urllib.request import Request, urlopen
 from dotenv import dotenv_values
 
 from src.agents.monitor_tematico._types import SearchResult
+from src.agents.provider_audit import record_provider_failure
 
 
 class SearchProvider(Protocol):
@@ -162,6 +163,7 @@ class DuckDuckGoHtmlSearchProvider:
             with urlopen(request, timeout=self.timeout_seconds) as response:
                 raw_html = response.read().decode("utf-8", errors="replace")
         except OSError as exc:
+            record_provider_failure(self, operation="search")
             raise SearchProviderError(f"{self.name} failed for query {query!r}: {exc}") from exc
 
         parser = _DuckDuckGoHtmlParser(query=query)
@@ -203,6 +205,11 @@ class TavilySearchProvider:
         max_results: int,
     ) -> tuple[SearchResult, ...]:
         if not self.api_key:
+            record_provider_failure(
+                self,
+                operation="search",
+                reason_code="provider_configuration_missing",
+            )
             raise SearchProviderError("TAVILY_API_KEY is required when using the tavily search provider.")
 
         payload = {
@@ -226,15 +233,26 @@ class TavilySearchProvider:
             with urlopen(request, timeout=self.timeout_seconds) as response:
                 raw_payload = response.read().decode("utf-8", errors="replace")
         except OSError as exc:
+            record_provider_failure(self, operation="search")
             raise SearchProviderError(f"{self.name} failed for query {query!r}: {exc}") from exc
 
         try:
             data = json.loads(raw_payload)
         except json.JSONDecodeError as exc:
+            record_provider_failure(
+                self,
+                operation="search",
+                reason_code="provider_response_invalid",
+            )
             raise SearchProviderError(f"{self.name} returned invalid JSON for query {query!r}.") from exc
 
         raw_results = data.get("results", [])
         if not isinstance(raw_results, list):
+            record_provider_failure(
+                self,
+                operation="search",
+                reason_code="provider_response_invalid",
+            )
             raise SearchProviderError(f"{self.name} response did not include a valid results list.")
 
         results: list[SearchResult] = []

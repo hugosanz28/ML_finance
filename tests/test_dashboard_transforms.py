@@ -3,6 +3,7 @@ from datetime import date
 import pandas as pd
 
 from src.portfolio import PortfolioMetricsResult
+from src.portfolio.dashboard_agents import _raw_response_summary
 from src.portfolio.dashboard_transforms import _build_asset_evolution_frame
 
 
@@ -60,3 +61,24 @@ def test_asset_evolution_starts_on_first_buy_date() -> None:
 
     assert frame["valuation_date"].tolist() == [date(2026, 1, 2), date(2026, 1, 3)]
     assert frame["Asset A"].tolist() == [0.0, 9.09090909]
+
+
+def test_agent_raw_summary_hides_nested_response_bodies() -> None:
+    raw_response = {
+        "status": "captured",
+        "providers": {
+            "llm": {
+                "status": "captured",
+                "provider": {"provider": "openai", "model": "test-model"},
+                "responses": [{"response": {"output_text": "private body"}}],
+            }
+        },
+        "responses": [{"role": "llm", "response": {"output_text": "private body"}}],
+    }
+
+    summary = _raw_response_summary(raw_response)
+
+    assert "responses" not in summary
+    assert "responses" not in summary["providers"]["llm"]
+    assert summary["providers"]["llm"]["provider"]["model"] == "test-model"
+    assert "private body" not in str(summary)

@@ -59,6 +59,28 @@ necesariamente la fecha del snapshot.
   `input_payload.json` y `agents/<agent_name>/...`
 - Overrides temporales de informes para agentes: `src/data/local/agents/input_overrides/latest_monthly_report_override_YYYY-MM-DD.md`
 
+### Auditoria reproducible
+
+El schema v2 persiste la peticion y el contexto efectivos de cada agente. El
+`request.json` conserva `scope`, `parameters`, `constraints`, `metadata` e
+`input_refs`; estas referencias se resuelven contra el contexto real, por lo que
+analista y asistente incluyen tambien resultados de agentes anteriores.
+
+Cada directorio de agente añade `provider.json` y `audit_metadata.json`.
+`provider.json` contiene solo provider, modelo y opciones allowlisted; no
+incluye credenciales, cabeceras, variables de entorno ni clientes SDK.
+`raw_response.json` usa `captured`, `partial` o `not_captured` y un
+`reason_code` estable cuando la captura no es completa.
+
+Los hashes SHA-256 se calculan sobre JSON canonico y contenido semantico. Los
+hashes de entrada excluyen ids de run y timestamps volatiles; los de salida
+representan la salida parseada. Sirven para detectar cambios reproducibles, no
+para anonimizar datos ni validar una recomendacion.
+
+Los runs sin `schema_version` o sin los artefactos nuevos son legacy v1.
+`GetAgentRunAuditUseCase` y Streamlit los leen sin reescribirlos y muestran como
+no disponible la metadata que no existia entonces.
+
 ## Notas operativas
 
 - `import_degiro.py` carga por defecto los parquets normalizados a DuckDB.
