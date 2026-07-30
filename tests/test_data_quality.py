@@ -57,6 +57,24 @@ def test_agent_quality_blocks_inconsistent_report_and_snapshot_dates() -> None:
     assert "monthly_report_snapshot_date_mismatch" in {issue.code for issue in report.issues}
 
 
+def test_agent_quality_returns_structured_error_for_invalid_snapshot_date() -> None:
+    metrics = _metrics_result(
+        valuation_coverage_ratio=1.0,
+        return_coverage_ratio=1.0,
+        missing_price_positions_count=0,
+        missing_fx_positions_count=0,
+    )
+
+    report = check_agent_input_quality(
+        metrics=metrics,
+        monthly_report_date=date(2026, 5, 26),
+        portfolio_metrics_snapshot={"as_of_date": "not-a-date"},
+    )
+
+    assert report.can_run_agents is False
+    assert "snapshot_date_missing" in {issue.code for issue in report.issues}
+
+
 def test_run_agent_quality_checks_use_case_returns_application_result() -> None:
     metrics = _metrics_result(
         valuation_coverage_ratio=1.0,
@@ -73,9 +91,34 @@ def test_run_agent_quality_checks_use_case_returns_application_result() -> None:
     )
 
     assert result.can_run_agents is True
-    assert result.result.status == "succeeded"
+    assert result.result.status == "partial"
     assert result.report.warning_count == 1
     assert result.result.warnings
+    assert result.to_dict()["status"] == "passed_with_warnings"
+
+
+def test_run_agent_quality_checks_use_case_returns_failed_for_blocking_issue() -> None:
+    metrics = _metrics_result(
+        valuation_coverage_ratio=0.0,
+        return_coverage_ratio=1.0,
+        missing_price_positions_count=1,
+        missing_fx_positions_count=0,
+    )
+
+    result = RunAgentQualityChecksUseCase().execute(
+        RunAgentQualityChecksRequest(
+            metrics=metrics,
+            monthly_report_date=date(2026, 5, 26),
+            portfolio_metrics_snapshot={"as_of_date": "2026-05-26"},
+        )
+    )
+
+    payload = result.to_dict()
+    assert result.can_run_agents is False
+    assert result.result.status == "failed"
+    assert payload["status"] == "blocked"
+    assert payload["counts"]["error"] >= 1
+    assert "missing_prices" in {issue["code"] for issue in payload["issues"]}
 
 
 def _metrics_result(

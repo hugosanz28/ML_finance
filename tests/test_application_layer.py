@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 import csv
+from dataclasses import replace
 from datetime import date
 import json
 from pathlib import Path
 import shutil
+from types import SimpleNamespace
 from uuid import uuid4
 
 import duckdb
@@ -46,6 +48,7 @@ from src.application import (
 )
 from src.application.serialization import json_ready_value
 from src.agents import AgentResult, MonthlyAgentPipelineResult
+from src.agents.pipeline import _persist_pipeline_result
 from src.config import default_repo_root, load_settings
 from src.degiro_exports.cash_movements import EXPECTED_ACCOUNT_HEADERS
 from src.degiro_exports.portfolio_snapshots import EXPECTED_PORTFOLIO_HEADERS
@@ -396,6 +399,7 @@ def test_agent_audit_use_cases_read_persisted_run() -> None:
         assert len(runs) == 1
         assert runs[0].run_id == "run-001"
         assert runs[0].status == "partial"
+        assert audit.preflight == {}
         assert audit.input_payload["inputs"][0]["key"] == "investment_brief"
         assert audit.agents["monitor_tematico"]["parsed_output"]["metadata"]["agent_plan"] == ["step"]
         assert audit.agents["monitor_tematico"]["prompt_rendered"] == "# prompt\n"
@@ -451,11 +455,16 @@ def test_run_monthly_agents_use_case_wraps_pipeline(monkeypatch) -> None:
     monkeypatch.setattr("src.application.agents.run_monthly_agent_pipeline", fake_pipeline)
     workspace = make_test_workspace()
     settings = load_settings(repo_root=workspace, env={})
+    report_path = workspace / "monthly_report_2026-05-26.md"
+    report_path.write_text("as_of_date: 2026-05-26\n", encoding="utf-8")
+    metrics = _agent_quality_metrics()
 
     try:
         result = RunMonthlyAgentsUseCase(settings=settings).execute(
             RunMonthlyAgentsRequest(
                 investment_brief_text="brief",
+                monthly_report_path=report_path,
+                metrics=metrics,
                 user_satellite_interest="semiconductors",
                 llm_provider="static",
                 search_provider="null",
@@ -469,11 +478,278 @@ def test_run_monthly_agents_use_case_wraps_pipeline(monkeypatch) -> None:
     assert captured["settings"] == settings
     assert captured["investment_brief_text"] == "brief"
     assert captured["user_satellite_interest"] == "semiconductors"
+    assert captured["metrics"] is metrics
     assert captured["persist"] is False
     assert captured["monthly_budget"] == 1500.0
     assert result.result.status == "partial"
+    assert result.quality_result.can_run_agents is True
     assert result.result.artifacts["run_id"] == "run-001"
     assert result.result.warnings == ("analista_activos: missing context",)
+
+
+def test_run_monthly_agents_blocks_before_pipeline_and_persists_attempt(monkeypatch) -> None:
+    pipeline_called = False
+
+    def fail_if_called(**_kwargs):
+        nonlocal pipeline_called
+        pipeline_called = True
+        raise AssertionError("Providers must not be reached after a blocking preflight.")
+
+    monkeypatch.setattr("src.application.agents.run_monthly_agent_pipeline", fail_if_called)
+    workspace = make_test_workspace()
+    settings = load_settings(repo_root=workspace, env={})
+    report_path = workspace / "monthly_report_2026-05-26.md"
+    report_path.write_text("as_of_date: 2026-05-26\n", encoding="utf-8")
+    output_dir = workspace / "blocked-audit"
+
+    try:
+        result = RunMonthlyAgentsUseCase(settings=settings).execute(
+            RunMonthlyAgentsRequest(
+                investment_brief_text="brief",
+                monthly_report_path=report_path,
+                metrics=_agent_quality_metrics(missing_price_positions_count=1),
+                portfolio_metrics_snapshot={"as_of_date": "2026-05-26"},
+                persist=True,
+                output_dir=output_dir,
+            )
+        )
+
+        assert pipeline_called is False
+        assert result.pipeline_result is None
+        assert result.result.status == "failed"
+        assert result.result.artifacts["execution_status"] == "blocked"
+        assert (output_dir / "preflight.json").exists()
+        assert (output_dir / "run_metadata.json").exists()
+        assert (output_dir / "input_payload.json").exists()
+        assert not (output_dir / "pipeline_result.json").exists()
+        assert not (output_dir / "agents").exists()
+        metadata = json.loads((output_dir / "run_metadata.json").read_text(encoding="utf-8"))
+        assert metadata["execution_status"] == "blocked"
+        assert {item["status"] for item in metadata["agents"].values()} == {"not_run"}
+    finally:
+        shutil.rmtree(workspace, ignore_errors=True)
+
+
+def test_run_monthly_agents_continues_with_quality_warnings(monkeypatch) -> None:
+    def fake_pipeline(**kwargs):
+        return MonthlyAgentPipelineResult(
+            run_id="run-warning",
+            as_of_date=kwargs["metrics"].end_date,
+            input_refs=(),
+            monitor_tematico=AgentResult(status="success", summary="monitor ok"),
+            analista_activos=AgentResult(status="success", summary="analyst ok"),
+            asistente_aportacion_mensual=AgentResult(status="success", summary="assistant ok"),
+        )
+
+    monkeypatch.setattr("src.application.agents.run_monthly_agent_pipeline", fake_pipeline)
+    workspace = make_test_workspace()
+    settings = load_settings(repo_root=workspace, env={})
+    report_path = workspace / "monthly_report_2026-05-26.md"
+    report_path.write_text("as_of_date: 2026-05-26\n", encoding="utf-8")
+
+    try:
+        result = RunMonthlyAgentsUseCase(settings=settings).execute(
+            RunMonthlyAgentsRequest(
+                investment_brief_text="brief",
+                monthly_report_path=report_path,
+                metrics=_agent_quality_metrics(return_coverage_ratio=0.5),
+                portfolio_metrics_snapshot={"as_of_date": "2026-05-26"},
+                persist=False,
+            )
+        )
+    finally:
+        shutil.rmtree(workspace, ignore_errors=True)
+
+    assert result.pipeline_result is not None
+    assert result.quality_result.result.status == "partial"
+    assert result.result.status == "partial"
+    assert result.result.warnings[0].startswith("quality_preflight:")
+
+
+def test_run_monthly_agents_persists_warning_preflight_on_allowed_run(monkeypatch) -> None:
+    workspace = make_test_workspace()
+    settings = load_settings(repo_root=workspace, env={})
+
+    def fake_pipeline(**kwargs):
+        pipeline_result = MonthlyAgentPipelineResult(
+            run_id="run-warning-persisted",
+            as_of_date=kwargs["metrics"].end_date,
+            input_refs=(),
+            monitor_tematico=AgentResult(status="success", summary="monitor ok"),
+            analista_activos=AgentResult(status="success", summary="analyst ok"),
+            asistente_aportacion_mensual=AgentResult(status="success", summary="assistant ok"),
+        )
+        output_dir = _persist_pipeline_result(
+            pipeline_result,
+            settings=kwargs["settings"],
+            output_dir=None,
+        )
+        return replace(pipeline_result, output_dir=output_dir)
+
+    monkeypatch.setattr("src.application.agents.run_monthly_agent_pipeline", fake_pipeline)
+    report_path = workspace / "monthly_report_2026-05-26.md"
+    report_path.write_text("as_of_date: 2026-05-26\n", encoding="utf-8")
+
+    try:
+        result = RunMonthlyAgentsUseCase(settings=settings).execute(
+            RunMonthlyAgentsRequest(
+                investment_brief_text="brief",
+                monthly_report_path=report_path,
+                metrics=_agent_quality_metrics(return_coverage_ratio=0.5),
+                portfolio_metrics_snapshot={"as_of_date": "2026-05-26"},
+                persist=True,
+            )
+        )
+        output_dir = result.pipeline_result.output_dir if result.pipeline_result else None
+        assert output_dir is not None
+        metadata = json.loads((output_dir / "run_metadata.json").read_text(encoding="utf-8"))
+        preflight = json.loads((output_dir / "preflight.json").read_text(encoding="utf-8"))
+        audit = GetAgentRunAuditUseCase(settings=settings).execute(
+            GetAgentRunAuditRequest(run_id="run-warning-persisted")
+        )
+
+        assert result.result.status == "partial"
+        assert preflight["status"] == "passed_with_warnings"
+        assert metadata["execution_status"] == "partial"
+        assert (output_dir / "pipeline_result.json").exists()
+        assert audit.preflight["counts"]["warning"] == 1
+        assert audit.agents["monitor_tematico"]["parsed_output"]["status"] == "success"
+    finally:
+        shutil.rmtree(workspace, ignore_errors=True)
+
+
+def test_run_monthly_agents_blocks_misaligned_dates_before_pipeline(monkeypatch) -> None:
+    def fail_if_called(**_kwargs):
+        raise AssertionError("The pipeline must not run with misaligned input dates.")
+
+    monkeypatch.setattr("src.application.agents.run_monthly_agent_pipeline", fail_if_called)
+    workspace = make_test_workspace()
+    settings = load_settings(repo_root=workspace, env={})
+    report_path = workspace / "monthly_report_2026-05-25.md"
+    report_path.write_text("as_of_date: 2026-05-25\n", encoding="utf-8")
+
+    try:
+        result = RunMonthlyAgentsUseCase(settings=settings).execute(
+            RunMonthlyAgentsRequest(
+                investment_brief_text="brief",
+                monthly_report_path=report_path,
+                metrics=_agent_quality_metrics(),
+                portfolio_metrics_snapshot={"as_of_date": "2026-05-26"},
+                persist=False,
+            )
+        )
+    finally:
+        shutil.rmtree(workspace, ignore_errors=True)
+
+    issue_codes = {issue.code for issue in result.quality_result.report.issues}
+    assert result.pipeline_result is None
+    assert result.result.status == "failed"
+    assert "monthly_report_date_mismatch" in issue_codes
+    assert "monthly_report_snapshot_date_mismatch" in issue_codes
+
+
+def test_run_monthly_agents_blocks_selected_report_without_date(monkeypatch) -> None:
+    def fail_if_called(**_kwargs):
+        raise AssertionError("The pipeline must not run with an undated selected report.")
+
+    monkeypatch.setattr("src.application.agents.run_monthly_agent_pipeline", fail_if_called)
+    workspace = make_test_workspace()
+    settings = load_settings(repo_root=workspace, env={})
+    report_path = workspace / "monthly_report_without_date.md"
+    report_path.write_text("# Monthly report without metadata\n", encoding="utf-8")
+
+    try:
+        result = RunMonthlyAgentsUseCase(settings=settings).execute(
+            RunMonthlyAgentsRequest(
+                investment_brief_text="brief",
+                monthly_report_path=report_path,
+                metrics=_agent_quality_metrics(),
+                portfolio_metrics_snapshot={"as_of_date": "2026-05-26"},
+                persist=False,
+            )
+        )
+    finally:
+        shutil.rmtree(workspace, ignore_errors=True)
+
+    assert result.pipeline_result is None
+    assert "monthly_report_date_missing" in {
+        issue.code for issue in result.quality_result.report.issues
+    }
+
+
+def test_run_monthly_agents_uses_latest_report_content_date_for_preflight(monkeypatch) -> None:
+    def fail_if_called(**_kwargs):
+        raise AssertionError("Stale report metadata must not bypass the content date.")
+
+    monkeypatch.setattr("src.application.agents.run_monthly_agent_pipeline", fail_if_called)
+    workspace = make_test_workspace()
+    settings = load_settings(repo_root=workspace, env={})
+    report_path = workspace / "latest_monthly_report.md"
+    report_path.write_text("as_of_date: 2026-05-25\n", encoding="utf-8")
+    monkeypatch.setattr(
+        "src.application.agents.get_latest_monthly_report",
+        lambda **_kwargs: SimpleNamespace(
+            report_path=report_path,
+            as_of_date=date(2026, 5, 26),
+        ),
+    )
+
+    try:
+        result = RunMonthlyAgentsUseCase(settings=settings).execute(
+            RunMonthlyAgentsRequest(
+                investment_brief_text="brief",
+                metrics=_agent_quality_metrics(),
+                portfolio_metrics_snapshot={"as_of_date": "2026-05-26"},
+                persist=False,
+            )
+        )
+    finally:
+        shutil.rmtree(workspace, ignore_errors=True)
+
+    assert result.pipeline_result is None
+    assert "monthly_report_date_mismatch" in {
+        issue.code for issue in result.quality_result.report.issues
+    }
+
+
+def _agent_quality_metrics(
+    *,
+    return_coverage_ratio: float = 1.0,
+    missing_price_positions_count: int = 0,
+) -> PortfolioMetricsResult:
+    total_positions_count = 1
+    valued_positions_count = total_positions_count - missing_price_positions_count
+    daily = pd.DataFrame(
+        [
+            {
+                "valuation_date": date(2026, 5, 26),
+                "total_positions_count": total_positions_count,
+                "valued_positions_count": valued_positions_count,
+                "missing_price_positions_count": missing_price_positions_count,
+                "missing_fx_positions_count": 0,
+                "valuation_coverage_ratio": float(valued_positions_count),
+                "return_coverage_ratio": return_coverage_ratio,
+                "total_market_value_base": 1000.0,
+            }
+        ]
+    )
+    positions = pd.DataFrame(
+        [
+            {
+                "valuation_date": date(2026, 5, 26),
+                "asset_id": "asset-1",
+                "asset_name": "Asset 1",
+                "market_value_base": 1000.0,
+            }
+        ]
+    )
+    return PortfolioMetricsResult(
+        start_date=date(2026, 5, 26),
+        end_date=date(2026, 5, 26),
+        base_currency="EUR",
+        position_metrics=positions,
+        portfolio_daily_metrics=daily,
+    )
 
 
 def _read_warehouse_snapshot(db_path: Path) -> dict[str, object]:

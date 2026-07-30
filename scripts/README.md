@@ -57,6 +57,11 @@ Ejemplo de pipeline mensual local:
 .\.venv\Scripts\python.exe scripts\run_monthly_agents.py --llm-provider static --search-provider null
 ```
 
+Cuando los inputs pueden prepararse, el runner imprime el preflight de calidad.
+Devuelve codigo `1` y no llama a providers si detecta errores bloqueantes; los
+warnings permiten continuar y mantienen codigo `0`. `--no-persist` desactiva
+tanto el resultado del pipeline como su audit trail.
+
 `static/null` es el baseline offline: el monitor no recibe resultados de
 busqueda. Para una demo offline mas completa usa `static/static`; la busqueda
 devuelve exclusivamente fixtures sinteticos:

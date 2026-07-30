@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 import json
 from pathlib import Path
 from typing import Any
@@ -40,6 +40,7 @@ class GetAgentRunAuditResult:
     run_metadata: dict[str, Any]
     input_payload: dict[str, Any]
     agents: dict[str, dict[str, Any]]
+    preflight: dict[str, Any] = field(default_factory=dict)
 
 
 class ListAgentRunsUseCase:
@@ -81,6 +82,7 @@ class GetAgentRunAuditUseCase:
 
         run_metadata = _read_json_or_empty(output_dir / "run_metadata.json")
         input_payload = _read_json_or_empty(output_dir / "input_payload.json")
+        preflight = _read_json_or_empty(output_dir / "preflight.json")
         agents = {
             agent_name: _read_agent_audit(output_dir / "agents" / agent_name)
             for agent_name in AGENT_NAMES
@@ -90,8 +92,77 @@ class GetAgentRunAuditUseCase:
             output_dir=output_dir,
             run_metadata=run_metadata,
             input_payload=input_payload,
+            preflight=preflight,
             agents=agents,
         )
+
+
+def persist_agent_preflight_audit(
+    *,
+    settings: Settings,
+    run_id: str,
+    as_of_date: str | None,
+    generated_at: str,
+    execution_status: str,
+    preflight: dict[str, Any],
+    output_dir: Path | None = None,
+    attach_to_existing_run: bool = False,
+) -> tuple[Path, Path]:
+    """Attach a quality preflight to a run or persist a blocked attempt."""
+    requested_dir = (
+        output_dir.expanduser().resolve()
+        if output_dir is not None
+        else settings.data_dir / "agents" / "monthly_pipeline" / run_id
+    )
+    if (
+        output_dir is not None
+        and not attach_to_existing_run
+        and requested_dir.exists()
+        and any(requested_dir.iterdir())
+    ):
+        # Preserve an existing audit directory instead of mixing two attempts.
+        base_dir = requested_dir / run_id
+    else:
+        base_dir = requested_dir
+    base_dir.mkdir(parents=True, exist_ok=True)
+    preflight_path = base_dir / "preflight.json"
+    _write_json(preflight_path, preflight)
+
+    metadata_path = base_dir / "run_metadata.json"
+    metadata = _read_json_or_empty(metadata_path)
+    if not metadata:
+        metadata = {
+            "run_id": run_id,
+            "as_of_date": as_of_date,
+            "generated_at": generated_at,
+            "base_currency": settings.default_currency,
+            "output_dir": str(base_dir),
+            "pipeline_result_path": None,
+            "agents": {name: {"status": "not_run"} for name in AGENT_NAMES},
+            "prompt_versions": {},
+        }
+    metadata["execution_status"] = execution_status
+    metadata["preflight"] = {
+        "status": preflight.get("status"),
+        "can_run_agents": preflight.get("can_run_agents"),
+        "error_count": (preflight.get("counts") or {}).get("error", 0),
+        "warning_count": (preflight.get("counts") or {}).get("warning", 0),
+        "path": preflight_path.name,
+    }
+    _write_json(metadata_path, metadata)
+
+    input_payload_path = base_dir / "input_payload.json"
+    if not input_payload_path.exists():
+        _write_json(
+            input_payload_path,
+            {
+                "run_id": run_id,
+                "as_of_date": as_of_date,
+                "inputs": [],
+                "preflight_inputs": preflight.get("inputs") or {},
+            },
+        )
+    return base_dir, preflight_path
 
 
 def _safe_run_id(value: str) -> str:
@@ -117,7 +188,10 @@ def _summary_from_metadata(metadata: dict[str, Any], *, run_dir: Path) -> AgentR
         name: str((metadata.get("agents") or {}).get(name, {}).get("status") or "unknown")
         for name in AGENT_NAMES
     }
-    if any(status == "failed" for status in agent_statuses.values()):
+    execution_status = str(metadata.get("execution_status") or "")
+    if execution_status in {"succeeded", "partial", "failed", "blocked"}:
+        status = execution_status
+    elif any(status == "failed" for status in agent_statuses.values()):
         status = "failed"
     elif any(status in {"partial", "unknown"} for status in agent_statuses.values()):
         status = "partial"
@@ -165,6 +239,12 @@ def _read_text_or_empty(path: Path) -> str:
     return path.read_text(encoding="utf-8")
 
 
+def _write_json(path: Path, payload: dict[str, Any]) -> None:
+    temp_path = path.with_name(f".{path.name}.tmp")
+    temp_path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+    temp_path.replace(path)
+
+
 __all__ = [
     "AgentRunSummary",
     "GetAgentRunAuditRequest",
@@ -172,4 +252,5 @@ __all__ = [
     "GetAgentRunAuditUseCase",
     "ListAgentRunsResult",
     "ListAgentRunsUseCase",
+    "persist_agent_preflight_audit",
 ]

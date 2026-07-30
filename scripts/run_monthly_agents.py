@@ -22,7 +22,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--user-satellite-interest", help="Optional one-off satellite idea for this run.")
     parser.add_argument("--llm-provider", choices=("static", "openai"), default="static")
     parser.add_argument("--search-provider", choices=("null", "static", "duckduckgo", "tavily"), default="null")
-    parser.add_argument("--no-persist", action="store_true", help="Do not write pipeline_result.json.")
+    parser.add_argument("--no-persist", action="store_true", help="Do not write pipeline or audit artifacts.")
     parser.add_argument("--output-dir", type=Path, help="Output directory for persisted agent results.")
     return parser.parse_args()
 
@@ -30,19 +30,39 @@ def parse_args() -> argparse.Namespace:
 def main() -> int:
     args = parse_args()
     settings = get_settings()
-    use_case_result = RunMonthlyAgentsUseCase(settings=settings).execute(
-        RunMonthlyAgentsRequest(
-            investment_brief_text=args.investment_brief_text,
-            investment_brief_path=args.investment_brief_file,
-            monthly_report_path=args.monthly_report,
-            user_satellite_interest=args.user_satellite_interest,
-            llm_provider=args.llm_provider,
-            search_provider=args.search_provider,
-            persist=not args.no_persist,
-            output_dir=args.output_dir,
+    try:
+        use_case_result = RunMonthlyAgentsUseCase(settings=settings).execute(
+            RunMonthlyAgentsRequest(
+                investment_brief_text=args.investment_brief_text,
+                investment_brief_path=args.investment_brief_file,
+                monthly_report_path=args.monthly_report,
+                user_satellite_interest=args.user_satellite_interest,
+                llm_provider=args.llm_provider,
+                search_provider=args.search_provider,
+                persist=not args.no_persist,
+                output_dir=args.output_dir,
+            )
         )
+    except (FileNotFoundError, OSError, ValueError) as exc:
+        print(f"Input error: {exc}")
+        return 1
+    preflight = use_case_result.quality_result.to_dict()
+    counts = preflight["counts"]
+    print(
+        "Preflight: "
+        f"{preflight['status']} | errors={counts['error']} "
+        f"| warnings={counts['warning']} | as_of={preflight['as_of_date'] or '-'}"
     )
+    for issue in preflight["issues"]:
+        print(f"  {issue['severity']}: {issue['code']} | {issue['message']}")
+
     result = use_case_result.pipeline_result
+    if result is None:
+        print(use_case_result.result.message)
+        output_dir = use_case_result.result.artifacts.get("output_dir")
+        if output_dir:
+            print(f"Audit: {output_dir}")
+        return 1
 
     print(f"Run: {result.run_id}")
     print(f"As of: {result.as_of_date.isoformat()}")
@@ -56,7 +76,7 @@ def main() -> int:
         print(f"- {name}: {agent_result.status} | findings={len(agent_result.findings)} | {agent_result.summary}")
         for warning in agent_result.warnings:
             print(f"  warning: {warning}")
-    return 0
+    return 1 if use_case_result.result.failed else 0
 
 
 if __name__ == "__main__":
