@@ -40,7 +40,9 @@ Fronteras ya disponibles:
 - `RunMonthlyAgentsUseCase`, con preflight bloqueante obligatorio, y
   `RunMonitorTematicoUseCase` para agentes;
 - `ReadInvestmentBriefUseCase` y `UpdateInvestmentBriefUseCase` para leer y
-  guardar el mandato local sin escribir desde la interfaz.
+  guardar el mandato local sin escribir desde la interfaz;
+- `ReadPortfolioTargetsUseCase` y `UpdatePortfolioTargetsUseCase` para leer,
+  validar y guardar objetivos estructurados con control de concurrencia.
 
 Las acciones operativas devuelven `ApplicationResult`. Los read models
 destinados a adaptadores externos, como estado de cartera y requisitos FX,

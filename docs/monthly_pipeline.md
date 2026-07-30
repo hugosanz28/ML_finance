@@ -46,6 +46,7 @@ necesariamente la fecha del snapshot.
 
 - CSV canonicos de DEGIRO: `src/degiro_exports/local/incoming/`
 - Investment brief editable: `src/data/local/investment_brief.md`
+- Portfolio targets estructurados: `src/data/local/portfolio_targets.yaml`
 - Overrides de market data: `src/data/local/market_data/asset_overrides.csv`
 
 ## Salidas principales

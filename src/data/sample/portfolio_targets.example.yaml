@@ -1,3 +1,4 @@
+# Los pesos pueden expresarse como porcentajes o decimales y deben sumar 100 o 1.
 base_currency: EUR
 monthly_contribution: 500
 risk_profile: medium

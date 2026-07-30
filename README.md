@@ -127,6 +127,10 @@ offline y no envian datos fuera del equipo.
 - **Falta `investment_brief.md`:** copia
   `src/data/sample/investment_brief.example.md` a
   `src/data/local/investment_brief.md` o al `DATA_DIR` privado configurado.
+- **Falta `portfolio_targets.yaml`:** copia
+  `src/data/sample/portfolio_targets.example.yaml` a
+  `src/data/local/portfolio_targets.yaml` o crea y guarda el contrato JSON
+  estructurado desde `Agentes` -> `Portfolio targets persistentes`.
 - **Streamlit no abre en `8501`:** usa la URL alternativa que imprime la
   terminal; el puerto puede estar ocupado.
 - **Los agentes bloquean por fechas:** regenera el informe para que su

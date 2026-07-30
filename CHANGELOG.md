@@ -16,6 +16,8 @@ proyecto usa [versionado semántico](https://semver.org/lang/es/).
   FX y ejecución aislada del monitor temático.
 - Caso de uso para actualizar el `investment_brief` con escritura atómica y
   control optimista por hash.
+- Contratos completos para leer y actualizar `portfolio_targets` mediante JSON
+  validado, escritura atómica y control optimista por hash.
 - Proyección reutilizable de estado/PnL y cálculo centralizado de aportaciones
   externas para dashboard, informes y futuras interfaces.
 - Providers `synthetic` de precios y FX que mantienen la demo completamente

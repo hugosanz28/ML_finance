@@ -122,7 +122,8 @@ O abre una terminal nueva y ejecuta el dashboard normal:
 ## Datos incluidos
 
 - `synthetic_config/investment_brief.md`: mandato ficticio.
-- `synthetic_config/portfolio_targets.yaml`: objetivos ficticios.
+- `synthetic_config/portfolio_targets.yaml`: objetivos ficticios con el mismo
+  contrato estructurado que lee y guarda la UI.
 - `synthetic_degiro_exports/incoming/transactions_2026-01-15_2026-04-30.csv`
 - `synthetic_degiro_exports/incoming/account_2026-01-15_2026-04-30.csv`
 - `synthetic_degiro_exports/incoming/portfolio_2026-04-30.csv`

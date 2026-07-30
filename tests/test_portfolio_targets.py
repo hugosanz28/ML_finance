@@ -69,3 +69,71 @@ def test_load_portfolio_targets_returns_none_when_optional_file_is_missing(works
 def test_portfolio_targets_validation_rejects_missing_allocation() -> None:
     with pytest.raises(ValueError, match="target_allocation"):
         portfolio_targets_from_mapping({"base_currency": "EUR"})
+
+
+def test_portfolio_targets_accepts_legacy_target_weights_alias() -> None:
+    targets = portfolio_targets_from_mapping(
+        {
+            "base_currency": "eur",
+            "monthly_contribution": 500,
+            "target_weights": {
+                "core": 80,
+                "satellite": 20,
+            },
+        }
+    )
+
+    assert targets.base_currency == "EUR"
+    assert targets.target_weights() == {"core": 0.80, "satellite": 0.20}
+    assert targets.to_storage_mapping() == {
+        "base_currency": "EUR",
+        "target_allocation": {"core": 0.80, "satellite": 0.20},
+        "monthly_contribution": 500.0,
+        "risk_profile": None,
+        "max_single_asset_weight": None,
+        "max_sector_weight": None,
+        "rebalance_mode": None,
+    }
+
+
+def test_portfolio_targets_rejects_conflicting_allocation_aliases() -> None:
+    with pytest.raises(ValueError, match="same weights"):
+        portfolio_targets_from_mapping(
+            {
+                "target_allocation": {"core": 0.80, "satellite": 0.20},
+                "target_weights": {"core": 0.70, "satellite": 0.30},
+            }
+        )
+
+
+def test_portfolio_targets_applies_one_scale_to_the_complete_allocation() -> None:
+    percentages = portfolio_targets_from_mapping(
+        {"target_allocation": {"equity": 99, "cash": 1}}
+    )
+
+    assert percentages.target_weights() == {"equity": 0.99, "cash": 0.01}
+    with pytest.raises(ValueError, match="sum to 1.0 or 100.0"):
+        portfolio_targets_from_mapping(
+            {"target_allocation": {"core": 80, "satellite": 0.20}}
+        )
+
+
+@pytest.mark.parametrize(
+    "payload",
+    [
+        {"target_allocation": {"core": float("nan"), "satellite": 1.0}},
+        {"target_allocation": {"core": float("inf"), "satellite": 1.0}},
+        {"target_allocation": {"core": float("-inf"), "satellite": 1.0}},
+        {
+            "target_allocation": {"core": 0.80, "satellite": 0.20},
+            "monthly_contribution": float("nan"),
+        },
+        {
+            "target_allocation": {"core": 0.80, "satellite": 0.20},
+            "max_single_asset_weight": float("inf"),
+        },
+    ],
+)
+def test_portfolio_targets_rejects_non_finite_numbers(payload: dict[str, object]) -> None:
+    with pytest.raises(ValueError, match="finite"):
+        portfolio_targets_from_mapping(payload)

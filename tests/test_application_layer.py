@@ -33,6 +33,7 @@ from src.application import (
     LoadPortfolioMetricsRequest,
     LoadPortfolioMetricsUseCase,
     ReadInvestmentBriefUseCase,
+    ReadPortfolioTargetsUseCase,
     ReadTargetWeightsUseCase,
     RefreshFxRequest,
     RefreshFxUseCase,
@@ -45,6 +46,8 @@ from src.application import (
     SaveDegiroUploadsUseCase,
     UpdateInvestmentBriefRequest,
     UpdateInvestmentBriefUseCase,
+    UpdatePortfolioTargetsRequest,
+    UpdatePortfolioTargetsUseCase,
 )
 from src.application.serialization import json_ready_value
 from src.agents import AgentResult, MonthlyAgentPipelineResult
@@ -111,6 +114,8 @@ def test_application_public_use_cases_are_importable() -> None:
     assert GetNetExternalContributionsUseCase.name == "get_net_external_contributions"
     assert ListDashboardReportsUseCase.name == "list_dashboard_reports"
     assert UpdateInvestmentBriefUseCase.name == "update_investment_brief"
+    assert ReadPortfolioTargetsUseCase.name == "read_portfolio_targets"
+    assert UpdatePortfolioTargetsUseCase.name == "update_portfolio_targets"
 
 
 def test_application_request_defaults_are_safe_for_construction() -> None:
@@ -199,6 +204,182 @@ def test_update_investment_brief_rejects_a_stale_hash_without_overwriting() -> N
         assert stale_update.result.status == "failed"
         assert stale_update.content_hash == first_update.content_hash
         assert settings.investment_brief_path.read_text(encoding="utf-8") == "First version"
+    finally:
+        shutil.rmtree(workspace, ignore_errors=True)
+
+
+def test_read_portfolio_targets_returns_complete_strict_json_model() -> None:
+    workspace = make_test_workspace()
+    try:
+        settings = load_settings(repo_root=workspace, env={}, env_file=workspace / ".env.missing")
+        settings.portfolio_targets_path.parent.mkdir(parents=True)
+        settings.portfolio_targets_path.write_text(
+            "\n".join(
+                [
+                    "base_currency: eur",
+                    "monthly_contribution: 750",
+                    "risk_profile: balanced",
+                    "target_allocation:",
+                    "  core: 80",
+                    "  satellite: 20",
+                    "max_single_asset_weight: 25",
+                    "max_sector_weight: 40",
+                    "rebalance_mode: contributions_only",
+                ]
+            ),
+            encoding="utf-8",
+        )
+
+        targets = ReadPortfolioTargetsUseCase(settings=settings).execute()
+
+        assert targets.exists is True
+        assert targets.path == str(settings.portfolio_targets_path)
+        assert targets.validation_error is None
+        assert targets.target_weights == {"core": 0.80, "satellite": 0.20}
+        assert targets.portfolio_targets == {
+            "base_currency": "EUR",
+            "target_allocation": {"core": 0.80, "satellite": 0.20},
+            "monthly_contribution": 750.0,
+            "risk_profile": "balanced",
+            "max_single_asset_weight": 0.25,
+            "max_sector_weight": 0.40,
+            "rebalance_mode": "contributions_only",
+        }
+        assert targets.content_hash.startswith("sha256:")
+        json.dumps(targets.to_dict(), allow_nan=False)
+    finally:
+        shutil.rmtree(workspace, ignore_errors=True)
+
+
+def test_read_portfolio_targets_distinguishes_missing_and_invalid_files() -> None:
+    workspace = make_test_workspace()
+    try:
+        settings = load_settings(repo_root=workspace, env={}, env_file=workspace / ".env.missing")
+        use_case = ReadPortfolioTargetsUseCase(settings=settings)
+
+        missing = use_case.execute()
+
+        assert missing.exists is False
+        assert missing.portfolio_targets is None
+        assert missing.target_weights == {}
+        assert missing.validation_error is None
+        json.dumps(missing.to_dict(), allow_nan=False)
+
+        settings.portfolio_targets_path.parent.mkdir(parents=True)
+        settings.portfolio_targets_path.write_text(
+            "target_allocation:\n  core: 70\n  satellite: 10\n",
+            encoding="utf-8",
+        )
+        invalid = use_case.execute()
+
+        assert invalid.exists is True
+        assert invalid.portfolio_targets is None
+        assert invalid.target_weights == {}
+        assert invalid.validation_error is not None
+        assert "sum to 1.0" in invalid.validation_error
+        assert invalid.content_hash != missing.content_hash
+        json.dumps(invalid.to_dict(), allow_nan=False)
+    finally:
+        shutil.rmtree(workspace, ignore_errors=True)
+
+
+def test_update_portfolio_targets_is_atomic_and_returns_normalized_strict_json() -> None:
+    workspace = make_test_workspace()
+    try:
+        settings = load_settings(repo_root=workspace, env={}, env_file=workspace / ".env.missing")
+        initial = ReadPortfolioTargetsUseCase(settings=settings).execute()
+
+        updated = UpdatePortfolioTargetsUseCase(settings=settings).execute(
+            UpdatePortfolioTargetsRequest(
+                portfolio_targets={
+                    "base_currency": "eur",
+                    "monthly_contribution": 600,
+                    "risk_profile": "medium",
+                    "target_weights": {"core": 75, "satellite": 25},
+                    "max_single_asset_weight": 20,
+                    "max_sector_weight": 35,
+                    "rebalance_mode": "contributions_only",
+                },
+                expected_previous_hash=initial.content_hash,
+            )
+        )
+
+        assert updated.result.status == "succeeded"
+        assert updated.result.artifacts["path"] == str(settings.portfolio_targets_path)
+        assert updated.result.artifacts["content_hash"] == updated.content_hash
+        assert updated.content_hash != initial.content_hash
+        assert updated.target_weights == {"core": 0.75, "satellite": 0.25}
+        assert updated.portfolio_targets is not None
+        assert updated.portfolio_targets["base_currency"] == "EUR"
+        assert json.loads(settings.portfolio_targets_path.read_text(encoding="utf-8")) == updated.portfolio_targets
+        assert ReadPortfolioTargetsUseCase(settings=settings).execute().content_hash == updated.content_hash
+        assert list(settings.portfolio_targets_path.parent.glob(".portfolio_targets.yaml.*.tmp")) == []
+        json.dumps(updated.to_dict(), allow_nan=False)
+    finally:
+        shutil.rmtree(workspace, ignore_errors=True)
+
+
+def test_update_portfolio_targets_rejects_stale_hash_without_overwriting() -> None:
+    workspace = make_test_workspace()
+    try:
+        settings = load_settings(repo_root=workspace, env={}, env_file=workspace / ".env.missing")
+        initial = ReadPortfolioTargetsUseCase(settings=settings).execute()
+        use_case = UpdatePortfolioTargetsUseCase(settings=settings)
+        first = use_case.execute(
+            UpdatePortfolioTargetsRequest(
+                portfolio_targets={"target_allocation": {"core": 0.80, "satellite": 0.20}},
+                expected_previous_hash=initial.content_hash,
+            )
+        )
+        persisted_content = settings.portfolio_targets_path.read_text(encoding="utf-8")
+
+        stale = use_case.execute(
+            UpdatePortfolioTargetsRequest(
+                portfolio_targets={"target_allocation": {"core": 0.70, "satellite": 0.30}},
+                expected_previous_hash=initial.content_hash,
+            )
+        )
+
+        assert first.result.status == "succeeded"
+        assert stale.result.status == "failed"
+        assert stale.content_hash == first.content_hash
+        assert settings.portfolio_targets_path.read_text(encoding="utf-8") == persisted_content
+        json.dumps(stale.to_dict(), allow_nan=False)
+    finally:
+        shutil.rmtree(workspace, ignore_errors=True)
+
+
+def test_update_portfolio_targets_rejects_invalid_data_without_overwriting() -> None:
+    workspace = make_test_workspace()
+    try:
+        settings = load_settings(repo_root=workspace, env={}, env_file=workspace / ".env.missing")
+        use_case = UpdatePortfolioTargetsUseCase(settings=settings)
+        valid = use_case.execute(
+            UpdatePortfolioTargetsRequest(
+                portfolio_targets={"target_allocation": {"core": 0.80, "satellite": 0.20}},
+            )
+        )
+        persisted_content = settings.portfolio_targets_path.read_text(encoding="utf-8")
+
+        invalid = use_case.execute(
+            UpdatePortfolioTargetsRequest(
+                portfolio_targets={
+                    "target_allocation": {
+                        "core": float("nan"),
+                        "satellite": 0.20,
+                    }
+                },
+                expected_previous_hash=valid.content_hash,
+            )
+        )
+
+        assert valid.result.status == "succeeded"
+        assert invalid.result.status == "failed"
+        assert "finite" in invalid.result.message
+        assert invalid.content_hash == valid.content_hash
+        assert settings.portfolio_targets_path.read_text(encoding="utf-8") == persisted_content
+        assert list(settings.portfolio_targets_path.parent.glob(".portfolio_targets.yaml.*.tmp")) == []
+        json.dumps(invalid.to_dict(), allow_nan=False)
     finally:
         shutil.rmtree(workspace, ignore_errors=True)
 

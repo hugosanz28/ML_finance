@@ -12,6 +12,10 @@ import pandas as pd
 
 from src.agents import build_portfolio_metrics_snapshot
 from src.agents.pipeline import extract_monthly_report_as_of_date, prepare_agent_metrics_snapshot
+from src.application.portfolio_targets import (
+    DEFAULT_TARGET_WEIGHTS,
+    ReadPortfolioTargetsUseCase,
+)
 from src.application.serialization import json_ready_value
 from src.application.settings import ReadInvestmentBriefResult, ReadInvestmentBriefUseCase
 from src.config import Settings, get_settings
@@ -21,7 +25,6 @@ from src.portfolio import (
     calculate_portfolio_metrics_from_normalized_degiro,
     load_normalized_degiro_snapshots,
     load_normalized_degiro_transactions,
-    load_portfolio_targets,
 )
 from src.portfolio.contributions import net_external_contributions_until
 from src.portfolio.state_projection import build_broker_snapshot_projection
@@ -198,13 +201,10 @@ class ReadTargetWeightsUseCase:
         self.settings = get_settings() if settings is None else settings
 
     def execute(self) -> ReadTargetWeightsResult:
-        try:
-            targets = load_portfolio_targets(settings=self.settings)
-        except ValueError:
-            return ReadTargetWeightsResult(target_weights={"core": 0.80, "satellite": 0.20})
-        if targets is None:
-            return ReadTargetWeightsResult(target_weights={"core": 0.80, "satellite": 0.20})
-        return ReadTargetWeightsResult(target_weights=targets.target_weights())
+        targets = ReadPortfolioTargetsUseCase(settings=self.settings).execute()
+        return ReadTargetWeightsResult(
+            target_weights=targets.target_weights or dict(DEFAULT_TARGET_WEIGHTS)
+        )
 
 
 class BuildAgentDashboardSnapshotUseCase:

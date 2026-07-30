@@ -23,7 +23,8 @@ Artefactos relevantes ya en uso:
 - `normalized/degiro/`: salida normalizada de los parsers DEGIRO, usada tambien para bootstrap de `assets_master`.
 - `portfolio_targets.yaml`: objetivos privados de cartera, pesos objetivo,
   aportacion mensual y limites de concentracion. Hay un ejemplo versionado en
-  `sample/portfolio_targets.example.yaml`.
+  `sample/portfolio_targets.example.yaml`. Streamlit lo lee y actualiza mediante
+  los casos de uso estructurados de `src/application/`, no como YAML libre.
 - `investment_brief.md`: mandato narrativo privado de la cuenta. Hay un ejemplo
   versionado en `sample/investment_brief.example.md`.
 
