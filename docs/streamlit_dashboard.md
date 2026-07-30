@@ -181,6 +181,7 @@ Casos de uso operativos:
 - `RefreshMarketDataUseCase`
 - `GenerateMonthlyReportUseCase`
 - `RunMonthlyAgentsUseCase`
+- `UpdateInvestmentBriefUseCase`
 
 Read models usados por la UI:
 
@@ -206,6 +207,10 @@ El `investment_brief` editable vive por defecto en:
 ```text
 src/data/local/investment_brief.md
 ```
+
+La UI lo guarda mediante `UpdateInvestmentBriefUseCase`, con escritura atomica
+y un hash de la version cargada para no sobrescribir cambios hechos desde otra
+sesion.
 
 Los objetivos estructurados de cartera viven por defecto en:
 

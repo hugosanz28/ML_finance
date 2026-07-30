@@ -10,9 +10,10 @@ from typing import Any
 
 import pandas as pd
 
-from src.agents import load_investment_brief
 from src.agents import build_portfolio_metrics_snapshot
 from src.agents.pipeline import extract_monthly_report_as_of_date, prepare_agent_metrics_snapshot
+from src.application.serialization import json_ready_value
+from src.application.settings import ReadInvestmentBriefResult, ReadInvestmentBriefUseCase
 from src.config import Settings, get_settings
 from src.market_data import DuckDBMarketDataRepository
 from src.portfolio import (
@@ -72,11 +73,6 @@ class GetNetExternalContributionsResult:
 @dataclass(frozen=True)
 class ListDashboardReportsResult:
     reports: list[dict[str, Any]]
-
-
-@dataclass(frozen=True)
-class ReadInvestmentBriefResult:
-    content: str
 
 
 @dataclass(frozen=True)
@@ -195,20 +191,6 @@ class ListDashboardReportsUseCase:
         return ListDashboardReportsResult(reports=list_dashboard_reports(self.settings))
 
 
-class ReadInvestmentBriefUseCase:
-    name = "read_investment_brief"
-
-    def __init__(self, *, settings: Settings | None = None) -> None:
-        self.settings = get_settings() if settings is None else settings
-
-    def execute(self) -> ReadInvestmentBriefResult:
-        try:
-            content = load_investment_brief(settings=self.settings)
-        except FileNotFoundError:
-            content = ""
-        return ReadInvestmentBriefResult(content=content)
-
-
 class ReadTargetWeightsUseCase:
     name = "read_target_weights"
 
@@ -292,23 +274,9 @@ def build_agent_dashboard_snapshot(
     return {
         "as_of_date": broker["snapshot_date"].isoformat(),
         "base_currency": metrics.base_currency,
-        "daily": _json_ready_value(daily_payload),
-        "positions": _json_ready_value(positions_ready.to_dict(orient="records")),
+        "daily": json_ready_value(daily_payload),
+        "positions": json_ready_value(positions_ready.to_dict(orient="records")),
     }
-
-
-def _json_ready_value(value: Any) -> Any:
-    if isinstance(value, dict):
-        return {str(key): _json_ready_value(item) for key, item in value.items()}
-    if isinstance(value, (tuple, list)):
-        return [_json_ready_value(item) for item in value]
-    if isinstance(value, (date, pd.Timestamp)):
-        return value.isoformat()
-    if value is None or pd.isna(value):
-        return None
-    if hasattr(value, "item") and callable(value.item):
-        return _json_ready_value(value.item())
-    return value
 
 
 def list_dashboard_reports(settings: Settings) -> list[dict[str, Any]]:

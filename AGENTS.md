@@ -32,8 +32,9 @@ La UI actual es Streamlit. Una futura API/FastAPI debe entrar casi siempre por `
 - `src/application/` es la frontera para scripts, Streamlit y futura API. Si una interfaz necesita dominio, crea o usa un `*UseCase`.
 - Casos de uso actuales que no deben puentearse desde interfaces:
   `GetPortfolioStateUseCase`, `SaveDegiroUploadsUseCase`,
-  `InferFxRequirementsUseCase`, `RunMonitorTematicoUseCase` y los casos
-  operativos de importacion, refresh, informes y agentes.
+  `InferFxRequirementsUseCase`, `RunMonitorTematicoUseCase`,
+  `UpdateInvestmentBriefUseCase` y los casos operativos de importacion,
+  refresh, informes y agentes.
 - Manten entradas como dataclasses `*Request` y salidas estructuradas. Para acciones operativas usa `ApplicationResult`.
 - No dupliques calculos financieros en `src/application/`; coordina servicios de dominio existentes.
 - `src/portfolio/dashboard.py` debe seguir siendo entrypoint fino de Streamlit. Las vistas viven en `dashboard_overview.py`, `dashboard_reports.py`, `dashboard_data_update.py` y `dashboard_agents.py`.

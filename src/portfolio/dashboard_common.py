@@ -17,7 +17,6 @@ from src.application import (
     LoadPortfolioMetricsUseCase,
     LoadPortfolioSnapshotsUseCase,
     LoadPortfolioTransactionsUseCase,
-    ReadInvestmentBriefUseCase,
     ReadTargetWeightsUseCase,
 )
 from src.application.dashboard import GetPendingDegiroImportStatusUseCase
@@ -220,10 +219,6 @@ def generate_report_action(settings: Settings) -> None:
             GenerateMonthlyReportRequest()
         ).report
     st.success(f"Informe generado: {report.output_path}")
-
-
-def read_default_brief(settings: Settings) -> str:
-    return ReadInvestmentBriefUseCase(settings=settings).execute().content
 
 
 def read_default_target_weights(settings: Settings) -> dict[str, Any]:

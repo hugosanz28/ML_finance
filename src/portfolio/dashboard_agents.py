@@ -16,8 +16,11 @@ from src.application import (
     GetAgentRunAuditRequest,
     GetAgentRunAuditUseCase,
     ListAgentRunsUseCase,
+    ReadInvestmentBriefUseCase,
     RunMonthlyAgentsRequest,
     RunMonthlyAgentsUseCase,
+    UpdateInvestmentBriefRequest,
+    UpdateInvestmentBriefUseCase,
     extract_monthly_report_as_of_date,
 )
 from src.config import Settings
@@ -26,7 +29,6 @@ from src.portfolio.dashboard_common import (
     list_reports,
     load_metrics,
     load_snapshots,
-    read_default_brief,
     read_default_target_weights,
     section_header,
     show_metrics_error,
@@ -60,13 +62,24 @@ def render_agents_tab(settings: Settings) -> None:
 
     left, right = st.columns([2, 1])
     with left:
-        default_brief = read_default_brief(settings)
-        investment_brief = st.text_area("Investment brief", value=default_brief, height=240)
+        brief_state = ReadInvestmentBriefUseCase(settings=settings).execute()
+        brief_hash_state_key = f"investment_brief_hash::{brief_state.path}"
+        if brief_hash_state_key not in st.session_state:
+            st.session_state[brief_hash_state_key] = brief_state.content_hash
+        investment_brief = st.text_area("Investment brief", value=brief_state.content, height=240)
         st.caption("Este texto es el mandato de la cuenta: objetivo, horizonte, tolerancia al riesgo y reglas personales.")
         if st.button("Guardar investment brief"):
-            settings.investment_brief_path.parent.mkdir(parents=True, exist_ok=True)
-            settings.investment_brief_path.write_text(investment_brief, encoding="utf-8")
-            st.success(f"Guardado en {settings.investment_brief_path}")
+            update = UpdateInvestmentBriefUseCase(settings=settings).execute(
+                UpdateInvestmentBriefRequest(
+                    content=investment_brief,
+                    expected_previous_hash=st.session_state[brief_hash_state_key],
+                )
+            )
+            if update.result.failed:
+                st.error(update.result.message)
+            else:
+                st.session_state[brief_hash_state_key] = update.content_hash
+                st.success(f"Guardado en {update.result.artifacts['path']}")
     with right:
         st.markdown("#### Configuracion")
         user_interest = st.text_input("Idea puntual de satellite")

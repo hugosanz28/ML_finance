@@ -37,7 +37,9 @@ Fronteras ya disponibles:
 - `InferFxRequirementsUseCase`, `RefreshFxUseCase` y
   `RefreshMarketDataUseCase` para market data;
 - `GenerateMonthlyReportUseCase` para informes;
-- `RunMonthlyAgentsUseCase` y `RunMonitorTematicoUseCase` para agentes.
+- `RunMonthlyAgentsUseCase` y `RunMonitorTematicoUseCase` para agentes;
+- `ReadInvestmentBriefUseCase` y `UpdateInvestmentBriefUseCase` para leer y
+  guardar el mandato local sin escribir desde la interfaz.
 
 Las acciones operativas devuelven `ApplicationResult`. Los read models
 destinados a adaptadores externos, como estado de cartera y requisitos FX,

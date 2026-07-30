@@ -14,6 +14,8 @@ proyecto usa [versionado semántico](https://semver.org/lang/es/).
   build, wheel instalada, demo sintética offline y auditoría de dependencias.
 - Casos de uso para estado de cartera serializable, uploads DEGIRO, requisitos
   FX y ejecución aislada del monitor temático.
+- Caso de uso para actualizar el `investment_brief` con escritura atómica y
+  control optimista por hash.
 - Proyección reutilizable de estado/PnL y cálculo centralizado de aportaciones
   externas para dashboard, informes y futuras interfaces.
 - Providers `synthetic` de precios y FX que mantienen la demo completamente
@@ -39,6 +41,8 @@ proyecto usa [versionado semántico](https://semver.org/lang/es/).
   pares explícitos.
 - Las fechas de requisitos FX y el estado de cartera se serializan de forma
   estable para adaptadores CLI/HTTP.
+- Los read models comparten una serialización JSON estricta que convierte
+  valores no finitos en `null`.
 - La salida humana del runner temático conserva el estado del agente mientras
   `ApplicationResult` usa el vocabulario normalizado de la capa de aplicación.
 

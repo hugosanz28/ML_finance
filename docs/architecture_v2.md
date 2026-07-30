@@ -49,11 +49,12 @@ Ese documento es deliberadamente previo a FastAPI: define que datos necesita la
 UI y que casos de uso deben existir antes de crear endpoints reales.
 
 La lectura principal ya dispone de `GetPortfolioStateUseCase`, que no devuelve
-DataFrames ni paths. Uploads, requisitos FX y el monitor aislado tambien tienen
-fronteras dedicadas: `SaveDegiroUploadsUseCase`,
-`InferFxRequirementsUseCase` y `RunMonitorTematicoUseCase`. Los casos de uso
-de escritura de brief/targets siguen pendientes y no deben implementarse dentro
-de futuros endpoints.
+DataFrames ni paths. Uploads, requisitos FX, el monitor aislado y la escritura
+del brief tambien tienen fronteras dedicadas: `SaveDegiroUploadsUseCase`,
+`InferFxRequirementsUseCase`, `RunMonitorTematicoUseCase` y
+`UpdateInvestmentBriefUseCase`. Los casos de uso completos de lectura/escritura
+de targets siguen pendientes y no deben implementarse dentro de futuros
+endpoints.
 
 ## Propuesta principal
 

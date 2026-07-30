@@ -30,6 +30,8 @@ que la interfaz no dependa de detalles internos de `src/portfolio/`,
 - ejecutar quality checks antes de agentes o recomendaciones;
 - cargar read models de dashboard: estado de cartera JSON, metricas, snapshots,
   transacciones, reports, brief, targets, requisitos FX y counts de bodega local;
+- leer y actualizar el `investment_brief` con escritura atomica y control
+  opcional de concurrencia mediante hash;
 - guardar uploads DEGIRO con nombres normalizados antes de importarlos.
 
 Las migraciones deben ser progresivas: primero se anade el wrapper, despues se

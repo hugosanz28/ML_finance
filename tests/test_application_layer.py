@@ -41,7 +41,10 @@ from src.application import (
     RunMonitorTematicoRequest,
     RunMonitorTematicoUseCase,
     SaveDegiroUploadsUseCase,
+    UpdateInvestmentBriefRequest,
+    UpdateInvestmentBriefUseCase,
 )
+from src.application.serialization import json_ready_value
 from src.agents import AgentResult, MonthlyAgentPipelineResult
 from src.config import default_repo_root, load_settings
 from src.degiro_exports.cash_movements import EXPECTED_ACCOUNT_HEADERS
@@ -66,6 +69,27 @@ def test_application_result_status_helpers() -> None:
     result.require_success()
 
 
+def test_application_json_serialization_rejects_non_finite_numbers() -> None:
+    payload = json_ready_value(
+        {
+            "nan": float("nan"),
+            "positive_inf": float("inf"),
+            "negative_inf": float("-inf"),
+            "missing": pd.NA,
+            "as_of_date": date(2026, 7, 30),
+        }
+    )
+
+    assert payload == {
+        "nan": None,
+        "positive_inf": None,
+        "negative_inf": None,
+        "missing": None,
+        "as_of_date": "2026-07-30",
+    }
+    json.dumps(payload, allow_nan=False)
+
+
 def test_application_public_use_cases_are_importable() -> None:
     assert ImportDegiroUseCase.name == "import_degiro"
     assert RefreshFxUseCase.name == "refresh_fx"
@@ -83,6 +107,7 @@ def test_application_public_use_cases_are_importable() -> None:
     assert GetPendingDegiroImportStatusUseCase.name == "get_pending_degiro_import_status"
     assert GetNetExternalContributionsUseCase.name == "get_net_external_contributions"
     assert ListDashboardReportsUseCase.name == "list_dashboard_reports"
+    assert UpdateInvestmentBriefUseCase.name == "update_investment_brief"
 
 
 def test_application_request_defaults_are_safe_for_construction() -> None:
@@ -114,9 +139,63 @@ def test_dashboard_read_use_cases_return_safe_defaults() -> None:
         fx_requirements = InferFxRequirementsUseCase(settings=settings).execute()
 
         assert brief.content == ""
+        assert brief.exists is False
+        json.dumps(brief.to_dict())
         assert targets.target_weights == {"core": 0.80, "satellite": 0.20}
         assert reports.reports == []
         assert fx_requirements.requirements == ()
+    finally:
+        shutil.rmtree(workspace, ignore_errors=True)
+
+
+def test_update_investment_brief_uses_configured_path_and_returns_json_ready_metadata() -> None:
+    workspace = make_test_workspace()
+    try:
+        settings = load_settings(repo_root=workspace, env={}, env_file=workspace / ".env.missing")
+        initial = ReadInvestmentBriefUseCase(settings=settings).execute()
+
+        updated = UpdateInvestmentBriefUseCase(settings=settings).execute(
+            UpdateInvestmentBriefRequest(
+                content="# Mandate\n\nLong-term.",
+                expected_previous_hash=initial.content_hash,
+            )
+        )
+
+        assert updated.result.status == "succeeded"
+        assert settings.investment_brief_path.read_text(encoding="utf-8") == "# Mandate\n\nLong-term."
+        assert updated.result.artifacts["path"] == str(settings.investment_brief_path)
+        assert updated.result.artifacts["content_hash"] == updated.content_hash
+        assert ReadInvestmentBriefUseCase(settings=settings).execute().content_hash == updated.content_hash
+        assert list(settings.investment_brief_path.parent.glob(".investment_brief.md.*.tmp")) == []
+        json.dumps(dict(updated.result.artifacts), allow_nan=False)
+    finally:
+        shutil.rmtree(workspace, ignore_errors=True)
+
+
+def test_update_investment_brief_rejects_a_stale_hash_without_overwriting() -> None:
+    workspace = make_test_workspace()
+    try:
+        settings = load_settings(repo_root=workspace, env={}, env_file=workspace / ".env.missing")
+        initial = ReadInvestmentBriefUseCase(settings=settings).execute()
+        use_case = UpdateInvestmentBriefUseCase(settings=settings)
+        first_update = use_case.execute(
+            UpdateInvestmentBriefRequest(
+                content="First version",
+                expected_previous_hash=initial.content_hash,
+            )
+        )
+
+        stale_update = use_case.execute(
+            UpdateInvestmentBriefRequest(
+                content="Stale version",
+                expected_previous_hash=initial.content_hash,
+            )
+        )
+
+        assert first_update.result.status == "succeeded"
+        assert stale_update.result.status == "failed"
+        assert stale_update.content_hash == first_update.content_hash
+        assert settings.investment_brief_path.read_text(encoding="utf-8") == "First version"
     finally:
         shutil.rmtree(workspace, ignore_errors=True)
 

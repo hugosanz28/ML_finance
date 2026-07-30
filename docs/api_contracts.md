@@ -471,7 +471,8 @@ Respuesta:
 {
   "content": "# Investment brief\n\nObjetivo: ...\n",
   "path": "src/data/local/investment_brief.md",
-  "exists": true
+  "exists": true,
+  "content_hash": "sha256:..."
 }
 ```
 
@@ -481,7 +482,7 @@ Actualiza el brief activo.
 
 Caso de uso necesario:
 
-- Pendiente: `UpdateInvestmentBriefUseCase`.
+- `UpdateInvestmentBriefUseCase`.
 
 Request:
 
@@ -600,13 +601,13 @@ Notas:
 Antes de implementar servidor, faltan estos casos de uso para que la API pueda
 ser fina:
 
-- `UpdateInvestmentBriefUseCase`: escribir brief con hash opcional.
 - `ReadPortfolioTargetsUseCase`: leer targets completos validados.
 - `UpdatePortfolioTargetsUseCase`: validar y escribir targets estructurados.
 
 ## Orden recomendado
 
-1. Implementar los casos de uso de escritura y targets pendientes sin FastAPI.
+1. Implementar los casos de uso de lectura/escritura de targets pendientes sin
+   FastAPI.
 2. Adaptar Streamlit para usar esos casos de uso cuando aplique.
 3. Anadir tests unitarios de contratos JSON sobre `src/application/`.
 4. Solo entonces montar FastAPI como wrapper fino.

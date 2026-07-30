@@ -4,11 +4,9 @@ from __future__ import annotations
 
 from dataclasses import asdict, dataclass
 from datetime import date
-from math import isfinite
 from typing import Any
 
-import pandas as pd
-
+from src.application.serialization import json_ready_value
 from src.config import Settings, get_settings
 from src.portfolio import (
     calculate_portfolio_metrics_from_normalized_degiro,
@@ -76,10 +74,10 @@ class GetPortfolioStateUseCase:
         return GetPortfolioStateResult(
             as_of_date=projection.as_of_date.isoformat(),
             base_currency=metrics.base_currency,
-            summary=_json_ready_value(summary),
-            broker_snapshot=_json_ready_value(projection.broker_snapshot),
-            positions=_json_ready_value(list(projection.positions)),
-            history=_json_ready_value(list(projection.history)),
+            summary=json_ready_value(summary),
+            broker_snapshot=json_ready_value(projection.broker_snapshot),
+            positions=json_ready_value(list(projection.positions)),
+            history=json_ready_value(list(projection.history)),
             data_quality={"warnings": list(projection.warnings)},
         )
 
@@ -91,22 +89,6 @@ def _parse_as_of_date(value: str | None) -> date | None:
         return date.fromisoformat(value)
     except ValueError as exc:
         raise ValueError("as_of_date must use ISO format YYYY-MM-DD.") from exc
-
-
-def _json_ready_value(value: Any) -> Any:
-    if isinstance(value, dict):
-        return {str(key): _json_ready_value(item) for key, item in value.items()}
-    if isinstance(value, (tuple, list)):
-        return [_json_ready_value(item) for item in value]
-    if isinstance(value, (date, pd.Timestamp)):
-        return value.isoformat()
-    if isinstance(value, float) and not isfinite(value):
-        return None
-    if value is None or pd.isna(value):
-        return None
-    if hasattr(value, "item") and callable(value.item):
-        return _json_ready_value(value.item())
-    return value
 
 
 __all__ = [

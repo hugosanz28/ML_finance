@@ -61,13 +61,18 @@ from src.application.dashboard import (
     LoadPortfolioSnapshotsUseCase,
     LoadPortfolioTransactionsResult,
     LoadPortfolioTransactionsUseCase,
-    ReadInvestmentBriefResult,
-    ReadInvestmentBriefUseCase,
     ReadTargetWeightsResult,
     ReadTargetWeightsUseCase,
     extract_monthly_report_as_of_date,
     extract_report_as_of_date_from_path,
     net_external_contributions_until,
+)
+from src.application.settings import (
+    ReadInvestmentBriefResult,
+    ReadInvestmentBriefUseCase,
+    UpdateInvestmentBriefRequest,
+    UpdateInvestmentBriefResult,
+    UpdateInvestmentBriefUseCase,
 )
 from src.application.portfolio_state import (
     GetPortfolioStateRequest,
@@ -134,6 +139,9 @@ __all__ = [
     "ReadInvestmentBriefUseCase",
     "ReadTargetWeightsResult",
     "ReadTargetWeightsUseCase",
+    "UpdateInvestmentBriefRequest",
+    "UpdateInvestmentBriefResult",
+    "UpdateInvestmentBriefUseCase",
     "RunMonthlyAgentsRequest",
     "RunMonthlyAgentsResult",
     "RunMonthlyAgentsUseCase",
