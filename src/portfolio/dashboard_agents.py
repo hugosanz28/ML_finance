@@ -156,7 +156,7 @@ def render_agents_tab(settings: Settings) -> None:
             report_option=report_option,
             report_text_input=report_text_input,
             snapshot_text_input=snapshot_text_input,
-            metrics_end_date=metrics.end_date,
+            metrics=metrics,
             target_weights_invalid=target_weights_invalid,
             send_target_weights=send_target_weights,
             target_weights=target_weights,
@@ -230,7 +230,10 @@ def _render_persisted_agent_audit(settings: Settings) -> None:
         st.error(str(exc))
         return
 
-    _render_run_overview(audit.run_metadata, audit.input_payload, audit.output_dir)
+    _render_run_overview(audit.run_metadata, audit.input_payload, audit.preflight, audit.output_dir)
+    if audit.run_metadata.get("execution_status") == "blocked":
+        st.info("Los agentes no se ejecutaron porque el preflight detecto errores bloqueantes.")
+        return
     agent_tabs = st.tabs(["monitor_tematico", "analista_activos", "asistente_aportacion_mensual"])
     for tab, agent_name in zip(
         agent_tabs,
@@ -241,7 +244,12 @@ def _render_persisted_agent_audit(settings: Settings) -> None:
             _render_agent_audit(agent_name, audit.agents.get(agent_name, {}))
 
 
-def _render_run_overview(run_metadata: Mapping[str, Any], input_payload: Mapping[str, Any], output_dir: Path) -> None:
+def _render_run_overview(
+    run_metadata: Mapping[str, Any],
+    input_payload: Mapping[str, Any],
+    preflight: Mapping[str, Any],
+    output_dir: Path,
+) -> None:
     st.markdown("#### Run")
     columns = st.columns(4)
     columns[0].metric("run_id", str(run_metadata.get("run_id") or output_dir.name))
@@ -256,6 +264,7 @@ def _render_run_overview(run_metadata: Mapping[str, Any], input_payload: Mapping
     if agent_statuses:
         st.dataframe(pd.DataFrame(agent_statuses), width="stretch", hide_index=True)
 
+    _render_quality_preflight(preflight)
     with st.expander("Inputs del run", expanded=False):
         _render_input_refs(input_payload.get("inputs") or [], key_prefix="run")
     with st.expander("Prompt versions", expanded=False):
@@ -419,7 +428,7 @@ def _run_agents_from_ui(
     report_option,
     report_text_input: str,
     snapshot_text_input: str,
-    metrics_end_date: date,
+    metrics,
     target_weights_invalid: bool,
     send_target_weights: bool,
     target_weights: dict[str, Any],
@@ -439,31 +448,15 @@ def _run_agents_from_ui(
     except Exception:
         st.error("`portfolio_metrics_snapshot` no es JSON valido.")
         return
-    snapshot_as_of = _snapshot_as_of_date(portfolio_metrics_snapshot)
     selected_report_date = extract_monthly_report_as_of_date(report_text_input, path=Path(report_option["path"]))
-    if selected_report_date is None:
-        st.error("El informe seleccionado no contiene una fecha `as_of_date` detectable.")
-        return
-    if selected_report_date != metrics_end_date:
-        st.error(
-            "Bloqueado: el informe mensual no corresponde a la cartera actual. "
-            f"Informe: {selected_report_date.isoformat()} | cartera: {metrics_end_date.isoformat()}."
-        )
-        return
-    if snapshot_as_of != metrics_end_date:
-        st.error(
-            "`portfolio_metrics_snapshot` no corresponde a la cartera actual. "
-            f"Snapshot: {snapshot_as_of.isoformat() if snapshot_as_of else 'sin fecha'} | "
-            f"cartera: {metrics_end_date.isoformat()}."
-        )
-        return
     if target_weights_invalid:
         st.error("`target_weights` esta activado pero no es un JSON valido.")
         return
 
     override_dir = settings.data_dir / "agents" / "input_overrides"
     override_dir.mkdir(parents=True, exist_ok=True)
-    report_override_path = override_dir / f"latest_monthly_report_override_{selected_report_date.isoformat()}.md"
+    report_date_label = selected_report_date.isoformat() if selected_report_date else "undated"
+    report_override_path = override_dir / f"latest_monthly_report_override_{report_date_label}.md"
     report_override_path.write_text(report_text_input, encoding="utf-8")
 
     request_parameters: dict[str, Any] = {}
@@ -475,6 +468,7 @@ def _run_agents_from_ui(
                 RunMonthlyAgentsRequest(
                     investment_brief_text=investment_brief,
                     monthly_report_path=report_override_path,
+                    metrics=metrics,
                     user_satellite_interest=user_interest or None,
                     monthly_budget=monthly_budget,
                     llm_provider=llm_provider,
@@ -484,11 +478,23 @@ def _run_agents_from_ui(
                     portfolio_metrics_snapshot=portfolio_metrics_snapshot,
                 )
             )
-            result = agents_result.pipeline_result
-    except ValueError as exc:
+    except (FileNotFoundError, OSError, ValueError) as exc:
         st.error(str(exc))
         return
-    st.success(f"Run {result.run_id} guardado en {result.output_dir}")
+    _render_quality_preflight(agents_result.quality_result.to_dict())
+    result = agents_result.pipeline_result
+    if result is None:
+        st.error(agents_result.result.message)
+        output_dir = agents_result.result.artifacts.get("output_dir")
+        if output_dir:
+            st.caption(f"Intento auditado en: {output_dir}")
+        return
+    if agents_result.result.status == "failed":
+        st.error(agents_result.result.message)
+    elif agents_result.result.status == "partial":
+        st.warning(agents_result.result.message)
+    else:
+        st.success(f"Run {result.run_id} guardado en {result.output_dir}")
     render_agent_result("monitor_tematico", result.monitor_tematico)
     render_agent_result("analista_activos", result.analista_activos)
     render_agent_result("asistente_aportacion_mensual", result.asistente_aportacion_mensual)
@@ -542,13 +548,19 @@ def _render_agent_inputs_summary(*, send_target_weights: bool, target_weights: M
             st.json(target_weights if target_weights else {"_status": "no definido"})
 
 
-def _snapshot_as_of_date(portfolio_metrics_snapshot: Mapping[str, Any]) -> date | None:
-    snapshot_as_of_raw = portfolio_metrics_snapshot.get("as_of_date")
-    try:
-        return date.fromisoformat(str(snapshot_as_of_raw)[:10]) if snapshot_as_of_raw else None
-    except ValueError:
-        st.error("`portfolio_metrics_snapshot.as_of_date` no es una fecha valida.")
-        return None
+def _render_quality_preflight(preflight: Mapping[str, Any]) -> None:
+    if not preflight:
+        return
+    st.markdown("#### Preflight de calidad")
+    counts = preflight.get("counts") or {}
+    columns = st.columns(4)
+    columns[0].metric("estado", str(preflight.get("status") or "-"))
+    columns[1].metric("errores", str(counts.get("error", 0)))
+    columns[2].metric("warnings", str(counts.get("warning", 0)))
+    columns[3].metric("fecha", str(preflight.get("as_of_date") or "-"))
+    issues = preflight.get("issues") or []
+    if issues:
+        st.dataframe(pd.DataFrame(issues), width="stretch", hide_index=True)
 
 
 def _markdown_list(values: Any) -> str:

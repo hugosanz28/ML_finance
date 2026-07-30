@@ -20,6 +20,7 @@ proyecto usa [versionado semántico](https://semver.org/lang/es/).
   externas para dashboard, informes y futuras interfaces.
 - Providers `synthetic` de precios y FX que mantienen la demo completamente
   offline, además de búsqueda `static` determinista para agentes.
+- Auditoría `preflight.json` para runs permitidos e intentos bloqueados.
 
 ### Cambiado
 
@@ -32,6 +33,8 @@ proyecto usa [versionado semántico](https://semver.org/lang/es/).
   `src/application/` en lugar de acceder directamente al dominio.
 - Los defaults de agentes son `llm_provider=static` y
   `search_provider=null`; `static/static` queda como modo demo offline completo.
+- La ejecución mensual aplica quality checks obligatorios antes de llamar a
+  providers; los warnings continúan como `partial`.
 
 ### Corregido
 
@@ -45,6 +48,8 @@ proyecto usa [versionado semántico](https://semver.org/lang/es/).
   valores no finitos en `null`.
 - La salida humana del runner temático conserva el estado del agente mientras
   `ApplicationResult` usa el vocabulario normalizado de la capa de aplicación.
+- CLI y Streamlit comparten el bloqueo estructurado por calidad y no crean
+  resultados ficticios cuando el preflight falla.
 
 ### Seguridad
 

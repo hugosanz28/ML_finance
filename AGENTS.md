@@ -49,6 +49,9 @@ Invariantes y errores tipicos:
 
 - No asumas que `src/data/local/` existe, esta poblado o puede abrirse sin necesidad.
 - No mezcles un informe mensual y un `portfolio_metrics_snapshot` con fechas distintas; el pipeline debe bloquearlo.
+- Las interfaces y ejecuciones de usuario deben entrar por
+  `RunMonthlyAgentsUseCase`: el preflight bloquea errores antes de construir
+  providers y audita el intento cuando la persistencia esta activa.
 - No uses `.\scripts\run_demo.ps1` en automatizacion: abre Streamlit y queda vivo.
 - No llames desde Streamlit a `src.agents`, `src.reports`, `src.market_data` o importadores si ya hay caso de uso en `src/application/`.
 - No cambies prompts/agentes sin mantener la auditoria: plan, acciones, fuentes, prompts, warnings, inputs y outputs.
@@ -85,6 +88,7 @@ Mapa rapido de tests por area:
 | `src/application/` | `tests\test_application_layer.py`, `tests\test_interface_boundaries.py` |
 | Agentes | `tests\test_agent_*.py`, `tests\test_*agente*.py`, `tests\test_monitor_tematico.py`, `tests\test_analista_activos.py`, `tests\test_asistente_aportacion_mensual.py` |
 | Auditoria de agentes | `tests\test_agent_audit_trail.py`, `tests\test_application_layer.py` |
+| Preflight de agentes | `tests\test_data_quality.py`, `tests\test_application_layer.py`, `tests\test_agent_audit_trail.py`, `tests\test_run_monthly_agents_cli.py` |
 | Dashboard | `tests\test_dashboard_transforms.py`, `tests\test_streamlit_dashboard_uploads.py` |
 | DEGIRO/importacion | `tests\test_degiro_*.py` |
 | Portfolio/metricas | `tests\test_portfolio_metrics.py`, `tests\test_positions.py`, `tests\test_portfolio_state_projection.py`, `tests\test_portfolio_contributions.py` |

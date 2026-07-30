@@ -302,7 +302,8 @@ Ejecuta el pipeline mensual de agentes.
 Caso de uso base:
 
 - `RunMonthlyAgentsUseCase`
-- `RunAgentQualityChecksUseCase` como preflight recomendado
+- `RunAgentQualityChecksUseCase` como preflight obligatorio dentro del caso de
+  uso anterior
 - `BuildAgentDashboardSnapshotUseCase` si la UI envia snapshot preparado desde
   estado de cartera
 
@@ -335,19 +336,40 @@ Respuesta:
   "status": "succeeded",
   "message": "Monthly agents completed successfully.",
   "warnings": [],
+  "preflight": {
+    "status": "passed",
+    "can_run_agents": true,
+    "counts": {"error": 0, "warning": 0, "info": 1},
+    "issues": [
+      {
+        "code": "portfolio_metrics_ready",
+        "severity": "info",
+        "message": "Portfolio metrics passed agent input quality checks."
+      }
+    ]
+  },
   "artifacts": {
     "run_id": "20260623T101500123456",
     "as_of_date": "2026-06-23",
     "output_dir": "src/data/local/agents/monthly_pipeline/20260623T101500123456",
-    "monitor_tematico_status": "succeeded",
-    "analista_activos_status": "succeeded",
-    "asistente_aportacion_mensual_status": "succeeded"
+    "execution_status": "succeeded",
+    "preflight_status": "passed",
+    "monitor_tematico_status": "success",
+    "analista_activos_status": "success",
+    "asistente_aportacion_mensual_status": "success"
   }
 }
 ```
 
 Notas:
 
+- El ejemplo de `preflight` esta abreviado; el payload tipado tambien incluye
+  `schema_version`, `as_of_date`, `inputs` y `details`.
+- Si el preflight bloquea, la respuesta usa `status=failed`,
+  `artifacts.execution_status=blocked` y no incluye un resultado de pipeline.
+  Con `persist=true` puede guardar `preflight.json` y `run_metadata.json`, pero
+  nunca resultados ficticios de agentes.
+- Los warnings de calidad permiten ejecutar y fuerzan `status=partial`.
 - El contrato usa defaults offline seguros:
   `llm_provider=static` y `search_provider=null`. La demo publica puede optar
   por `static/static` para añadir contexto de busqueda sintetico.
@@ -387,9 +409,21 @@ Respuesta:
       "output_dir": "src/data/local/agents/monthly_pipeline/20260623T101500123456",
       "status": "succeeded",
       "agent_statuses": {
-        "monitor_tematico": "succeeded",
-        "analista_activos": "succeeded",
-        "asistente_aportacion_mensual": "succeeded"
+        "monitor_tematico": "success",
+        "analista_activos": "success",
+        "asistente_aportacion_mensual": "success"
+      }
+    },
+    {
+      "run_id": "20260624T101500123456",
+      "as_of_date": "2026-06-24",
+      "generated_at": "2026-06-24T10:15:00+02:00",
+      "output_dir": "src/data/local/agents/monthly_pipeline/20260624T101500123456",
+      "status": "blocked",
+      "agent_statuses": {
+        "monitor_tematico": "not_run",
+        "analista_activos": "not_run",
+        "asistente_aportacion_mensual": "not_run"
       }
     }
   ]
@@ -415,6 +449,14 @@ Respuesta:
     "llm_provider": "static",
     "search_provider": "null"
   },
+  "preflight": {
+    "schema_version": 1,
+    "status": "passed",
+    "can_run_agents": true,
+    "as_of_date": "2026-06-23",
+    "counts": {"error": 0, "warning": 0, "info": 1},
+    "issues": []
+  },
   "inputs": [
     {
       "key": "investment_brief",
@@ -424,17 +466,17 @@ Respuesta:
   ],
   "agents": {
     "monitor_tematico": {
-      "status": "succeeded",
+      "status": "success",
       "summary": "Resumen corto del agente.",
       "warnings": []
     },
     "analista_activos": {
-      "status": "succeeded",
+      "status": "success",
       "summary": "Resumen corto del agente.",
       "warnings": []
     },
     "asistente_aportacion_mensual": {
-      "status": "succeeded",
+      "status": "success",
       "summary": "Resumen corto del agente.",
       "warnings": []
     }
@@ -442,13 +484,16 @@ Respuesta:
   "artifact_paths": {
     "pipeline_result": "src/data/local/agents/monthly_pipeline/20260623T101500123456/pipeline_result.json",
     "run_metadata": "src/data/local/agents/monthly_pipeline/20260623T101500123456/run_metadata.json",
-    "input_payload": "src/data/local/agents/monthly_pipeline/20260623T101500123456/input_payload.json"
+    "input_payload": "src/data/local/agents/monthly_pipeline/20260623T101500123456/input_payload.json",
+    "preflight": "src/data/local/agents/monthly_pipeline/20260623T101500123456/preflight.json"
   }
 }
 ```
 
 Notas:
 
+- Un run `blocked` devuelve su `preflight`, metadata e inputs disponibles, pero
+  no tiene `pipeline_result` ni outputs de agentes.
 - El endpoint debe devolver resumen y metadatos, no necesariamente el JSON
   completo de auditoria si es muy grande.
 - Para ver bruto: posible endpoint futuro

@@ -32,6 +32,10 @@ Las interfaces comparten los mismos casos de uso:
 - agentes: `RunMonthlyAgentsUseCase` y, para ejecucion aislada,
   `RunMonitorTematicoUseCase`.
 
+`RunMonthlyAgentsUseCase` ejecuta un preflight determinista obligatorio. Errores
+de valoracion, precios, FX o fechas bloquean antes de llamar a LLM/busqueda. Los
+warnings quedan auditados y permiten continuar con estado `partial`.
+
 Para una actualizacion rapida sin importar nuevos CSVs ni generar informe, usa
 `Vista general` -> `Actualizar a hoy`. Ese boton refresca FX y precios hasta la
 fecha actual, limpia la cache y mantiene el ultimo snapshot DEGIRO como ancla.
@@ -50,6 +54,7 @@ necesariamente la fecha del snapshot.
 - Bodega DuckDB: `src/data/local/portfolio.duckdb`
 - Informes mensuales: `src/data/local/reports/`
 - Resultados de agentes: `src/data/local/agents/monthly_pipeline/<run_id>/pipeline_result.json`
+- Preflight de calidad: `src/data/local/agents/monthly_pipeline/<run_id>/preflight.json`
 - Audit trail de agentes: `src/data/local/agents/monthly_pipeline/<run_id>/run_metadata.json`,
   `input_payload.json` y `agents/<agent_name>/...`
 - Overrides temporales de informes para agentes: `src/data/local/agents/input_overrides/latest_monthly_report_override_YYYY-MM-DD.md`
@@ -78,10 +83,12 @@ necesariamente la fecha del snapshot.
   informe mensual y el `as_of_date` de `portfolio_metrics_snapshot` deben
   coincidir. Si se pasa un informe Markdown manual, la fecha se extrae de
   `as_of_date:` en el frontmatter o del titulo `Informe mensual ... YYYY-MM-DD`.
-- Desde Streamlit la validacion es mas estricta: el informe seleccionado y el
-  snapshot enviado a agentes deben coincidir tambien con la fecha valorada
-  actual de la cartera. Si no coinciden, hay que generar un informe nuevo antes
-  de ejecutar agentes.
+- Si el preflight bloquea, el comando termina con codigo `1` y, salvo que se use
+  `--no-persist`, guarda el intento sin crear resultados ni prompts de agentes.
+  Con solo warnings ejecuta la red y termina con codigo `0`.
+- Streamlit envia sus metricas y el snapshot editable al mismo
+  `RunMonthlyAgentsUseCase` que usa CLI, y muestra el preflight comun. Si las
+  fechas no coinciden, hay que generar un informe nuevo antes de ejecutar.
 - Antes de llamar a los agentes, `portfolio_metrics_snapshot` se enriquece con
   `asset_overrides.csv`: nombre normalizado, ticker, mercado y divisa de trading.
   Si DEGIRO entrega un nombre truncado, se conserva como `broker_asset_name` y

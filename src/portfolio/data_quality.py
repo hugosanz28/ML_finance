@@ -198,6 +198,7 @@ def check_agent_input_quality(
     *,
     metrics: PortfolioMetricsResult,
     monthly_report_date: date | None = None,
+    require_monthly_report_date: bool = False,
     portfolio_metrics_snapshot: Mapping[str, Any] | None = None,
     min_valuation_coverage_ratio: float = 1.0,
     min_return_coverage_ratio: float = 0.8,
@@ -212,12 +213,23 @@ def check_agent_input_quality(
     as_of_date = metrics_report.as_of_date
     snapshot_date = extract_snapshot_as_of_date(portfolio_metrics_snapshot)
 
+    if require_monthly_report_date and monthly_report_date is None:
+        issues.append(
+            DataQualityIssue(
+                code="monthly_report_date_missing",
+                severity="error",
+                message="The selected monthly report does not contain a valid as_of_date.",
+            )
+        )
     if portfolio_metrics_snapshot is not None and snapshot_date is None:
         issues.append(
             DataQualityIssue(
                 code="snapshot_date_missing",
                 severity="error",
-                message="portfolio_metrics_snapshot must include `as_of_date` or `daily.valuation_date`.",
+                message=(
+                    "portfolio_metrics_snapshot must include a valid "
+                    "`as_of_date` or `daily.valuation_date`."
+                ),
             )
         )
     if snapshot_date is not None and as_of_date is not None and snapshot_date != as_of_date:
@@ -277,7 +289,10 @@ def extract_snapshot_as_of_date(snapshot: Mapping[str, Any] | None) -> date | No
     if isinstance(raw_date, date):
         return raw_date
     if isinstance(raw_date, str) and raw_date.strip():
-        return date.fromisoformat(raw_date[:10])
+        try:
+            return date.fromisoformat(raw_date[:10])
+        except ValueError:
+            return None
     return None
 
 

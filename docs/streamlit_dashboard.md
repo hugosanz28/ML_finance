@@ -93,12 +93,12 @@ oficiales de DEGIRO, primero debes subir/importar las exportaciones en
    ejecucion real usa `openai/tavily` si tienes `TAVILY_API_KEY`;
    `openai/duckduckgo` queda como fallback best-effort sin API key.
 
-La pestaña `Agentes` bloquea la ejecucion si el informe mensual seleccionado no
-corresponde a la fecha valorada actual de la cartera, o si el
-`portfolio_metrics_snapshot` editable tiene otro `as_of_date`. Esto evita mezclar
-un informe antiguo con metricas actuales. Si aparece el bloqueo, vuelve a
-`Actualizar datos` y genera un informe nuevo para la fecha actual antes de
-ejecutar la red.
+La pestaña `Agentes` envia los inputs a `RunMonthlyAgentsUseCase`, que ejecuta el
+mismo preflight usado por CLI. Si el informe, las metricas calculadas y el
+`portfolio_metrics_snapshot` no comparten fecha, o faltan precios/FX, la UI
+muestra los codigos de calidad y no se construyen providers. Si aparece el
+bloqueo, vuelve a `Actualizar datos` y corrige los datos o genera un informe
+nuevo antes de ejecutar la red.
 
 `BuildAgentDashboardSnapshotUseCase` prepara el
 `portfolio_metrics_snapshot` editable y aplica `asset_overrides.csv`. Cuando
@@ -112,7 +112,7 @@ La pestana `Agentes` incluye un bloque `Auditoria de agentes` para revisar runs
 persistidos en `src/data/local/agents/monthly_pipeline/<run_id>/` o en el
 directorio demo equivalente. Esta vista permite inspeccionar:
 
-- estado del run, fechas, inputs y versiones de prompts;
+- estado del run, preflight de calidad, fechas, inputs y versiones de prompts;
 - plan interno, acciones permitidas, acciones usadas, acciones descartadas y
   base de decision de cada agente;
 - warnings y errores;
@@ -125,6 +125,9 @@ directorio demo equivalente. Esta vista permite inspeccionar:
 La `raw_response` puede aparecer como `not_captured` porque los proveedores
 actuales devuelven objetos de dominio ya parseados. Si mas adelante interesa
 auditar la respuesta bruta del LLM, habra que ampliar el contrato de providers.
+Los intentos bloqueados persistidos tambien aparecen en la lista con estado
+`blocked`. Incluyen metadata, inputs y preflight, pero no `pipeline_result.json`,
+outputs ni tabs de agentes vacios.
 
 Al guardar desde la UI, el dashboard detecta el tipo de exportacion por el
 nombre del archivo y lo copia a `incoming` con el nombre canonico que exige el

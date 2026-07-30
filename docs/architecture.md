@@ -37,7 +37,8 @@ Fronteras ya disponibles:
 - `InferFxRequirementsUseCase`, `RefreshFxUseCase` y
   `RefreshMarketDataUseCase` para market data;
 - `GenerateMonthlyReportUseCase` para informes;
-- `RunMonthlyAgentsUseCase` y `RunMonitorTematicoUseCase` para agentes;
+- `RunMonthlyAgentsUseCase`, con preflight bloqueante obligatorio, y
+  `RunMonitorTematicoUseCase` para agentes;
 - `ReadInvestmentBriefUseCase` y `UpdateInvestmentBriefUseCase` para leer y
   guardar el mandato local sin escribir desde la interfaz.
 

@@ -176,16 +176,17 @@ snapshot `2026-05-26` se rechaza antes de llamar a los agentes.
 
 ## Quality checks previos
 
-La capa `src.portfolio.data_quality` define checks deterministas que pueden
-ejecutarse antes de los agentes mediante
-`RunAgentQualityChecksUseCase` en `src.application.quality_checks`.
+La capa `src.portfolio.data_quality` define checks deterministas que
+`RunMonthlyAgentsUseCase` ejecuta obligatoriamente mediante
+`RunAgentQualityChecksUseCase` antes de invocar el pipeline.
 
 El caso de uso devuelve `can_run_agents=False` y estado `failed` cuando faltan
 metricas, posiciones valoradas, precios, FX o cuando las fechas de informe,
 metricas calculadas y `portfolio_metrics_snapshot` no coinciden. La cobertura de
-rentabilidad incompleta se trata como warning. Independientemente de este
-preflight opcional, el pipeline rechaza siempre la mezcla de fechas descrita en
-la seccion anterior.
+rentabilidad incompleta se trata como warning y permite ejecutar con estado
+`partial`. Con `persist=True`, los bloqueos se auditan en `preflight.json` sin
+crear resultados ficticios de agentes. El pipeline mantiene ademas su
+validacion de fechas como segunda barrera interna.
 
 ## Identidad de activos
 
@@ -217,6 +218,7 @@ en `src/data/local/agents/monthly_pipeline/<run_id>/`. Ademas de
 `pipeline_result.json`, se guardan:
 
 - `run_metadata.json`: fecha, moneda base, estados por agente y versiones de prompts.
+- `preflight.json`: resultado, codigos, severidades y conteos de calidad.
 - `input_payload.json`: referencias de entrada completas usadas en el run.
 - `agents/<agent_name>/context.json`: contexto efectivo del agente.
 - `agents/<agent_name>/request.json`: request estructurada enviada al agente.
@@ -228,6 +230,9 @@ en `src/data/local/agents/monthly_pipeline/<run_id>/`. Ademas de
 
 Estos artefactos viven bajo `src/data/local/`, por tanto son privados y estan
 ignorados por Git. Para demos publicas deben usarse datos sinteticos.
+Con persistencia activa, un intento bloqueado contiene `run_metadata.json`,
+`preflight.json` e `input_payload.json`, pero no `pipeline_result.json` ni
+carpetas de agentes.
 
 ## Prompts versionados
 

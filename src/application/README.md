@@ -42,7 +42,8 @@ adapta el script o la vista de Streamlit correspondiente.
 `RunAgentQualityChecksUseCase` centraliza las validaciones deterministas antes
 de ejecutar agentes: cobertura de valoracion, precios/FX faltantes, existencia
 de posiciones valoradas y alineacion de fechas entre metricas, informe mensual y
-`portfolio_metrics_snapshot`.
+`portfolio_metrics_snapshot`. Devuelve `failed` con errores bloqueantes,
+`partial` cuando solo hay warnings y `succeeded` cuando el preflight esta limpio.
 
 ## Agentes mensuales
 
@@ -50,6 +51,10 @@ de posiciones valoradas y alineacion de fechas entre metricas, informe mensual y
 y devuelve un `ApplicationResult` con estado agregado, warnings y artefactos
 principales (`run_id`, `as_of_date`, `output_dir`). Scripts, Streamlit y futuras
 interfaces deben usar este caso de uso en vez de llamar directamente al pipeline.
+El caso de uso ejecuta siempre el preflight antes de construir providers. Un
+bloqueo devuelve `pipeline_result=None` y, con `persist=True`, guarda
+`preflight.json` junto con `run_metadata.json`; un warning permite continuar y
+fuerza estado agregado `partial`.
 
 `ListAgentRunsUseCase` y `GetAgentRunAuditUseCase` exponen read models de la
 auditoria persistida en disco. Streamlit los usa para visualizar plan interno,
