@@ -40,6 +40,11 @@ PORTFOLIO_TARGET_APPLICATION_CONTRACT = {
     "UpdatePortfolioTargetsRequest",
     "UpdatePortfolioTargetsUseCase",
 }
+CONTRIBUTION_LAB_APPLICATION_CONTRACT = {
+    "ReadPortfolioTargetsUseCase",
+    "SimulateContributionRequest",
+    "SimulateContributionUseCase",
+}
 
 
 @pytest.mark.parametrize("script_name", USER_FACING_SCRIPTS)
@@ -90,6 +95,18 @@ def test_dashboard_portfolio_targets_use_application_contract() -> None:
 
     assert violations == []
     assert PORTFOLIO_TARGET_APPLICATION_CONTRACT <= application_symbols
+
+
+def test_contribution_lab_uses_application_contract() -> None:
+    repo_root = default_repo_root()
+    path = repo_root / "src" / "portfolio" / "dashboard_contribution_lab.py"
+    application_symbols = {
+        symbol
+        for module, symbol, _line_number in _imported_symbols(path)
+        if module.startswith("src.application")
+    }
+
+    assert CONTRIBUTION_LAB_APPLICATION_CONTRACT <= application_symbols
 
 
 @pytest.mark.parametrize(

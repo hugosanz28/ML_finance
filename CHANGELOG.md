@@ -18,6 +18,9 @@ proyecto usa [versionado semántico](https://semver.org/lang/es/).
   control optimista por hash.
 - Contratos completos para leer y actualizar `portfolio_targets` mediante JSON
   validado, escritura atómica y control optimista por hash.
+- Laboratorio determinista de aportación con compras sobre posiciones
+  existentes, límites configurables, caja residual y comparación de pesos antes
+  y después, sin ventas ni ejecución de órdenes.
 - Proyección reutilizable de estado/PnL y cálculo centralizado de aportaciones
   externas para dashboard, informes y futuras interfaces.
 - Providers `synthetic` de precios y FX que mantienen la demo completamente

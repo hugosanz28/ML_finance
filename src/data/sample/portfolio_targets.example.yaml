@@ -6,6 +6,11 @@ target_allocation:
   ETFs: 70
   stocks: 20
   cash: 10
+asset_bucket_mapping:
+  degiro:isin:IE00SYNCORE1: ETFs
+  degiro:isin:IE00SYNBOND1: ETFs
+  degiro:isin:NL00SYNTECH1: stocks
+  degiro:cash:eur: cash
 max_single_asset_weight: 15
 max_sector_weight: 30
 rebalance_mode: contributions_only

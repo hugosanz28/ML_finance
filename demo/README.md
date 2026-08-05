@@ -86,6 +86,7 @@ como baseline: no genera contexto de busqueda y el monitor puede quedar
 En la demo puedes mostrar:
 
 - vista general de cartera ficticia;
+- laboratorio determinista de aportacion sobre las posiciones sinteticas;
 - evolucion y metricas;
 - informe mensual demo;
 - agentes con plan interno, acciones usadas, restricciones y trazabilidad.
@@ -123,7 +124,8 @@ O abre una terminal nueva y ejecuta el dashboard normal:
 
 - `synthetic_config/investment_brief.md`: mandato ficticio.
 - `synthetic_config/portfolio_targets.yaml`: objetivos ficticios con el mismo
-  contrato estructurado que lee y guarda la UI.
+  contrato estructurado que lee y guarda la UI, incluido el mapping exacto
+  entre activos sinteticos y buckets.
 - `synthetic_degiro_exports/incoming/transactions_2026-01-15_2026-04-30.csv`
 - `synthetic_degiro_exports/incoming/account_2026-01-15_2026-04-30.csv`
 - `synthetic_degiro_exports/incoming/portfolio_2026-04-30.csv`
@@ -131,5 +133,8 @@ O abre una terminal nueva y ejecuta el dashboard normal:
 Limitaciones:
 
 - La demo no pretende modelar una cartera real.
+- El laboratorio solo propone compras de posiciones actuales valoradas y
+  mapeadas. No vende ni ejecuta ordenes; la caja residual se muestra aparte y
+  no entra en los pesos posteriores.
 - Los precios sinteticos solo cubren el periodo necesario para mostrar el flujo.
 - Los agentes en modo `static/static` devuelven resultados deterministas de demo.

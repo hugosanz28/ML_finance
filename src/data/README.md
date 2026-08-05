@@ -22,9 +22,11 @@ Artefactos relevantes ya en uso:
 - `market_data/asset_overrides.csv`: overrides manuales para tickers, proxies o exclusiones del refresh.
 - `normalized/degiro/`: salida normalizada de los parsers DEGIRO, usada tambien para bootstrap de `assets_master`.
 - `portfolio_targets.yaml`: objetivos privados de cartera, pesos objetivo,
-  aportacion mensual y limites de concentracion. Hay un ejemplo versionado en
-  `sample/portfolio_targets.example.yaml`. Streamlit lo lee y actualiza mediante
-  los casos de uso estructurados de `src/application/`, no como YAML libre.
+  aportacion mensual, limites de concentracion y `asset_bucket_mapping` exacto
+  para asociar `asset_id` o ISIN con un bucket objetivo. Hay un ejemplo
+  versionado en `sample/portfolio_targets.example.yaml`. Streamlit lo lee y
+  actualiza mediante los casos de uso estructurados de `src/application/`, no
+  como YAML libre.
 - `investment_brief.md`: mandato narrativo privado de la cuenta. Hay un ejemplo
   versionado en `sample/investment_brief.example.md`.
 
