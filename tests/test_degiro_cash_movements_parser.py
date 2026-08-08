@@ -187,6 +187,20 @@ def write_account_fixture(csv_path: Path) -> None:
             "",
         ],
         [
+            "01-04-2026",
+            "08:30",
+            "01-04-2026",
+            "",
+            "",
+            "Retirada",
+            "",
+            "EUR",
+            "-250,00",
+            "EUR",
+            "1267,61",
+            "",
+        ],
+        [
             "06-04-2026",
             "06:01",
             "31-03-2026",
@@ -274,7 +288,7 @@ def test_parse_degiro_cash_movements_csv_normalizes_cash_movements(tmp_path: Pat
 
         assert parsed.date_from.isoformat() == "2025-11-01"
         assert parsed.date_to.isoformat() == "2026-04-12"
-        assert len(parsed.cash_movements) == 16
+        assert len(parsed.cash_movements) == 17
 
         buy_row = parsed.cash_movements.loc[
             parsed.cash_movements["movement_type"] == "TRADE_SETTLEMENT_BUY"
@@ -311,6 +325,11 @@ def test_parse_degiro_cash_movements_csv_normalizes_cash_movements(tmp_path: Pat
         assert interest_row["amount"] == pytest.approx(0.0)
         assert interest_row["amount_base"] == pytest.approx(0.0)
 
+        withdrawal_row = parsed.cash_movements.loc[
+            parsed.cash_movements["movement_type"] == "WITHDRAWAL"
+        ].iloc[0]
+        assert withdrawal_row["amount_base"] == pytest.approx(-250.0)
+
         tax_row = parsed.cash_movements.loc[parsed.cash_movements["movement_type"] == "TRANSACTION_TAX"].iloc[0]
         assert tax_row["amount"] == pytest.approx(-0.48)
 
@@ -338,7 +357,7 @@ def test_parse_and_persist_degiro_cash_movements_writes_parquet_output(tmp_path:
         assert parsed.output_path.exists()
 
         frame = pd.read_parquet(parsed.output_path)
-        assert len(frame) == 16
+        assert len(frame) == 17
         assert frame["cash_movement_id"].is_unique
         assert set(["movement_type", "amount", "source_file"]) <= set(frame.columns)
     finally:

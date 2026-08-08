@@ -375,6 +375,8 @@ def _classify_movement_type(description: str) -> str:
         return "TRANSACTION_TAX"
     if description in {"flatex Deposit", "Ingreso"}:
         return "DEPOSIT"
+    if description in {"flatex Withdrawal", "Retirada"}:
+        return "WITHDRAWAL"
     if description == "Flatex Interest Income":
         return "INTEREST"
     if description.startswith("Promoción DEGIRO"):

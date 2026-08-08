@@ -11,6 +11,10 @@ La proyeccion reutilizable de snapshots broker, coste y PnL vive en
 `src/portfolio/state_projection.py`. Informes, dashboard y snapshot de agentes
 consumen esa implementacion comun para no duplicar reglas financieras.
 
+El rendimiento ajustado por aportaciones y retiradas vive por separado en
+`src/portfolio/performance.py`. Calcula retornos por intervalo, TWR y MWR/XIRR
+con contratos explicitos; consulta `docs/performance.md`.
+
 Parte de:
 
 - historico de posiciones por `asset_id` y fecha,
@@ -79,6 +83,10 @@ Campos principales:
   `missing_fx` cuando no puede valorar una posicion,
 - y calcula drawdown sobre el valor agregado efectivamente valorado.
 
+`daily_return_pct` es la variacion bruta del valor agregado y no descuenta
+aportaciones o retiradas. Para analizar rendimiento financiero debe usarse la
+serie ajustada y el TWR de `src/portfolio/performance.py`.
+
 En la demo, `PRICE_PROVIDER=synthetic` conserva las series sinteticas sembradas
 y no accede a red. No sustituye la politica de valoracion ni fabrica precios
 nuevos.
@@ -125,6 +133,10 @@ Ficheros generados:
 
 ## Alcance y limites
 
-- la rentabilidad actual es basica y se apoya en coste base e inventario restante,
-- no calcula aun rentabilidad money-weighted ni time-weighted,
-- y la cobertura de divisa depende de que existan `fx_rates` o de que el activo ya cotice en la moneda base.
+- la rentabilidad basada en coste sigue describiendo el inventario restante;
+- TWR y MWR/XIRR existen como capa de dominio, pero aun no estan integrados en
+  UI, API ni agentes;
+- el TWR diario aplica la convencion documentada para flujos fechados sin
+  valoracion intradia;
+- y la cobertura de divisa depende de que existan `fx_rates` o de que el activo
+  ya cotice en la moneda base.

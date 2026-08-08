@@ -266,6 +266,8 @@ Excepcion confirmada:
 Consecuencia para el parser:
 
 - `Descripción` debe gobernar la clasificacion inicial del movimiento
+- `Ingreso`/`flatex Deposit` se normalizan como `DEPOSIT` y
+  `Retirada`/`flatex Withdrawal` como `WITHDRAWAL`
 - `Tipo` debe tratarse como campo contextual opcional, no como enumeracion de
   negocio
 

@@ -20,6 +20,7 @@ viven en rutas locales ignoradas por Git y la demo publica usa datos sinteticos.
 - Importacion y normalizacion de transacciones, efectivo y snapshots DEGIRO.
 - Base local DuckDB/Parquet para datos derivados.
 - Reconstruccion diaria de posiciones y metricas agregadas de cartera.
+- Base de rendimiento ajustado por flujos con retornos diarios, TWR y MWR/XIRR.
 - Refresco de FX y precios con politica `broker_snapshot_anchored`.
 - Informe mensual en Markdown.
 - Laboratorio determinista para simular aportaciones sobre posiciones actuales,
@@ -165,6 +166,7 @@ Consulta `docs/streamlit_dashboard.md`, `docs/monthly_pipeline.md` y
 - `docs/privacy.md`: separacion publico/privado y checklist de secretos.
 - `docs/streamlit_dashboard.md`: uso del dashboard local.
 - `docs/monthly_pipeline.md`: flujo mensual completo con informes y agentes.
+- `docs/performance.md`: contratos, formulas y limites de TWR y MWR/XIRR.
 - `src/agents/README.md`: detalle funcional de agentes.
 - `src/application/README.md`: capa de casos de uso.
 - `AGENTS.md`: instrucciones compactas para agentes de programacion.

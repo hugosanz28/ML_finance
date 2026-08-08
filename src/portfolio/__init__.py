@@ -19,7 +19,24 @@ from .data_quality import (
     check_portfolio_metrics_quality,
     extract_snapshot_as_of_date,
 )
-from .contributions import net_external_contributions_until
+from .contributions import classify_external_cash_flows, net_external_contributions_until
+from .performance import (
+    DEFAULT_PERFORMANCE_PERIODS,
+    calculate_daily_returns,
+    calculate_money_weighted_return,
+    calculate_portfolio_performance,
+    calculate_time_weighted_return,
+)
+from .performance_models import (
+    CashFlowClassificationIssue,
+    CashFlowClassificationResult,
+    DailyPerformanceObservation,
+    ExternalCashFlow,
+    PerformanceMetric,
+    PerformancePeriodResult,
+    PortfolioPerformanceResult,
+    PortfolioValuation,
+)
 from .positions import (
     ReconstructedPositionHistory,
     load_normalized_degiro_snapshots,
@@ -38,11 +55,25 @@ __all__ = [
     "POSITION_METRICS_COLUMNS",
     "DataQualityIssue",
     "DataQualityReport",
+    "DEFAULT_PERFORMANCE_PERIODS",
+    "CashFlowClassificationIssue",
+    "CashFlowClassificationResult",
+    "DailyPerformanceObservation",
+    "ExternalCashFlow",
+    "PerformanceMetric",
+    "PerformancePeriodResult",
+    "PortfolioPerformanceResult",
+    "PortfolioValuation",
     "ReconstructedPositionHistory",
     "calculate_portfolio_metrics",
     "calculate_portfolio_metrics_from_normalized_degiro",
+    "calculate_money_weighted_return",
+    "calculate_daily_returns",
+    "calculate_portfolio_performance",
+    "calculate_time_weighted_return",
     "check_agent_input_quality",
     "check_portfolio_metrics_quality",
+    "classify_external_cash_flows",
     "extract_snapshot_as_of_date",
     "load_normalized_degiro_snapshots",
     "load_normalized_degiro_transactions",

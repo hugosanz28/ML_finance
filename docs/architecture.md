@@ -85,7 +85,9 @@ Estado actual de esta capa:
   `broker_snapshot_anchored`,
 - proyecciones compartidas de snapshot broker, coste y PnL en
   `state_projection.py`,
-- consultas de aportaciones externas en `contributions.py`,
+- clasificacion auditable de aportaciones y retiradas externas en
+  `contributions.py`,
+- retornos diarios ajustados por flujos, TWR y MWR/XIRR en `performance.py`,
 - planificacion determinista `contributions_only` en
   `contribution_planner.py`, limitada a posiciones actuales valoradas y
   mapeadas,
