@@ -52,6 +52,11 @@ FX y precios permanecen offline: conservan las series precargadas y marcan como
 omitidos los rangos que no cubre la demo, en vez de consultar proveedores
 externos.
 
+La demo incluye tambien la seleccion MSCI World, S&P 500, cartera 60/40 y
+efectivo €STR. `SyntheticBenchmarkProvider` genera esas referencias y el FX
+necesario de forma determinista y sin red. Esta base aun no se muestra en la UI
+Streamlit; queda preparada para la capa de aplicacion y la futura UI.
+
 Este es el comando recomendado para ensenar el proyecto a otra persona:
 
 ```powershell
@@ -126,6 +131,8 @@ O abre una terminal nueva y ejecuta el dashboard normal:
 - `synthetic_config/portfolio_targets.yaml`: objetivos ficticios con el mismo
   contrato estructurado que lee y guarda la UI, incluido el mapping exacto
   entre activos sinteticos y buckets.
+- `synthetic_config/benchmark_selection.json`: benchmark principal,
+  referencias secundarias y composicion 60/40.
 - `synthetic_degiro_exports/incoming/transactions_2026-01-15_2026-04-30.csv`
 - `synthetic_degiro_exports/incoming/account_2026-01-15_2026-04-30.csv`
 - `synthetic_degiro_exports/incoming/portfolio_2026-04-30.csv`

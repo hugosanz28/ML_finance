@@ -1,5 +1,19 @@
 """Portfolio domain logic, historical reconstruction, and dashboard code."""
 
+from .benchmark_models import (
+    BenchmarkComparison,
+    BenchmarkComparisonMetric,
+    BenchmarkSelection,
+    GrowthComparisonPoint,
+    PortfolioBenchmarkComparisonResult,
+)
+from .benchmarks import (
+    MIN_STATISTICAL_OBSERVATIONS,
+    benchmark_selection_from_mapping,
+    build_benchmark_return_series,
+    compare_portfolio_to_benchmarks,
+    load_benchmark_selection,
+)
 from .metrics import (
     calculate_portfolio_metrics,
     calculate_portfolio_metrics_from_normalized_degiro,
@@ -49,6 +63,12 @@ from .positions import (
 from .targets import PortfolioTargets, load_portfolio_targets, portfolio_targets_from_mapping
 
 __all__ = [
+    "BenchmarkComparison",
+    "BenchmarkComparisonMetric",
+    "BenchmarkSelection",
+    "GrowthComparisonPoint",
+    "MIN_STATISTICAL_OBSERVATIONS",
+    "PortfolioBenchmarkComparisonResult",
     "PortfolioMetricsResult",
     "PortfolioTargets",
     "PORTFOLIO_DAILY_METRICS_COLUMNS",
@@ -71,12 +91,16 @@ __all__ = [
     "calculate_daily_returns",
     "calculate_portfolio_performance",
     "calculate_time_weighted_return",
+    "benchmark_selection_from_mapping",
+    "build_benchmark_return_series",
+    "compare_portfolio_to_benchmarks",
     "check_agent_input_quality",
     "check_portfolio_metrics_quality",
     "classify_external_cash_flows",
     "extract_snapshot_as_of_date",
     "load_normalized_degiro_snapshots",
     "load_normalized_degiro_transactions",
+    "load_benchmark_selection",
     "load_portfolio_targets",
     "load_fx_rates_from_duckdb",
     "load_prices_daily_from_duckdb",

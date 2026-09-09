@@ -48,6 +48,8 @@ def main() -> int:
     from src.degiro_exports.importer import import_degiro_exports
     from src.degiro_exports.warehouse import load_normalized_degiro_to_duckdb
     from src.market_data import DuckDBMarketDataRepository
+    from src.market_data import SyntheticBenchmarkProvider
+    from src.portfolio import build_benchmark_return_series, load_benchmark_selection
     from src.reports import generate_monthly_report
 
     os.environ["ML_FINANCE_ENV_FILE"] = str(DEMO_ENV_FILE)
@@ -83,6 +85,19 @@ def main() -> int:
     repository = DuckDBMarketDataRepository(settings=settings)
     prices_written = _upsert_synthetic_prices(repository)
     print(f"Synthetic market data: prices={prices_written}, fx=0")
+
+    benchmark_selection = load_benchmark_selection(settings=settings, required=True)
+    benchmark_provider = SyntheticBenchmarkProvider()
+    for benchmark_id in benchmark_selection.selected_ids:
+        build_benchmark_return_series(
+            benchmark_id,
+            provider=benchmark_provider,
+            start_date=date(2026, 1, 15),
+            end_date=DEMO_AS_OF_DATE,
+            base_currency=settings.default_currency,
+            component_weights=benchmark_selection.composite_weights.get(benchmark_id),
+        )
+    print(f"Synthetic benchmarks ready: {', '.join(benchmark_selection.selected_ids)}")
 
     report = generate_monthly_report(settings=settings, as_of_date=DEMO_AS_OF_DATE, persist=True)
     print(f"Monthly report generated: {report.output_path}")

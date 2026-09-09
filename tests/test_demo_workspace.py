@@ -17,6 +17,7 @@ def test_demo_env_is_separated_from_private_local_paths() -> None:
     assert settings.portfolio_db_path == repo_root / "demo" / "local_data" / "portfolio.duckdb"
     assert settings.investment_brief_path == repo_root / "demo" / "synthetic_config" / "investment_brief.md"
     assert settings.portfolio_targets_path == repo_root / "demo" / "synthetic_config" / "portfolio_targets.yaml"
+    assert settings.benchmark_selection_path == repo_root / "demo" / "synthetic_config" / "benchmark_selection.json"
     assert settings.data_dir != repo_root / "src" / "data" / "local"
     assert settings.degiro_exports_dir != repo_root / "src" / "degiro_exports" / "local"
 

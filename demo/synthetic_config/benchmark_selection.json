@@ -1,0 +1,14 @@
+{
+  "primary_benchmark_id": "msci_world",
+  "secondary_benchmark_ids": [
+    "sp500",
+    "portfolio_60_40",
+    "estr_cash"
+  ],
+  "composite_weights": {
+    "portfolio_60_40": {
+      "msci_world": 0.6,
+      "global_aggregate_bonds_eur_hedged": 0.4
+    }
+  }
+}

@@ -88,6 +88,8 @@ Estado actual de esta capa:
 - clasificacion auditable de aportaciones y retiradas externas en
   `contributions.py`,
 - retornos diarios ajustados por flujos, TWR y MWR/XIRR en `performance.py`,
+- seleccion y comparacion de benchmarks, incluido el 60/40 mensual, en
+  `benchmarks.py`, con providers en `src/market_data/benchmarks.py`,
 - planificacion determinista `contributions_only` en
   `contribution_planner.py`, limitada a posiciones actuales valoradas y
   mapeadas,

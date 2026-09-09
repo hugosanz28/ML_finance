@@ -45,6 +45,7 @@ def test_load_settings_uses_repo_relative_defaults(workspace_tmp_path: Path) -> 
     assert settings.monthly_contribution_eur == 500.0
     assert settings.investment_brief_path == workspace_tmp_path / "src" / "data" / "local" / "investment_brief.md"
     assert settings.portfolio_targets_path == workspace_tmp_path / "src" / "data" / "local" / "portfolio_targets.yaml"
+    assert settings.benchmark_selection_path == workspace_tmp_path / "src" / "data" / "local" / "benchmark_selection.json"
 
 
 def test_load_settings_reads_values_from_env_file(workspace_tmp_path: Path) -> None:
@@ -59,6 +60,7 @@ def test_load_settings_reads_values_from_env_file(workspace_tmp_path: Path) -> N
                 "MONTHLY_CONTRIBUTION_EUR=750",
                 "INVESTMENT_BRIEF_PATH=private/brief.md",
                 "PORTFOLIO_TARGETS_PATH=private/targets.yaml",
+                "BENCHMARK_SELECTION_PATH=private/benchmarks.json",
             ]
         ),
         encoding="utf-8",
@@ -76,6 +78,7 @@ def test_load_settings_reads_values_from_env_file(workspace_tmp_path: Path) -> N
     assert settings.monthly_contribution_eur == 750.0
     assert settings.investment_brief_path == workspace_tmp_path / "private" / "brief.md"
     assert settings.portfolio_targets_path == workspace_tmp_path / "private" / "targets.yaml"
+    assert settings.benchmark_selection_path == workspace_tmp_path / "private" / "benchmarks.json"
 
 
 def test_explicit_overrides_take_precedence_over_env_file(workspace_tmp_path: Path) -> None:

@@ -1,5 +1,16 @@
 """Market data ingestion, provider contracts, and daily price refresh utilities."""
 
+from src.market_data.benchmarks import (
+    DEFAULT_BENCHMARK_CATALOG,
+    BenchmarkComponent,
+    BenchmarkDefinition,
+    BenchmarkProvider,
+    BenchmarkReturnObservation,
+    BenchmarkReturnSeries,
+    LoadedBenchmarkProvider,
+    SyntheticBenchmarkProvider,
+    selectable_benchmarks,
+)
 from src.market_data.degiro import (
     load_asset_overrides_frame,
     load_market_assets_from_normalized_degiro,
@@ -42,6 +53,12 @@ from src.market_data.repository import DuckDBMarketDataRepository
 from src.market_data.service import PriceRefreshService
 
 __all__ = [
+    "DEFAULT_BENCHMARK_CATALOG",
+    "BenchmarkComponent",
+    "BenchmarkDefinition",
+    "BenchmarkProvider",
+    "BenchmarkReturnObservation",
+    "BenchmarkReturnSeries",
     "DailyPriceRecord",
     "DuckDBMarketDataRepository",
     "FxDataNotFoundError",
@@ -54,6 +71,7 @@ __all__ = [
     "FxRefreshService",
     "FxRefreshSummary",
     "MarketAsset",
+    "LoadedBenchmarkProvider",
     "load_asset_overrides_frame",
     "load_market_assets_from_normalized_degiro",
     "PriceDataNotFoundError",
@@ -64,6 +82,7 @@ __all__ = [
     "PriceRefreshService",
     "PriceRefreshSummary",
     "SyntheticFxProvider",
+    "SyntheticBenchmarkProvider",
     "SyntheticPriceProvider",
     "UnknownFxProviderError",
     "UnknownPriceProviderError",
@@ -73,5 +92,6 @@ __all__ = [
     "build_price_provider",
     "infer_fx_requirements_from_normalized_degiro",
     "sync_market_assets_from_normalized_degiro",
+    "selectable_benchmarks",
     "write_asset_overrides_template",
 ]

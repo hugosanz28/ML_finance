@@ -56,6 +56,9 @@ Invariantes y errores tipicos:
 - Para rendimiento, solo `DEPOSIT` y `WITHDRAWAL` son flujos externos. No uses
   `daily_return_pct` como TWR ni reclasifiques dividendos, comisiones, FX o
   transferencias internas como aportaciones.
+- Los benchmarks son referencias, no recomendaciones. Conserva IDs, tipo de
+  serie, moneda, cobertura y `reason_code`; no calcules alpha, beta o tracking
+  error con menos de 30 observaciones alineadas.
 - Las interfaces y ejecuciones de usuario deben entrar por
   `RunMonthlyAgentsUseCase`: el preflight bloquea errores antes de construir
   providers y audita el intento cuando la persistencia esta activa.
@@ -107,8 +110,8 @@ Mapa rapido de tests por area:
 | Preflight de agentes | `tests\test_data_quality.py`, `tests\test_application_layer.py`, `tests\test_agent_audit_trail.py`, `tests\test_run_monthly_agents_cli.py` |
 | Dashboard | `tests\test_dashboard_transforms.py`, `tests\test_streamlit_dashboard_uploads.py` |
 | DEGIRO/importacion | `tests\test_degiro_*.py` |
-| Portfolio/metricas y laboratorio | `tests\test_portfolio_metrics.py`, `tests\test_portfolio_performance.py`, `tests\test_positions.py`, `tests\test_portfolio_state_projection.py`, `tests\test_portfolio_contributions.py`, `tests\test_contribution_planner.py`, `tests\test_contribution_application.py` |
-| Market data/FX | `tests\test_market_data.py`, `tests\test_fx_refresh.py` |
+| Portfolio/metricas y laboratorio | `tests\test_portfolio_metrics.py`, `tests\test_portfolio_performance.py`, `tests\test_benchmark_comparison.py`, `tests\test_positions.py`, `tests\test_portfolio_state_projection.py`, `tests\test_portfolio_contributions.py`, `tests\test_contribution_planner.py`, `tests\test_contribution_application.py` |
+| Market data/FX | `tests\test_market_data.py`, `tests\test_fx_refresh.py`, `tests\test_benchmark_market_data.py` |
 | Defaults offline | `tests\test_agent_safe_defaults.py`, `tests\test_demo_workspace.py` |
 | Documentacion/publicacion | `tests\test_public_documentation.py`, `tests\test_dev_commands.py` |
 | Smoke Streamlit | `tests\test_streamlit_dashboard_smoke.py` |
@@ -163,6 +166,7 @@ no dupliques aqui el pipeline completo de CI.
 | `docs/privacy.md` | Privacidad y secretos | Leer antes de publicar, demo o capturas. |
 | `docs/monthly_pipeline.md` | Flujo mensual completo | Datos, informes y agentes. |
 | `docs/performance.md` | Rendimiento de cartera | Flujos externos, retornos diarios, TWR, MWR/XIRR y limites. |
+| `docs/benchmarks.md` | Comparacion de rendimiento | Catalogo, 60/40, calendarios, FX y metricas. |
 
 Comandos principales:
 

@@ -11,6 +11,9 @@ Esta capa es dominio puro y offline. Todavia no se muestra en Streamlit ni se
 expone mediante FastAPI o agentes; esas integraciones deben entrar por un caso
 de uso de `src/application/`.
 
+La comparacion de este TWR con referencias configurables se documenta en
+`docs/benchmarks.md`.
+
 ## Entradas y clasificacion de flujos
 
 El calculo combina:
@@ -96,4 +99,3 @@ Estados:
 
 No se crea otro Parquet: estas metricas se derivan de valoraciones y flujos ya
 persistidos. Asi se evita duplicar reglas o almacenar resultados obsoletos.
-

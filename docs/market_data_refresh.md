@@ -17,6 +17,10 @@ El refresh de tipos de cambio se documenta aparte en `docs/fx_refresh.md`.
 Alimenta `fx_rates` con pares inferidos desde los normalizados de DEGIRO, por
 ejemplo `EUR/USD` o `EUR/CAD`.
 
+Las series de referencia tienen un contrato independiente en
+`src/market_data/benchmarks.py`. Actualmente pueden cargarse desde data frames o
+generarse con el provider sintetico offline; consulta `docs/benchmarks.md`.
+
 ## Ejecucion
 
 ```powershell
