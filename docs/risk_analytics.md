@@ -2,8 +2,9 @@
 
 `src/analytics/` contiene calculos offline de dominio y un catalogo explicativo
 reutilizable. No carga datos privados, consulta proveedores ni implementa una UI.
-La integracion en casos de uso, API, agentes y nueva UI pertenece a las tareas
-posteriores del roadmap; estas metricas todavia no aparecen en el dashboard.
+La integracion en casos de uso esta en `src/application/analytics.py`; API,
+agentes y nueva UI pertenecen a las siguientes tareas del roadmap. Estas
+metricas todavia no aparecen en el dashboard.
 
 ## Entradas y resultados
 

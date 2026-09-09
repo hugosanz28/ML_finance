@@ -814,3 +814,91 @@ Notas:
 
 Con estos casos de uso, un futuro endpoint FastAPI puede ser un adaptador fino
 sin acceder directamente al archivo ni al dominio de cartera.
+
+## 9. Analitica avanzada
+
+Los casos de uso siguientes estan implementados; las rutas HTTP son contratos
+previstos, **no endpoints FastAPI ya disponibles**.
+
+| Ruta GET prevista | Caso de uso |
+| --- | --- |
+| `/api/v1/analytics/summary` | `GetAnalyticsSummaryUseCase` |
+| `/api/v1/analytics/performance` | `GetPortfolioPerformanceUseCase` |
+| `/api/v1/analytics/risk` | `GetPortfolioRiskUseCase` |
+| `/api/v1/analytics/benchmarks` | `GetBenchmarkComparisonUseCase` |
+| `/api/v1/analytics/metric-definitions` | `GetMetricDefinitionsUseCase` |
+
+Las primeras cuatro rutas comparten `AnalyticsRequest`, con parametros query:
+
+| Parametro | Default | Contrato |
+| --- | --- | --- |
+| `period` | `since_inception` | `last_month`, `last_quarter`, `last_year`, `since_inception` |
+| `as_of_date` | `null` | Fecha ISO `YYYY-MM-DD`, no futura; por defecto ultimo cierre disponible |
+| `benchmark_id` | `null` | ID seleccionable; omitir usa configuracion local, no inventa una seleccion |
+| `risk_free_rate_annual` | `null` | Decimal finito mayor que -1; `0.02` representa 2 %; necesario para Sharpe/Sortino |
+
+Una consulta no cambia la seleccion guardada, ni acepta rutas, provider,
+credenciales, DataFrames o posiciones enviadas por el cliente. La configuracion
+de entorno se resuelve en el servidor; no hay parametro para saltar de demo a
+datos privados. Los errores de parametros deben mapearse a HTTP 422.
+
+`AnalyticsResult.to_dict()` tiene este sobre comun (estructura ilustrativa,
+no un resultado financiero real):
+
+```json
+{
+  "schema_version": 1,
+  "section": "summary",
+  "status": "unavailable",
+  "reason_code": "portfolio_data_unavailable",
+  "base_currency": "EUR",
+  "period": {
+    "period_id": "since_inception",
+    "requested_start": null,
+    "actual_start": null,
+    "end_date": null
+  },
+  "warnings": ["portfolio_data_unavailable"],
+  "data": {}
+}
+```
+
+Con datos, `data` contiene las secciones correspondientes:
+
+- `performance`: `period` (TWR, MWR/XIRR, numero de valoraciones y flujos),
+  `daily_returns` ajustados por flujos, y `cash_flow_issues` con codigo y fecha,
+  sin nombres privados de archivos.
+- `risk`: `portfolio` (metricas, anualizacion y tasa de referencia), y
+  `positions` (concentracion por dimension, riesgo por activo y diversificacion).
+  Las series de activos se etiquetan `valuation_price_proxy`; sus limitaciones
+  se documentan en [application](../src/application/README.md#analitica-avanzada).
+- `benchmarks`: seleccion efectiva, catalogo de opciones, comparacion con
+  crecimiento indexado/metricas y `reason_code`. La comparacion puede ser `null`
+  por falta de seleccion, provider o muestra.
+
+Cada metrica conserva valor nullable, unidad, observaciones, cobertura, estado
+y motivo. Las metricas de riesgo/rendimiento contienen sus fechas; las de
+benchmark heredan las de su comparacion. No hay NaN/Infinity, objetos de dominio,
+conexiones ni `Path` en los resultados, incluso antes de llamar a `to_dict()`.
+
+El estado agregado es `unavailable` si no hay resultados evaluables, `partial`
+si existen avisos o metricas parciales/no disponibles, y `available` en otro
+caso. La UI debe mostrar el estado de cada metrica, no sustituir todos sus
+valores porque una razon agregada sea parcial. Falta de datos es HTTP 200 con
+estado explicito, no un fallo inesperado del servidor.
+
+La seleccion temporal informa `requested_start` y `actual_start`: si el
+historico es corto, se conserva el aviso del dominio. Benchmarks usan sus
+sesiones alineadas dentro de esa ventana y explicitan fechas/cobertura propias.
+No se igualan artificialmente muestras ni convenciones de anualizacion.
+
+`GetMetricDefinitionsUseCase().execute().to_dict()` devuelve
+`{"schema_version": 1, "definitions": [...]}` sin leer configuracion ni datos.
+Cada definicion tiene `metric_id`, `name`, `description`, `formula`, `unit`,
+`interpretation`, `limitations`, `required_data` y `validity_conditions`, para
+desplegables educativos compartidos por la nueva UI y agentes.
+
+Validacion offline: `tests/test_analytics_application.py` cubre JSON estricto,
+igualdad de vistas/resumen, casos sin datos, aislamiento de entornos y demo
+completa sin escrituras durante la lectura; las fronteras de interfaz se
+protegen con `tests/test_interface_boundaries.py`. Streamlit sigue operativo.

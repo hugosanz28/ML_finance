@@ -9,6 +9,10 @@ from pathlib import Path
 import pandas as pd
 
 
+class PortfolioDataUnavailableError(ValueError):
+    """No normalized transaction or snapshot history exists to value."""
+
+
 POSITION_METRICS_COLUMNS = [
     "valuation_date",
     "asset_id",

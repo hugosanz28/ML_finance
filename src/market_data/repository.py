@@ -57,8 +57,10 @@ class DuckDBMarketDataRepository:
         *,
         settings: Settings | None = None,
         db_path: str | Path | None = None,
+        read_only: bool = False,
     ) -> None:
         self.settings = get_settings() if settings is None else settings
+        self.read_only = read_only
         self.db_path = (
             self.settings.portfolio_db_path
             if db_path is None
@@ -72,6 +74,16 @@ class DuckDBMarketDataRepository:
     @contextmanager
     def connection(self) -> Iterator[duckdb.DuckDBPyConnection]:
         """Open a connection with the project schema applied."""
+        # Analytics queries must not create directories, databases or schema objects.
+        if self.read_only:
+            if not self.db_path.is_file():
+                raise FileNotFoundError("Portfolio database is unavailable")
+            connection = duckdb.connect(str(self.db_path), read_only=True)
+            try:
+                yield connection
+            finally:
+                connection.close()
+            return
         ensure_local_directories(self.settings)
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
 

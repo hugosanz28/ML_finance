@@ -22,6 +22,16 @@ def metric_catalog() -> tuple[MetricDefinition, ...]:
     minimum = "Al menos 30 observaciones; calendario diario, 365 periodos al ano."
     historical = "Describe el historico disponible; no predice rendimientos futuros."
     definitions = [
+        ("twr", "Rentabilidad ponderada por tiempo", "Retorno compuesto ajustado por aportaciones y retiradas externas.",
+         "producto((valor_final - flujo_externo) / valor_inicial) - 1", "decimal",
+         "Describe la evolucion sin atribuir las aportaciones a ganancias.",
+         "Aproximacion diaria con flujos al cierre; no es rentabilidad intradia exacta.", daily + " Movimientos externos fechados.",
+         "Al menos dos valoraciones y aperturas positivas; cobertura y clasificacion conocidas."),
+        ("mwr_xirr", "Rentabilidad ponderada por dinero (XIRR)", "Tasa anual que equilibra los flujos del inversor.",
+         "suma(flujo_t / (1 + tasa)^((fecha_t - fecha_0)/365)) = 0", "decimal",
+         "Refleja el importe y momento de las aportaciones y retiradas.",
+         "Puede no existir solucion o haber varias; no equivale al TWR acumulado.",
+         "Valor inicial/final y flujos externos fechados.", "Solucion identificable dentro del dominio del solver; signos opuestos y fechas distintas."),
         ("volatility_annualized", "Volatilidad anualizada", "Dispersion de los retornos diarios.",
          "stdev_muestral(r) * sqrt(365)", "decimal_annualized", "Mayor valor indica mas variacion historica.",
          historical, daily, minimum),

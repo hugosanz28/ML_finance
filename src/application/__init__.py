@@ -1,5 +1,11 @@
 """Reusable application use cases for scripts, Streamlit, and future UIs."""
 
+from src.application.analytics import (
+    AnalyticsRequest, AnalyticsResult, MetricDefinitionsResult,
+    GetAnalyticsSummaryUseCase, GetPortfolioPerformanceUseCase,
+    GetPortfolioRiskUseCase, GetBenchmarkComparisonUseCase, GetMetricDefinitionsUseCase,
+)
+
 from src.application.degiro import ImportDegiroRequest, ImportDegiroResult, ImportDegiroUseCase
 from src.application.market_data import (
     FxRequirementView,
@@ -100,6 +106,9 @@ from src.application.monitor import (
 from src.application.types import ApplicationResult, ApplicationStatus
 
 __all__ = [
+    "AnalyticsRequest", "AnalyticsResult", "MetricDefinitionsResult",
+    "GetAnalyticsSummaryUseCase", "GetPortfolioPerformanceUseCase",
+    "GetPortfolioRiskUseCase", "GetBenchmarkComparisonUseCase", "GetMetricDefinitionsUseCase",
     "ApplicationResult",
     "ApplicationStatus",
     "AgentRunSummary",

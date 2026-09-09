@@ -37,6 +37,49 @@ que la interfaz no dependa de detalles internos de `src/portfolio/`,
 - simular una aportacion determinista con estado y targets locales validados,
   sin aceptar esos datos desde la interfaz ni ejecutar ordenes;
 - guardar uploads DEGIRO con nombres normalizados antes de importarlos.
+- consultar resumen analitico, TWR/MWR, riesgo, concentracion, correlaciones,
+  benchmarks y definiciones de metricas mediante read models JSON.
+
+## Analitica avanzada
+
+`GetAnalyticsSummaryUseCase`, `GetPortfolioPerformanceUseCase`,
+`GetPortfolioRiskUseCase` y `GetBenchmarkComparisonUseCase` comparten
+`AnalyticsRequest` y devuelven `AnalyticsResult`. La consulta de definiciones
+es `GetMetricDefinitionsUseCase`, sin configuracion ni acceso a datos.
+
+La seleccion de periodo se delega en rendimiento: `last_month`, `last_quarter`,
+`last_year` y `since_inception`. Todas las secciones usan su misma apertura
+efectiva y fecha final; no se recortan independientemente. `benchmark_id`
+sobrescribe la seleccion solo para esa consulta, sin escribir configuracion.
+Las formulas siguen en dominio, no en esta capa.
+
+Las consultas usan DuckDB en modo `read_only=True` y no persisten metricas,
+crean carpetas ni inicializan schemas. Solo leen rutas de `Settings`: no
+aceptan paths, DataFrames, providers ni estado de cartera en la request.
+Sin bodega o historico normalizado devuelven `portfolio_data_unavailable`.
+Errores de contrato/datos malformados se propagan; no se disfrazan como vacios.
+
+Sin exportaciones de movimientos, TWR/MWR y retornos diarios quedan no
+disponibles con `cash_flow_data_missing`. Sin tasa explicita, Sharpe/Sortino
+quedan no disponibles. Datos ausentes nunca se convierten en ceros.
+
+Las series por activo son proxies del precio de valoracion convertido a moneda
+base, independientes de cantidades. Se identifican como `valuation_price_proxy`
+y se marcan parciales: no incluyen dividendos ni ajustes adicionales de acciones
+corporativas y pueden heredar precios arrastrados o cambios de ancla del motor
+de valoracion. Solo cubren activos presentes al cierre y dias con historia
+disponible; no se rellenan huecos. Si falta valoracion actual, no se renormalizan
+los pesos restantes para atribuir riesgo. Buckets se resuelven por ID/ISIN
+exactos; mappings contradictorios quedan sin clasificar.
+
+La demo usa benchmarks sinteticos solo con `Settings.price_provider=synthetic`.
+En local real, un backend puede inyectar `LoadedBenchmarkProvider` construido
+con datos ya cargados; si no lo hace, se devuelve
+`benchmark_provider_unavailable`, sin usar red ni sustituirlo por la demo.
+El adaptador de fuente real y su persistencia siguen pendientes.
+
+Ver los payloads y rutas HTTP previstas en [contratos API](../../docs/api_contracts.md#9-analitica-avanzada).
+Tests: `tests/test_analytics_application.py` y `tests/test_interface_boundaries.py`.
 
 Las migraciones deben ser progresivas: primero se anade el wrapper, despues se
 adapta el script o la vista de Streamlit correspondiente.
@@ -112,9 +155,8 @@ por separado.
 ## Relacion con v2
 
 La nota `docs/architecture_v2.md` define que una futura API FastAPI deberia
-entrar por esta capa. La v2 no esta priorizada todavia, pero cada caso de uso
-estable aqui reduce el coste de migrar desde Streamlit a una interfaz
-cliente-servidor si mas adelante compensa.
+entrar por esta capa. El roadmap v2 contempla FastAPI local y React +
+TypeScript + Vite; estos contratos preparan la migracion manteniendo Streamlit operativo.
 
 Los contratos HTTP previstos antes de implementar FastAPI estan en
 `docs/api_contracts.md`. Si un contrato necesita logica que todavia no existe

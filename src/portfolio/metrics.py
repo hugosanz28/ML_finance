@@ -13,6 +13,7 @@ from src.market_data.repository import DuckDBMarketDataRepository
 from src.portfolio.metrics_models import (
     PORTFOLIO_DAILY_METRICS_COLUMNS,
     POSITION_METRICS_COLUMNS,
+    PortfolioDataUnavailableError,
     PortfolioMetricsResult,
 )
 from src.portfolio.positions import (
@@ -113,6 +114,9 @@ def calculate_portfolio_metrics_from_normalized_degiro(
         settings=resolved_settings,
         normalized_degiro_dir=normalized_degiro_dir,
     )
+
+    if transactions.empty and snapshots.empty:
+        raise PortfolioDataUnavailableError("No normalized portfolio history is available")
 
     reconstructed = reconstruct_positions_by_date(
         transactions,

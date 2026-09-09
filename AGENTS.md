@@ -37,6 +37,12 @@ La UI actual es Streamlit. Una futura API/FastAPI debe entrar casi siempre por `
   `UpdatePortfolioTargetsUseCase`, `SimulateContributionUseCase` y los casos
   operativos de importacion, refresh, informes y agentes.
 - Manten entradas como dataclasses `*Request` y salidas estructuradas. Para acciones operativas usa `ApplicationResult`.
+- Analitica: las interfaces usan `GetAnalyticsSummaryUseCase`,
+  `GetPortfolioPerformanceUseCase`, `GetPortfolioRiskUseCase`,
+  `GetBenchmarkComparisonUseCase` y `GetMetricDefinitionsUseCase`.
+  `AnalyticsRequest` no acepta paths/providers. Conservar lectura DuckDB
+  estricta, periodo comun, ausencia de flujos explicita y proxies de activos
+  identificados; no usar benchmarks sinteticos como fallback de datos reales.
 - No dupliques calculos financieros en `src/application/`; coordina servicios de dominio existentes.
 - `src/portfolio/dashboard.py` debe seguir siendo entrypoint fino de Streamlit. Las vistas viven en `dashboard_overview.py`, `dashboard_contribution_lab.py`, `dashboard_reports.py`, `dashboard_data_update.py` y `dashboard_agents.py`.
 - No metas logica de UI en dominio ni queries/repositorios directos en Streamlit si existe caso de uso equivalente.
@@ -117,6 +123,7 @@ Mapa rapido de tests por area:
 | Portfolio/metricas y laboratorio | `tests\test_portfolio_metrics.py`, `tests\test_portfolio_performance.py`, `tests\test_benchmark_comparison.py`, `tests\test_positions.py`, `tests\test_portfolio_state_projection.py`, `tests\test_portfolio_contributions.py`, `tests\test_contribution_planner.py`, `tests\test_contribution_application.py` |
 | Market data/FX | `tests\test_market_data.py`, `tests\test_fx_refresh.py`, `tests\test_benchmark_market_data.py` |
 | Analitica de riesgo | `tests\test_risk_analytics.py` |
+| Contratos de analitica | `tests\test_analytics_application.py`, `tests\test_interface_boundaries.py` |
 | Defaults offline | `tests\test_agent_safe_defaults.py`, `tests\test_demo_workspace.py` |
 | Documentacion/publicacion | `tests\test_public_documentation.py`, `tests\test_dev_commands.py` |
 | Smoke Streamlit | `tests\test_streamlit_dashboard_smoke.py` |

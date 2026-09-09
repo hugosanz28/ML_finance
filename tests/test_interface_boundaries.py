@@ -25,6 +25,9 @@ USER_FACING_SCRIPTS = (
     "run_monthly_agents.py",
 )
 FORBIDDEN_INTERFACE_PREFIXES = (
+    "src.analytics",
+    "src.portfolio.performance",
+    "src.portfolio.benchmarks",
     "src.agents",
     "src.degiro_exports",
     "src.market_data",
