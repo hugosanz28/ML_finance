@@ -749,7 +749,8 @@ def test_run_monthly_agents_use_case_wraps_pipeline(monkeypatch) -> None:
     assert result.result.status == "partial"
     assert result.quality_result.can_run_agents is True
     assert result.result.artifacts["run_id"] == "run-001"
-    assert result.result.warnings == ("analista_activos: missing context",)
+    assert result.result.warnings == ("quality_preflight: analytics unavailable", "analista_activos: missing context")
+    assert captured["portfolio_analytics_snapshot"]["status"] == "unavailable"
 
 
 def test_run_monthly_agents_blocks_before_pipeline_and_persists_attempt(monkeypatch) -> None:
@@ -877,7 +878,8 @@ def test_run_monthly_agents_persists_warning_preflight_on_allowed_run(monkeypatc
         assert preflight["status"] == "passed_with_warnings"
         assert metadata["execution_status"] == "partial"
         assert (output_dir / "pipeline_result.json").exists()
-        assert audit.preflight["counts"]["warning"] == 1
+        assert audit.preflight["counts"]["warning"] == 2
+        assert "analytics_unavailable" in {item["code"] for item in audit.preflight["issues"]}
         assert audit.agents["monitor_tematico"]["parsed_output"]["status"] == "success"
     finally:
         shutil.rmtree(workspace, ignore_errors=True)

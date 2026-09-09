@@ -59,6 +59,10 @@ Invariantes y errores tipicos:
 
 - No asumas que `src/data/local/` existe, esta poblado o puede abrirse sin necesidad.
 - No mezcles un informe mensual y un `portfolio_metrics_snapshot` con fechas distintas; el pipeline debe bloquearlo.
+- `portfolio_analytics_snapshot` se construye en application, nunca desde la
+  UI ni por el LLM. Conservar su schema v1, limites, validacion antes de
+  providers y hash en preflight/auditoria. No enviarlo al monitor. Prompts de
+  analista/asistente son v2; ver `docs/agent_analytics.md`.
 - Para rendimiento, solo `DEPOSIT` y `WITHDRAWAL` son flujos externos. No uses
   `daily_return_pct` como TWR ni reclasifiques dividendos, comisiones, FX o
   transferencias internas como aportaciones.
@@ -124,6 +128,7 @@ Mapa rapido de tests por area:
 | Market data/FX | `tests\test_market_data.py`, `tests\test_fx_refresh.py`, `tests\test_benchmark_market_data.py` |
 | Analitica de riesgo | `tests\test_risk_analytics.py` |
 | Contratos de analitica | `tests\test_analytics_application.py`, `tests\test_interface_boundaries.py` |
+| Analitica en agentes | `tests\test_agent_analytics.py`, `tests\test_agent_prompts.py`, `tests\test_agent_audit_trail.py` |
 | Defaults offline | `tests\test_agent_safe_defaults.py`, `tests\test_demo_workspace.py` |
 | Documentacion/publicacion | `tests\test_public_documentation.py`, `tests\test_dev_commands.py` |
 | Smoke Streamlit | `tests\test_streamlit_dashboard_smoke.py` |

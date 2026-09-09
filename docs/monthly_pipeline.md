@@ -62,6 +62,13 @@ necesariamente la fecha del snapshot.
 
 ### Auditoria reproducible
 
+El preflight construye y valida tambien `portfolio_analytics_snapshot` antes
+de crear providers. El analista recibe analitica por activo y comparacion; el
+asistente recibe rendimiento, riesgo, concentracion y desviaciones frente a
+targets. El monitor mantiene sus inputs de contexto externo. Ver
+[analitica para agentes](agent_analytics.md) para schema, limites y politica
+ante datos parciales.
+
 El schema v2 persiste la peticion y el contexto efectivos de cada agente. El
 `request.json` conserva `scope`, `parameters`, `constraints`, `metadata` e
 `input_refs`; estas referencias se resuelven contra el contexto real, por lo que

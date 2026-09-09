@@ -88,6 +88,17 @@ def analyze_positions(
     return PositionAnalytics(concentration, asset_risk, diversification, reason)
 
 
+def target_deviations(groups: list[dict], targets: Mapping[str, float]) -> list[dict]:
+    """Signed bucket deviations; incomplete classifications never imply zero weight."""
+    buckets = {row["group"]: row["weight"] for row in groups if row["dimension"] == "bucket"}
+    complete = bool(buckets) and all(row["status"] == "available" for row in buckets.values())
+    return [{"bucket": key, "target_weight": target,
+             "deviation": round((buckets.get(key, {}).get("value") or 0) - target, 12) if complete else None,
+             "status": "available" if complete else "unavailable",
+             "reason_code": "ok" if complete else "incomplete_bucket_coverage"}
+            for key, target in sorted(targets.items())]
+
+
 def _number(value: object) -> float | None:
     if value is None or pd.isna(value):
         return None

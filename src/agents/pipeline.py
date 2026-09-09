@@ -20,6 +20,7 @@ from src.agents.asistente_aportacion_mensual import (
     StaticContributionLLMProvider,
 )
 from src.agents.models import AgentContext, AgentInputRef, AgentRequest, AgentResult, build_agent_context
+from src.agents.analytics import ANALYTICS_INPUT_KEY, analytics_for_agent, analytics_quality_issues
 from src.agents.provider_audit import (
     provider_audit_config,
     providers_raw_response_audit,
@@ -80,6 +81,7 @@ def run_monthly_agent_pipeline(
     request_constraints: Mapping[str, Any] | None = None,
     request_metadata: Mapping[str, Any] | None = None,
     portfolio_metrics_snapshot: Mapping[str, Any] | None = None,
+    portfolio_analytics_snapshot: Mapping[str, Any] | None = None,
     monthly_budget: float | None = None,
 ) -> MonthlyAgentPipelineResult:
     """Run monitor, asset analyst, and monthly assistant with shared inputs."""
@@ -111,6 +113,10 @@ def run_monthly_agent_pipeline(
         metrics_snapshot=metrics_snapshot,
         fallback_as_of_date=as_of_date,
     )
+    if portfolio_analytics_snapshot is not None:
+        issues = analytics_quality_issues(portfolio_analytics_snapshot, as_of_date=as_of_date, base_currency=resolved_metrics.base_currency)
+        if any(issue.blocks_agents for issue in issues):
+            raise ValueError("Invalid portfolio_analytics_snapshot: " + ", ".join(issue.code for issue in issues if issue.blocks_agents))
 
     common_refs = _build_common_input_refs(
         investment_brief=investment_brief,
@@ -168,7 +174,7 @@ def run_monthly_agent_pipeline(
         generated_at=generated_at,
         base_currency=resolved_settings.default_currency,
         settings=resolved_settings,
-        input_refs=(*common_refs, monitor_ref),
+        input_refs=(*common_refs, *_analytics_refs(portfolio_analytics_snapshot, "analista_activos", as_of_date), monitor_ref),
         run_id=run_id,
     )
     analista_request = _request_for_context(base_request, analista_context)
@@ -183,7 +189,7 @@ def run_monthly_agent_pipeline(
         generated_at=generated_at,
         base_currency=resolved_settings.default_currency,
         settings=resolved_settings,
-        input_refs=(*common_refs, monitor_ref, analista_ref),
+        input_refs=(*common_refs, *_analytics_refs(portfolio_analytics_snapshot, "asistente_aportacion_mensual", as_of_date), monitor_ref, analista_ref),
         metadata={
             "monthly_budget": (
                 float(monthly_budget)
@@ -239,7 +245,7 @@ def run_monthly_agent_pipeline(
     result = MonthlyAgentPipelineResult(
         run_id=run_id,
         as_of_date=as_of_date,
-        input_refs=common_refs,
+        input_refs=(*common_refs, *_analytics_refs(portfolio_analytics_snapshot, "full", as_of_date)),
         monitor_tematico=monitor_result,
         analista_activos=analista_result,
         asistente_aportacion_mensual=asistente_result,
@@ -258,6 +264,16 @@ def run_monthly_agent_pipeline(
         )
         result = replace(result, output_dir=resolved_output_dir)
     return result
+
+
+def _analytics_refs(snapshot, agent_name, as_of_date):
+    if snapshot is None:
+        return ()
+    return (AgentInputRef(
+        key=ANALYTICS_INPUT_KEY, label="Portfolio analytics snapshot",
+        location="derived://portfolio_analytics_snapshot", source_type="derived", as_of_date=as_of_date,
+        metadata={"snapshot": analytics_for_agent(snapshot, agent_name)},
+    ),)
 
 
 def _request_for_context(request: AgentRequest, context: AgentContext) -> AgentRequest:
@@ -759,14 +775,14 @@ def _agent_audit_specs(
         (
             "monitor_tematico",
             result.monitor_tematico,
-            result.input_refs,
+            tuple(ref for ref in result.input_refs if ref.key != ANALYTICS_INPUT_KEY),
             {},
         ),
         (
             "analista_activos",
             result.analista_activos,
             (
-                *result.input_refs,
+                *_audit_input_refs(result, "analista_activos"),
                 _result_input_ref(
                     "monitor_tematico_result",
                     "Monitor tematico result",
@@ -779,7 +795,7 @@ def _agent_audit_specs(
             "asistente_aportacion_mensual",
             result.asistente_aportacion_mensual,
             (
-                *result.input_refs,
+                *_audit_input_refs(result, "asistente_aportacion_mensual"),
                 _result_input_ref(
                     "monitor_tematico_result",
                     "Monitor tematico result",
@@ -794,6 +810,11 @@ def _agent_audit_specs(
             {},
         ),
     )
+
+
+def _audit_input_refs(result, agent_name):
+    return tuple(replace(ref, metadata={"snapshot": analytics_for_agent(ref.metadata["snapshot"], agent_name)})
+                 if ref.key == ANALYTICS_INPUT_KEY else ref for ref in result.input_refs)
 
 
 def _serialize_agent_context(context: AgentContext) -> dict[str, Any]:
@@ -1047,7 +1068,7 @@ def _sanitize_source_metadata(metadata: Mapping[str, Any]) -> dict[str, Any]:
     omitted: list[str] = []
     for key, value in metadata.items():
         key_str = str(key)
-        if key_str in {"content", "text", "agent_result", "result", "findings", "positions", "daily"}:
+        if key_str in {"content", "text", "agent_result", "result", "findings", "positions", "daily", "snapshot"}:
             omitted.append(key_str)
             continue
         compact[key_str] = _json_ready(value)

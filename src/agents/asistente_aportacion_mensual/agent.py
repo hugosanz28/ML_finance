@@ -16,6 +16,7 @@ from src.agents.asistente_aportacion_mensual.llm import (
     StaticContributionLLMProvider,
 )
 from src.agents.autonomy import autonomy_metadata, skipped_action
+from src.agents.analytics import context_analytics
 from src.agents.base import BaseAgent
 from src.agents.models import AgentArtifact, AgentContext, AgentFinding, AgentRequest, AgentResult, AgentSource
 
@@ -81,6 +82,7 @@ class AsistenteAportacionMensualAgent(BaseAgent):
                 current_allocation=current_allocation,
                 upstream_findings=upstream_findings,
                 max_recommendations=max_recommendations,
+                **({"portfolio_analytics_snapshot": context_analytics(context)} if context.has_input("portfolio_analytics_snapshot") else {}),
             )
         except ContributionLLMProviderError as exc:
             return AgentResult(

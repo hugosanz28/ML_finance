@@ -1,5 +1,9 @@
 """Reusable application use cases for scripts, Streamlit, and future UIs."""
 
+from src.application.analytics_snapshot import (
+    BuildPortfolioAnalyticsSnapshotRequest, BuildPortfolioAnalyticsSnapshotResult, BuildPortfolioAnalyticsSnapshotUseCase,
+)
+
 from src.application.analytics import (
     AnalyticsRequest, AnalyticsResult, MetricDefinitionsResult,
     GetAnalyticsSummaryUseCase, GetPortfolioPerformanceUseCase,
@@ -106,6 +110,7 @@ from src.application.monitor import (
 from src.application.types import ApplicationResult, ApplicationStatus
 
 __all__ = [
+    "BuildPortfolioAnalyticsSnapshotRequest", "BuildPortfolioAnalyticsSnapshotResult", "BuildPortfolioAnalyticsSnapshotUseCase",
     "AnalyticsRequest", "AnalyticsResult", "MetricDefinitionsResult",
     "GetAnalyticsSummaryUseCase", "GetPortfolioPerformanceUseCase",
     "GetPortfolioRiskUseCase", "GetBenchmarkComparisonUseCase", "GetMetricDefinitionsUseCase",

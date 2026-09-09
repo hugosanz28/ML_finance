@@ -15,6 +15,7 @@ from src.agents.provider_audit import (
     record_provider_raw_response,
 )
 from src.agents.prompts import load_prompt
+from src.agents.analytics import analytics_reason_codes
 from src.agents.analista_activos._types import (
     AssetAnalysis,
     AssetAssessment,
@@ -39,6 +40,7 @@ class AssetLLMProvider(Protocol):
         assets: tuple[AssetUnderReview, ...],
         monitor_findings: tuple[MonitorContextFinding, ...],
         max_assets: int,
+        portfolio_analytics_snapshot: dict[str, Any] | None = None,
     ) -> AssetAnalysis:
         """Evaluate assets against the account mandate."""
 
@@ -66,9 +68,10 @@ class StaticAssetLLMProvider:
         assets: tuple[AssetUnderReview, ...],
         monitor_findings: tuple[MonitorContextFinding, ...],
         max_assets: int,
+        portfolio_analytics_snapshot: dict[str, Any] | None = None,
     ) -> AssetAnalysis:
         if self._analysis is None:
-            if not portfolio_metrics_snapshot and not monitor_findings:
+            if not portfolio_metrics_snapshot and not monitor_findings and not portfolio_analytics_snapshot:
                 return AssetAnalysis(summary="Sin analisis de activos.")
             assessments = tuple(
                 AssetAssessment(
@@ -90,7 +93,7 @@ class StaticAssetLLMProvider:
                     ),
                     portfolio_role_view=f"Rol inferido: {asset.role or 'portfolio'}.",
                     monitor_context_used=tuple(finding.title for finding in monitor_findings[:3]),
-                    tags=("demo", "synthetic", asset.asset_type),
+                    tags=("demo", "synthetic", asset.asset_type, *analytics_reason_codes(portfolio_analytics_snapshot, asset_id=asset.asset_id or "")),
                 )
                 for asset in assets[:max_assets]
             )
@@ -150,6 +153,7 @@ class OpenAIAssetLLMProvider:
         assets: tuple[AssetUnderReview, ...],
         monitor_findings: tuple[MonitorContextFinding, ...],
         max_assets: int,
+        portfolio_analytics_snapshot: dict[str, Any] | None = None,
     ) -> AssetAnalysis:
         payload = {
             "investment_brief": _truncate_text(investment_brief),
@@ -158,6 +162,7 @@ class OpenAIAssetLLMProvider:
             "assets": [_asset_payload(asset) for asset in assets[:max_assets]],
             "monitor_findings": [_monitor_finding_payload(finding) for finding in monitor_findings],
             "max_assets": max_assets,
+            "portfolio_analytics_snapshot": portfolio_analytics_snapshot,
         }
         data = self._call_structured(
             system_prompt=_ANALYSIS_SYSTEM_PROMPT,

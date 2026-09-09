@@ -34,13 +34,13 @@ PROMPT_REGISTRY: dict[str, PromptSpec] = {
     ),
     "analista_activos.analysis": PromptSpec(
         key="analista_activos.analysis",
-        version="v1",
-        filename="analista_activos_analysis_v1.md",
+        version="v2",
+        filename="analista_activos_analysis_v2.md",
     ),
     "asistente_aportacion_mensual.decision": PromptSpec(
         key="asistente_aportacion_mensual.decision",
-        version="v1",
-        filename="asistente_aportacion_mensual_decision_v1.md",
+        version="v2",
+        filename="asistente_aportacion_mensual_decision_v2.md",
     ),
 }
 

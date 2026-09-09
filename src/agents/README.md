@@ -73,6 +73,8 @@ El pipeline mensual usa estos `input_refs` comunes:
 - `investment_brief`: texto editable con el objetivo de la cuenta, horizonte, filosofia `core + satellites` y restricciones o preferencias actuales.
 - `latest_monthly_report`: informe mensual mas reciente con historial y asignacion.
 - `portfolio_metrics_snapshot`: metricas agregadas y pesos actuales.
+- `portfolio_analytics_snapshot`: input derivado y versionado para analista y
+  asistente mensual; el monitor no lo recibe. Ver [contrato](../../docs/agent_analytics.md).
 - `target_weights`: objetivos estructurados procedentes de `portfolio_targets.yaml` o de una entrada manual compatible.
 - `watchlist_candidates`: candidatos observados o universo invertible.
 - `user_satellite_interest`: idea opcional propuesta por el usuario para evaluar ese mes.
@@ -279,6 +281,9 @@ carpetas de agentes.
 Los prompts de sistema de proveedores LLM reales viven en `src/agents/prompts/`
 y se cargan mediante `src.agents.prompts.registry`. Cada prompt tiene una clave
 estable y version, por ejemplo `monitor_tematico.query` -> `v1`.
+
+Analista y asistente usan ahora prompts `v2` que interpretan el snapshot
+analitico sin recalcular metricas. Los archivos `v1` se conservan para referencia.
 
 Los proveedores `Static*LLMProvider` siguen siendo deterministas para tests y no
 dependen de estos archivos. Si se cambia el comportamiento esperado de un agente,

@@ -32,6 +32,13 @@ decisiones personales.
 
 ## Auditoria de agentes
 
+`portfolio_analytics_snapshot` tambien es privado: revela rendimiento, riesgo,
+concentracion y desviaciones respecto a objetivos. Se incluye en los inputs y
+hashes del run y en los contextos de analista/asistente, no del monitor. Con
+un LLM externo se transmite la vista correspondiente; reducir su tamano no
+anonimiza la cartera. La demo y los tests siguen usando datos sinteticos y
+providers offline.
+
 La auditoria reproducible conserva mas detalle que un log convencional. En
 particular, `request.json`, `context.json`, `prompt_rendered.md`,
 `raw_response.json` y `parsed_output.json` pueden contener el brief, posiciones,

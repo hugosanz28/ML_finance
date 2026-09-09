@@ -2,9 +2,13 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import date
+import hashlib
+import json
 from typing import Any, Mapping
+
+from src.agents.analytics import analytics_quality_issues
 
 from src.application.types import ApplicationResult
 from src.config import Settings, get_settings
@@ -24,6 +28,7 @@ class RunAgentQualityChecksRequest:
     portfolio_metrics_snapshot: Mapping[str, Any] | None = None
     min_valuation_coverage_ratio: float = 1.0
     min_return_coverage_ratio: float = 0.8
+    portfolio_analytics_snapshot: Mapping[str, Any] | None = None
 
 
 @dataclass(frozen=True)
@@ -74,8 +79,19 @@ class RunAgentQualityChecksResult:
                 "snapshot_as_of_date": snapshot_date.isoformat() if snapshot_date else None,
                 "min_valuation_coverage_ratio": self.request.min_valuation_coverage_ratio,
                 "min_return_coverage_ratio": self.request.min_return_coverage_ratio,
+                "analytics_snapshot_hash": _analytics_hash(self.request.portfolio_analytics_snapshot),
             },
         }
+
+
+def _analytics_hash(snapshot):
+    if snapshot is None:
+        return None
+    try:
+        content = json.dumps(snapshot, sort_keys=True, separators=(",", ":"), allow_nan=False)
+        return "sha256:" + hashlib.sha256(content.encode("utf-8")).hexdigest()
+    except (TypeError, ValueError):
+        return None
 
 
 class RunAgentQualityChecksUseCase:
@@ -100,6 +116,11 @@ class RunAgentQualityChecksUseCase:
             min_valuation_coverage_ratio=resolved_request.min_valuation_coverage_ratio,
             min_return_coverage_ratio=resolved_request.min_return_coverage_ratio,
         )
+        if resolved_request.portfolio_analytics_snapshot is not None and report.as_of_date is not None:
+            report = replace(report, issues=(*report.issues, *analytics_quality_issues(
+                resolved_request.portfolio_analytics_snapshot,
+                as_of_date=report.as_of_date, base_currency=metrics.base_currency,
+            )))
         if not report.can_run_agents:
             status = "failed"
             message = f"Agent input quality checks failed with {report.error_count} blocking issue(s)."

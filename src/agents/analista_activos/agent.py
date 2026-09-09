@@ -14,6 +14,7 @@ from src.agents.analista_activos.llm import (
     StaticAssetLLMProvider,
 )
 from src.agents.autonomy import autonomy_metadata, skipped_action
+from src.agents.analytics import context_analytics
 from src.agents.base import BaseAgent
 from src.agents.models import AgentContext, AgentFinding, AgentRequest, AgentResult, AgentSource
 
@@ -85,6 +86,7 @@ class AnalistaActivosAgent(BaseAgent):
                 assets=tuple(assets),
                 monitor_findings=monitor_findings,
                 max_assets=max_assets,
+                **({"portfolio_analytics_snapshot": context_analytics(context)} if context.has_input("portfolio_analytics_snapshot") else {}),
             )
         except AssetLLMProviderError as exc:
             return AgentResult(

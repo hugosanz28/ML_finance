@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import asdict
+from dataclasses import asdict, replace
 import json
 import os
 from pathlib import Path
@@ -15,6 +15,7 @@ from src.agents.provider_audit import (
     record_provider_raw_response,
 )
 from src.agents.prompts import load_prompt
+from src.agents.analytics import analytics_reason_codes
 from src.agents.asistente_aportacion_mensual._types import (
     MonthlyDecision,
     MonthlyRecommendation,
@@ -42,6 +43,7 @@ class ContributionLLMProvider(Protocol):
         current_allocation: tuple[Mapping[str, Any], ...],
         upstream_findings: tuple[PriorAgentFinding, ...],
         max_recommendations: int,
+        portfolio_analytics_snapshot: dict[str, Any] | None = None,
     ) -> MonthlyDecision:
         """Synthesize one monthly portfolio decision."""
 
@@ -72,15 +74,32 @@ class StaticContributionLLMProvider:
         current_allocation: tuple[Mapping[str, Any], ...],
         upstream_findings: tuple[PriorAgentFinding, ...],
         max_recommendations: int,
+        portfolio_analytics_snapshot: dict[str, Any] | None = None,
     ) -> MonthlyDecision:
         if self._decision is None:
-            return _static_monthly_decision(
+            decision = _static_monthly_decision(
                 monthly_budget=monthly_budget,
                 target_weights=target_weights,
                 current_allocation=current_allocation,
                 upstream_findings=upstream_findings,
                 max_recommendations=max_recommendations,
             )
+            codes = analytics_reason_codes(portfolio_analytics_snapshot)
+            if "analytics_manual_review_required" in codes:
+                # No reliable performance context: deterministic manual review, never forced buying.
+                hold = MonthlyRecommendation(
+                    target="liquidez", action="hold", recommendation_type="hold", suggested_amount=0,
+                    priority="high", rationale="Revision manual: contexto analitico insuficiente.", tags=codes,
+                )
+                return MonthlyDecision(
+                    summary="Demo: esperar y revisar datos analiticos antes de asignar la aportacion.",
+                    primary_action="hold", monthly_budget=monthly_budget,
+                    recommendations=(hold,)[:max_recommendations], warnings=codes,
+                    scenarios=tuple(MonthlyScenario(name=name, summary="Revision manual de datos.",
+                        recommended_action="hold", budget_to_invest=0, recommendations=(hold,)[:max_recommendations])
+                        for name in ("conservador", "neutral", "oportunista")),
+                )
+            return replace(decision, recommendations=tuple(replace(item, tags=(*item.tags, *codes)) for item in decision.recommendations))
         return MonthlyDecision(
             summary=self._decision.summary,
             primary_action=self._decision.primary_action,
@@ -231,6 +250,7 @@ class OpenAIContributionLLMProvider:
         current_allocation: tuple[Mapping[str, Any], ...],
         upstream_findings: tuple[PriorAgentFinding, ...],
         max_recommendations: int,
+        portfolio_analytics_snapshot: dict[str, Any] | None = None,
     ) -> MonthlyDecision:
         payload = {
             "investment_brief": _truncate_text(investment_brief),
@@ -242,6 +262,7 @@ class OpenAIContributionLLMProvider:
             "current_allocation": [dict(item) for item in current_allocation],
             "upstream_findings": [asdict(finding) for finding in upstream_findings],
             "max_recommendations": max_recommendations,
+            "portfolio_analytics_snapshot": portfolio_analytics_snapshot,
         }
         data = self._call_structured(
             system_prompt=_DECISION_SYSTEM_PROMPT,

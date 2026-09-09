@@ -10,6 +10,7 @@ from typing import Any, Mapping
 from src.agents import MonthlyAgentPipelineResult, run_monthly_agent_pipeline
 from src.agents.pipeline import extract_monthly_report_as_of_date
 from src.application.agent_audit import persist_agent_preflight_audit
+from src.application.analytics_snapshot import BuildPortfolioAnalyticsSnapshotRequest, BuildPortfolioAnalyticsSnapshotUseCase
 from src.application.quality_checks import (
     RunAgentQualityChecksRequest,
     RunAgentQualityChecksResult,
@@ -73,6 +74,23 @@ class RunMonthlyAgentsUseCase:
                 portfolio_metrics_snapshot=resolved_request.portfolio_metrics_snapshot,
             )
         )
+        analytics_snapshot = None
+        if quality_result.can_run_agents:
+            try:
+                analytics_snapshot = BuildPortfolioAnalyticsSnapshotUseCase(settings=self.settings).execute(
+                    BuildPortfolioAnalyticsSnapshotRequest(as_of_date=quality_result.report.as_of_date.isoformat())
+                ).snapshot
+            except (TypeError, ValueError):
+                # Audit a contract failure without persisting exception text or constructing providers.
+                analytics_snapshot = {"schema_version": 0}
+            quality_result = RunAgentQualityChecksUseCase(settings=self.settings).execute(
+                RunAgentQualityChecksRequest(
+                    metrics=resolved_metrics, monthly_report_date=monthly_report_date,
+                    require_monthly_report_date=resolved_report_path is not None,
+                    portfolio_metrics_snapshot=resolved_request.portfolio_metrics_snapshot,
+                    portfolio_analytics_snapshot=analytics_snapshot,
+                )
+            )
         preflight_payload = quality_result.to_dict()
         if not quality_result.can_run_agents:
             return self._blocked_result(
@@ -97,6 +115,7 @@ class RunMonthlyAgentsUseCase:
             request_constraints=resolved_request.request_constraints,
             request_metadata=resolved_request.request_metadata,
             portfolio_metrics_snapshot=resolved_request.portfolio_metrics_snapshot,
+            portfolio_analytics_snapshot=analytics_snapshot,
             monthly_budget=resolved_request.monthly_budget,
         )
         agent_statuses = {

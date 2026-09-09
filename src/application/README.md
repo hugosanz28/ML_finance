@@ -103,6 +103,13 @@ bloqueo devuelve `pipeline_result=None` y, con `persist=True`, guarda
 `preflight.json` junto con `run_metadata.json`; un warning permite continuar y
 fuerza estado agregado `partial`.
 
+Tras los checks iniciales, `BuildPortfolioAnalyticsSnapshotUseCase` construye
+la analitica del ultimo ano con el mismo cierre validado. La request mensual
+no admite un snapshot analitico aportado por la UI: se deriva de datos locales
+mediante `GetAnalyticsSummaryUseCase`. Se vuelve a validar fecha, moneda,
+JSON estricto, cobertura y muestra antes de entrar en el pipeline. El contrato,
+limites y reparto por agente estan en [analitica de agentes](../../docs/agent_analytics.md).
+
 `ListAgentRunsUseCase` y `GetAgentRunAuditUseCase` exponen read models de la
 auditoria persistida en disco. Streamlit los usa para visualizar plan interno,
 acciones, fuentes, prompts, warnings, inputs y outputs sin acoplar la UI a la
