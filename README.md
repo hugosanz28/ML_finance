@@ -169,6 +169,7 @@ Consulta `docs/streamlit_dashboard.md`, `docs/monthly_pipeline.md` y
 - `docs/monthly_pipeline.md`: flujo mensual completo con informes y agentes.
 - `docs/performance.md`: contratos, formulas y limites de TWR y MWR/XIRR.
 - `docs/benchmarks.md`: catalogo, configuracion y metricas comparativas.
+- `docs/risk_analytics.md`: riesgo, concentracion, correlaciones y catalogo explicativo.
 - `src/agents/README.md`: detalle funcional de agentes.
 - `src/application/README.md`: capa de casos de uso.
 - `AGENTS.md`: instrucciones compactas para agentes de programacion.

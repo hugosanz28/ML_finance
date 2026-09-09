@@ -59,6 +59,10 @@ Invariantes y errores tipicos:
 - Los benchmarks son referencias, no recomendaciones. Conserva IDs, tipo de
   serie, moneda, cobertura y `reason_code`; no calcules alpha, beta o tracking
   error con menos de 30 observaciones alineadas.
+- Analitica de riesgo: lee `docs/risk_analytics.md`; usa retornos de un dia
+  natural y anualizacion 365, no variaciones de cantidades ni intervalos
+  multidiarios. No rellenes huecos con ceros. Sharpe/Sortino necesitan tasa
+  explicita; sectores necesitan fuente. Mantener `metric_catalog()` coherente.
 - Las interfaces y ejecuciones de usuario deben entrar por
   `RunMonthlyAgentsUseCase`: el preflight bloquea errores antes de construir
   providers y audita el intento cuando la persistencia esta activa.
@@ -112,6 +116,7 @@ Mapa rapido de tests por area:
 | DEGIRO/importacion | `tests\test_degiro_*.py` |
 | Portfolio/metricas y laboratorio | `tests\test_portfolio_metrics.py`, `tests\test_portfolio_performance.py`, `tests\test_benchmark_comparison.py`, `tests\test_positions.py`, `tests\test_portfolio_state_projection.py`, `tests\test_portfolio_contributions.py`, `tests\test_contribution_planner.py`, `tests\test_contribution_application.py` |
 | Market data/FX | `tests\test_market_data.py`, `tests\test_fx_refresh.py`, `tests\test_benchmark_market_data.py` |
+| Analitica de riesgo | `tests\test_risk_analytics.py` |
 | Defaults offline | `tests\test_agent_safe_defaults.py`, `tests\test_demo_workspace.py` |
 | Documentacion/publicacion | `tests\test_public_documentation.py`, `tests\test_dev_commands.py` |
 | Smoke Streamlit | `tests\test_streamlit_dashboard_smoke.py` |
@@ -167,6 +172,7 @@ no dupliques aqui el pipeline completo de CI.
 | `docs/monthly_pipeline.md` | Flujo mensual completo | Datos, informes y agentes. |
 | `docs/performance.md` | Rendimiento de cartera | Flujos externos, retornos diarios, TWR, MWR/XIRR y limites. |
 | `docs/benchmarks.md` | Comparacion de rendimiento | Catalogo, 60/40, calendarios, FX y metricas. |
+| `docs/risk_analytics.md` | Riesgo y concentracion | Formulas, cobertura, muestra y catalogo explicativo. |
 
 Comandos principales:
 
