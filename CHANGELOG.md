@@ -8,6 +8,10 @@ proyecto usa [versionado semántico](https://semver.org/lang/es/).
 
 ### Añadido
 
+- Operaciones FastAPI opt-in (#54) con worker local, jobs persistidos en DuckDB,
+  idempotencia, controles de entorno/confirmacion y actualizaciones por hash.
+- Copias editables de la demo sin modificar fixtures, limites de uploads,
+  recuperacion de jobs interrumpidos y retry solo para simulaciones fallidas.
 - API FastAPI local de solo lectura (#53), esquemas OpenAPI, consultas de
   cartera/analitica/definiciones/informes/auditoria y launcher Windows/POSIX.
 - Documentación de contribución, seguridad, conducta y licencia MIT.

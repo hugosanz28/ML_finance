@@ -1,4 +1,4 @@
-"""Run the read-only API on loopback without touching or bootstrapping local data."""
+"""Run the local API on loopback; operations require an explicit workspace mode."""
 
 import argparse
 from pathlib import Path
@@ -14,12 +14,13 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--env-file", help="Server-side environment file, e.g. demo/synthetic_config/.env.demo")
     parser.add_argument("--port", type=int, default=8000)
+    parser.add_argument("--operations", choices=("demo", "real"), help="Enable the persistent local worker and writes")
     args = parser.parse_args()
     if not 1 <= args.port <= 65535:
         parser.error("port must be between 1 and 65535")
     import uvicorn
 
-    app = create_app(settings=load_settings(env_file=args.env_file))
+    app = create_app(settings=load_settings(env_file=args.env_file), workspace_mode=args.operations)
     # No public bind option or access logs containing user queries.
     uvicorn.run(app, host="127.0.0.1", port=args.port, access_log=False, proxy_headers=False)
 

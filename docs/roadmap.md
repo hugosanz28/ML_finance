@@ -27,6 +27,9 @@ La serie `v0.1.x` consolida la v1 local con Streamlit. Ya estan disponibles:
 - primera API FastAPI local de solo lectura (#53), con contratos OpenAPI,
   acceso a analitica/informes/auditoria y GET sin persistencia; ver
   [API local](local_api.md);
+- operaciones/jobs locales (#54) opt-in, con estado persistido, worker unico,
+  control de concurrencia y recuperacion sin reejecucion automatica; ver
+  [jobs locales](local_jobs.md);
 - CI multiplataforma con lint, typecheck gradual, secret scanning, cobertura,
   bootstrap demo offline, auditoria de dependencias y build de wheel.
 

@@ -2,10 +2,13 @@
 
 ## Estado
 
-La primera vertical FastAPI de solo lectura (#53) esta implementada. Las rutas
-disponibles y su arranque estan en [API local](local_api.md). Las operaciones
-POST/PUT y las rutas no incluidas en ese listado siguen siendo propuestas;
-no estan implementadas por esta entrega.
+Las lecturas (#53) y las operaciones/jobs opt-in (#54) estan implementadas.
+Ver [API local](local_api.md) y [contratos operativos vigentes](local_jobs.md).
+Las secciones operativas historicas de este documento describen los casos de
+uso internos; sus ejemplos sincronos/con paths no son el contrato HTTP actual.
+Las escrituras actuales no aceptan paths ni `persist`, responden 202 con un job
+y exigen confirmacion, entorno y clave de idempotencia. Las rutas no incluidas
+en los listados vigentes siguen siendo propuestas.
 
 La regla de diseno es simple: los endpoints deben ser capas finas sobre
 `src/application/`. Si un endpoint necesita llamar directamente a

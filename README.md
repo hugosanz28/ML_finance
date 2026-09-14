@@ -30,8 +30,9 @@ viven en rutas locales ignoradas por Git y la demo publica usa datos sinteticos.
   actualizacion de datos y agentes.
 - Agentes mensuales con prompts versionados y auditoria visual.
 - Demo sintetica ejecutable sin exponer datos reales.
-- API FastAPI local de solo lectura para cartera, analitica, informes y auditoria.
-  Arranque y contratos: [API local](docs/local_api.md). Streamlit sigue operativo.
+- API FastAPI local para cartera, analitica, informes y auditoria, con
+  [operaciones/jobs opcionales](docs/local_jobs.md). Arranque y contratos:
+  [API local](docs/local_api.md). Streamlit sigue operativo.
 
 ## Puesta en marcha
 

@@ -48,7 +48,7 @@ class ErrorResponse(Schema):
 class HealthResponse(Schema):
     status: Literal["ok"] = "ok"
     api_version: Literal["v1"] = "v1"
-    mode: Literal["read_only"] = "read_only"
+    mode: Literal["read_only", "operations"] = "read_only"
 
 
 class PortfolioResponse(Schema):

@@ -27,6 +27,8 @@ Para desarrollar o ejecutar la suite usa `requirements-dev.txt`; consulta
   Windows: `.\.venv\Scripts\python.exe scripts\run_api.py`;
   POSIX con entorno activo: `python scripts/run_api.py`.
   Admite `--env-file` y `--port`; ver [API local](../docs/local_api.md).
+  `--operations demo|real` habilita escrituras y worker persistente; consultar
+  [jobs locales](../docs/local_jobs.md) antes de activarlo.
 - `run_dashboard.ps1`: abre Streamlit con `.env` o con `-EnvFile`.
 - `run_demo.ps1`: prepara la demo sintetica y abre Streamlit con
   `demo/synthetic_config/.env.demo`.

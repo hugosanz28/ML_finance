@@ -1,6 +1,8 @@
 """FastAPI adapter over application use cases, with local-only browser access."""
 
 from typing import Annotated
+from contextlib import asynccontextmanager, nullcontext
+import asyncio
 import re
 
 from fastapi import APIRouter, FastAPI, HTTPException, Path, Query, Request
@@ -21,6 +23,10 @@ from src.application.portfolio_state import (
     GetPortfolioStateRequest, GetPortfolioStateUseCase, PortfolioStateUnavailableError,
 )
 from src.config import Settings, get_settings
+from src.application.local_jobs import LocalJobManager
+from src.application.operational_workspace import OperationalWorkspace, OperationError
+from src.api.body_limit import BodyLimitMiddleware
+from src.api.operations import operation_router
 from src.api.schemas import (
     AnalyticsQuery, AnalyticsResponse, AuditResponse, ErrorResponse, HealthResponse,
     ListQuery, MetricDefinition, MetricDefinitionsResponse, PortfolioQuery, PortfolioResponse,
@@ -36,11 +42,32 @@ def _error(status: int, code: str, message: str) -> JSONResponse:
     return JSONResponse(status_code=status, content={"error": {"code": code, "message": message}})
 
 
-def create_app(*, settings: Settings | None = None) -> FastAPI:
+def create_app(*, settings: Settings | None = None, workspace_mode: str | None = None) -> FastAPI:
     # Resolve one environment per process; HTTP input cannot switch workspaces/providers.
     resolved = get_settings() if settings is None else settings
-    app = FastAPI(title="ML_finance local API", version="1.0.0", docs_url=None, redoc_url=None)
-    app.add_middleware(CORSMiddleware, allow_origins=list(LOCAL_ORIGINS), allow_methods=["GET"], allow_credentials=False)
+    manager = LocalJobManager(OperationalWorkspace(resolved, workspace_mode)) if workspace_mode else None
+    if manager:
+        resolved = manager.workspace.settings
+
+    @asynccontextmanager
+    async def lifespan(app):
+        if manager:
+            await asyncio.to_thread(manager.open)
+        try:
+            yield
+        finally:
+            if manager:
+                await asyncio.to_thread(manager.close)
+
+    app = FastAPI(title="ML_finance local API", version="1.0.0", docs_url=None, redoc_url=None, lifespan=lifespan)
+    app.state.jobs = manager
+    app.add_middleware(CORSMiddleware, allow_origins=list(LOCAL_ORIGINS),
+                       allow_methods=["GET", "POST", "PUT"] if manager else ["GET"],
+                       allow_headers=["Content-Type", "Idempotency-Key", "X-ML-Finance-Confirm"], allow_credentials=False)
+    app.add_middleware(BodyLimitMiddleware)
+
+    def reading():
+        return manager.reading() if manager else nullcontext()
 
     @app.middleware("http")
     async def local_boundary(request: Request, call_next):
@@ -49,6 +76,10 @@ def create_app(*, settings: Settings | None = None) -> FastAPI:
             response = _error(400, "invalid_host", "Only localhost is supported.")
         elif request.headers.get("origin") not in {None, *LOCAL_ORIGINS, f"http://{host}"}:
             response = _error(403, "origin_not_allowed", "This browser origin is not allowed.")
+        elif manager and request.method in {"POST", "PUT", "PATCH", "DELETE"} and request.headers.get("x-ml-finance-confirm") != "local-write":
+            response = _error(403, "confirmation_required", "Explicit local write confirmation is required.")
+        elif manager and request.method in {"POST", "PUT", "PATCH"} and request.headers.get("content-type", "").split(";")[0] != "application/json":
+            response = _error(415, "json_required", "Use application/json.")
         else:
             try:
                 response = await call_next(request)
@@ -57,6 +88,11 @@ def create_app(*, settings: Settings | None = None) -> FastAPI:
                 response = _error(500, "internal_error", "Unable to read local data.")
         response.headers["Cache-Control"] = "no-store"
         response.headers["X-Content-Type-Options"] = "nosniff"
+        # Vite must also be able to read early validation/body-limit errors.
+        origin = request.headers.get("origin")
+        if origin in LOCAL_ORIGINS and "Access-Control-Allow-Origin" not in response.headers:
+            response.headers["Access-Control-Allow-Origin"] = origin
+            response.headers.add_vary_header("Origin")
         return response
 
     @app.exception_handler(RequestValidationError)
@@ -77,19 +113,24 @@ def create_app(*, settings: Settings | None = None) -> FastAPI:
     async def no_artifact(request, exc):
         return _error(404, "not_found", "The requested local artifact is unavailable.")
 
+    @app.exception_handler(OperationError)
+    async def operation_error(request, exc):
+        return _error(exc.status_code, exc.code, "Local operation could not be completed.")
+
     router = APIRouter(prefix="/api/v1", responses={
-        status: {"model": ErrorResponse} for status in (400, 403, 404, 405, 422, 500)
+        status: {"model": ErrorResponse} for status in (400, 403, 404, 405, 409, 422, 500)
     })
 
     @router.get("/health", response_model=HealthResponse)
     def health():
-        return HealthResponse()
+        return HealthResponse(mode="operations" if manager else "read_only")
 
     @router.get("/portfolio/state", response_model=PortfolioResponse)
     def portfolio(query: Annotated[PortfolioQuery, Query()]):
-        return GetPortfolioStateUseCase(settings=resolved).execute(
-            GetPortfolioStateRequest(persist=False, **query.model_dump()),
-        ).to_dict()
+        with reading():
+            return GetPortfolioStateUseCase(settings=resolved).execute(
+                GetPortfolioStateRequest(persist=False, **query.model_dump()),
+            ).to_dict()
 
     def analytics_endpoint(use_case):
         def read(query: Annotated[AnalyticsQuery, Query()]):
@@ -98,7 +139,8 @@ def create_app(*, settings: Settings | None = None) -> FastAPI:
                 request.validate()
             except ValueError as exc:
                 raise HTTPException(422) from exc
-            return use_case(settings=resolved).execute(request).to_dict()
+            with reading():
+                return use_case(settings=resolved).execute(request).to_dict()
         return read
 
     for section, use_case in (
@@ -121,19 +163,25 @@ def create_app(*, settings: Settings | None = None) -> FastAPI:
 
     @router.get("/reports", response_model=ReportsResponse)
     def reports(query: Annotated[ListQuery, Query()]):
-        return ListReportsUseCase(settings=resolved).execute(ListArtifactsRequest(**query.model_dump())).to_dict()
+        with reading():
+            return ListReportsUseCase(settings=resolved).execute(ListArtifactsRequest(**query.model_dump())).to_dict()
 
     @router.get("/reports/{report_id}", response_model=ReportResponse)
     def report(report_id: ArtifactId):
-        return ReadReportUseCase(settings=resolved).execute(ReadArtifactRequest(report_id)).to_dict()
+        with reading():
+            return ReadReportUseCase(settings=resolved).execute(ReadArtifactRequest(report_id)).to_dict()
 
     @router.get("/agents/runs", response_model=RunsResponse)
     def runs(query: Annotated[ListQuery, Query()]):
-        return ListAuditRunsUseCase(settings=resolved).execute(ListArtifactsRequest(**query.model_dump())).to_dict()
+        with reading():
+            return ListAuditRunsUseCase(settings=resolved).execute(ListArtifactsRequest(**query.model_dump())).to_dict()
 
     @router.get("/agents/runs/{run_id}", response_model=AuditResponse)
     def audit(run_id: ArtifactId):
-        return ReadAgentAuditUseCase(settings=resolved).execute(ReadArtifactRequest(run_id)).to_dict()
+        with reading():
+            return ReadAgentAuditUseCase(settings=resolved).execute(ReadArtifactRequest(run_id)).to_dict()
 
     app.include_router(router)
+    if manager:
+        app.include_router(operation_router(manager))
     return app

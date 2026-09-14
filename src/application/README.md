@@ -161,6 +161,21 @@ por separado.
 
 ## Relacion con v2
 
+### Operaciones y jobs (#54)
+
+`LocalJobManager` coordina un worker y el almacen `jobs.duckdb` separado, con
+`SubmitJobUseCase`, `GetJobUseCase`, `ListJobsUseCase` y `RetryJobUseCase`.
+`ExecuteOperationUseCase` delega en los casos de uso existentes de importacion,
+uploads, refresh, informes, simulaciones, agentes, brief y targets; no calcula
+metricas ni sustituye el preflight. Requests HTTP no aceptan paths/providers
+libres ni estado de cartera. `OperationalWorkspace` fija modo/rutas desde el
+servidor, prepara copias demo y mantiene un bloqueo de proceso.
+
+Leer [jobs locales](../../docs/local_jobs.md) para los estados, idempotencia,
+recuperacion, limites y concurrencia. Las peticiones de consulta financieras
+se rechazan temporalmente durante una operacion; polling usa otro bloqueo y
+sigue disponible. No anadir reintentos automaticos de operaciones con efectos.
+
 La nota `docs/architecture_v2.md` define que una futura API FastAPI deberia
 entrar por esta capa. El roadmap v2 contempla FastAPI local y React +
 TypeScript + Vite; estos contratos preparan la migracion manteniendo Streamlit operativo.

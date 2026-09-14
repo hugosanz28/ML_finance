@@ -32,6 +32,13 @@ decisiones personales.
 
 ## Auditoria de agentes
 
+La API operativa guarda parametros/resultados en `jobs.duckdb` dentro del
+directorio privado de datos: puede incluir CSVs subidos, brief y targets.
+Nunca versionar ni compartir esa base. La API no expone parametros en su polling
+y sanea resultados, pero estos siguen siendo datos financieros privados.
+No tiene autenticacion para multiples usuarios ni debe publicarse mediante un
+tunel. Ver [operaciones y jobs](local_jobs.md) para limites y confirmaciones.
+
 `portfolio_analytics_snapshot` tambien es privado: revela rendimiento, riesgo,
 concentracion y desviaciones respecto a objetivos. Se incluye en los inputs y
 hashes del run y en los contextos de analista/asistente, no del monitor. Con

@@ -23,7 +23,12 @@ La API de lectura (#53) ya vive en `src/api/`; entra exclusivamente por casos
 de uso de `src/application/`. Lee `docs/local_api.md` antes de ampliarla.
 Conserva GET sin escrituras, DuckDB read-only, errores sin detalles privados,
 validacion de Host/Origin y configuracion de entorno solo en el servidor.
-No anadas operaciones HTTP de escritura fuera del alcance de la #54.
+Las operaciones #54 son opt-in (`--operations demo|real`); lee `docs/local_jobs.md`.
+Conserva un unico worker por entorno, deduplicacion por Idempotency-Key,
+confirmacion explicita y hash obligatorio para actualizar brief/targets.
+No reejecutes automaticamente jobs interrumpidos ni agentes/proveedores.
+Solo simulaciones fallidas admiten retry explicito. No mezcles escrituras de
+Streamlit/CLI con el worker. La demo solo modifica copias en `demo/local_data`.
 
 ## Directrices de trabajo
 
@@ -139,7 +144,7 @@ Mapa rapido de tests por area:
 | Market data/FX | `tests\test_market_data.py`, `tests\test_fx_refresh.py`, `tests\test_benchmark_market_data.py` |
 | Analitica de riesgo | `tests\test_risk_analytics.py` |
 | Contratos de analitica | `tests\test_analytics_application.py`, `tests\test_interface_boundaries.py` |
-| API local | `tests\test_api.py`, `tests\test_interface_boundaries.py` |
+| API local | `tests\test_api.py`, `tests\test_api_jobs.py`, `tests\test_interface_boundaries.py` |
 | Analitica en agentes | `tests\test_agent_analytics.py`, `tests\test_agent_prompts.py`, `tests\test_agent_audit_trail.py` |
 | Defaults offline | `tests\test_agent_safe_defaults.py`, `tests\test_demo_workspace.py` |
 | Documentacion/publicacion | `tests\test_public_documentation.py`, `tests\test_dev_commands.py` |
@@ -192,6 +197,7 @@ no dupliques aqui el pipeline completo de CI.
 | `docs/architecture.md` | Arquitectura v1 | Componentes y flujo de datos. |
 | `docs/api_contracts.md` | Contratos API local | Distingue lecturas implementadas y operaciones futuras. |
 | `docs/local_api.md` | FastAPI local de lectura | Arranque, seguridad, endpoints y limites. |
+| `docs/local_jobs.md` | Operaciones y jobs FastAPI | Activacion, worker, privacidad, concurrencia y recuperacion. |
 | `docs/streamlit_dashboard.md` | Uso del dashboard | Flujos UI, auditoria y uploads. |
 | `docs/privacy.md` | Privacidad y secretos | Leer antes de publicar, demo o capturas. |
 | `docs/monthly_pipeline.md` | Flujo mensual completo | Datos, informes y agentes. |

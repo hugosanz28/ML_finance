@@ -1,8 +1,9 @@
-# API local de solo lectura
+# API local: lectura y operaciones opcionales
 
 La issue #53 incorpora FastAPI como adaptador de `src/application/`.
-Streamlit sigue operativo. No hay endpoints para importar, refrescar, ejecutar
-agentes ni modificar datos: operaciones/jobs corresponden a la #54.
+Streamlit sigue operativo. El modo por defecto sigue siendo de solo lectura.
+La #54 incorpora [operaciones y jobs](local_jobs.md), que requieren activacion
+explicita con `--operations demo` o `--operations real`.
 
 ## Arranque
 
@@ -41,7 +42,8 @@ python scripts/run_api.py --env-file demo/synthetic_config/.env.demo
 ```
 
 `bootstrap_demo.py` escribe exclusivamente el entorno sintetico configurado;
-la API no prepara datos ni crea la base DuckDB al arrancar o consultar.
+la API en modo de lectura no prepara datos ni crea la base DuckDB al arrancar
+o consultar. El modo operativo inicializa su almacen de jobs y copias demo.
 Sin datos, health y el catalogo funcionan y la analitica informa que no esta
 disponible. La salud del proceso no certifica calidad financiera.
 
