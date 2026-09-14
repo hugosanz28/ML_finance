@@ -17,6 +17,7 @@ from src.portfolio.dashboard_agents import _parse_portfolio_targets_input
 
 
 USER_FACING_SCRIPTS = (
+    "run_api.py",
     "generate_monthly_report.py",
     "import_degiro.py",
     "refresh_fx_rates.py",
@@ -69,6 +70,7 @@ def test_user_interfaces_do_not_bypass_application_layer() -> None:
     repo_root = default_repo_root()
     interface_paths = [repo_root / "scripts" / name for name in USER_FACING_SCRIPTS]
     interface_paths.extend(sorted((repo_root / "src" / "portfolio").glob("dashboard*.py")))
+    interface_paths.extend(sorted((repo_root / "src" / "api").glob("*.py")))
 
     violations: list[str] = []
     for path in interface_paths:

@@ -41,9 +41,12 @@ INTERNAL_MOVEMENT_TYPES = frozenset(
 )
 
 
-def net_external_contributions_until(settings: Settings, *, as_of_date: date) -> float | None:
+def net_external_contributions_until(
+    settings: Settings, *, as_of_date: date, repository: DuckDBMarketDataRepository | None = None,
+) -> float | None:
     """Return deposits minus withdrawals up to and including a valuation date."""
-    repository = DuckDBMarketDataRepository(settings=settings)
+    # Interfaces may supply a strict read-only repository without changing legacy callers.
+    repository = repository or DuckDBMarketDataRepository(settings=settings)
     query = """
         SELECT SUM(
             CASE

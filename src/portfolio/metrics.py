@@ -339,6 +339,8 @@ def _prepare_prices_frame(prices: pd.DataFrame, *, use_adjusted_close: bool) -> 
             frame[column] = None
 
     if frame.empty:
+        # A workspace without cached prices still needs the complete valuation schema.
+        frame["effective_close_price"] = pd.Series(dtype="float64")
         return frame.loc[:, [*_PRICE_REQUIRED_COLUMNS, *_PRICE_OPTIONAL_COLUMNS, "effective_close_price"]]
 
     frame["price_date"] = pd.to_datetime(frame["price_date"], errors="raise").dt.date

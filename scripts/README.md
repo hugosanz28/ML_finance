@@ -23,6 +23,10 @@ Para desarrollar o ejecutar la suite usa `requirements-dev.txt`; consulta
 
 ## Flujos
 
+- `run_api.py`: inicia FastAPI de solo lectura en `127.0.0.1:8000`.
+  Windows: `.\.venv\Scripts\python.exe scripts\run_api.py`;
+  POSIX con entorno activo: `python scripts/run_api.py`.
+  Admite `--env-file` y `--port`; ver [API local](../docs/local_api.md).
 - `run_dashboard.ps1`: abre Streamlit con `.env` o con `-EnvFile`.
 - `run_demo.ps1`: prepara la demo sintetica y abre Streamlit con
   `demo/synthetic_config/.env.demo`.

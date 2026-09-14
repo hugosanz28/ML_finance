@@ -8,6 +8,8 @@ from typing import Any
 
 from src.application.serialization import json_ready_value
 from src.config import Settings, get_settings
+from src.market_data.repository import DuckDBMarketDataRepository
+from src.portfolio.metrics_models import PortfolioDataUnavailableError
 from src.portfolio import (
     calculate_portfolio_metrics_from_normalized_degiro,
     load_normalized_degiro_snapshots,
@@ -43,6 +45,10 @@ class GetPortfolioStateResult:
         return asdict(self)
 
 
+class PortfolioStateUnavailableError(ValueError):
+    """The configured workspace has no readable portfolio history."""
+
+
 class GetPortfolioStateUseCase:
     name = "get_portfolio_state"
 
@@ -52,10 +58,16 @@ class GetPortfolioStateUseCase:
     def execute(self, request: GetPortfolioStateRequest | None = None) -> GetPortfolioStateResult:
         resolved_request = request or GetPortfolioStateRequest()
         requested_date = _parse_as_of_date(resolved_request.as_of_date)
-        metrics = calculate_portfolio_metrics_from_normalized_degiro(
-            settings=self.settings,
-            persist=resolved_request.persist,
-        )
+        # Disabling persistence also prevents implicit DuckDB/schema creation on GET.
+        repository = DuckDBMarketDataRepository(settings=self.settings, read_only=not resolved_request.persist)
+        try:
+            metrics = calculate_portfolio_metrics_from_normalized_degiro(
+                settings=self.settings,
+                repository=repository,
+                persist=resolved_request.persist,
+            )
+        except (FileNotFoundError, PortfolioDataUnavailableError) as exc:
+            raise PortfolioStateUnavailableError("Portfolio data is unavailable") from exc
         snapshots = load_normalized_degiro_snapshots(settings=self.settings)
         projection = project_portfolio_state(
             position_metrics=metrics.position_metrics,
@@ -69,6 +81,7 @@ class GetPortfolioStateUseCase:
         summary["net_external_contributions_base"] = net_external_contributions_until(
             self.settings,
             as_of_date=projection.as_of_date,
+            repository=repository,
         )
 
         return GetPortfolioStateResult(

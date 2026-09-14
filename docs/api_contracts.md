@@ -1,9 +1,11 @@
-# Contratos futuros de API local
+# Contratos de API local
 
 ## Estado
 
-Este documento define contratos de API para una posible v2 local con FastAPI.
-No implica que FastAPI exista ya ni que haya que implementarlo ahora.
+La primera vertical FastAPI de solo lectura (#53) esta implementada. Las rutas
+disponibles y su arranque estan en [API local](local_api.md). Las operaciones
+POST/PUT y las rutas no incluidas en ese listado siguen siendo propuestas;
+no estan implementadas por esta entrega.
 
 La regla de diseno es simple: los endpoints deben ser capas finas sobre
 `src/application/`. Si un endpoint necesita llamar directamente a
@@ -15,9 +17,9 @@ La regla de diseno es simple: los endpoints deben ser capas finas sobre
 
 - Base path previsto: `/api/v1`.
 - Todas las fechas viajan como `YYYY-MM-DD`.
-- Los paths locales se devuelven como strings y deben tratarse como datos
-  privados. La UI no debe exponerlos en una demo publica salvo que apunten al
-  entorno demo.
+- La API de lectura no expone metadata de rutas locales. Los ejemplos de
+  acciones futuras que incluyen paths deben revisarse antes de implementar
+  esas operaciones; no autorizan aceptar destinos arbitrarios desde HTTP.
 - Las acciones que escriben en disco son `POST` o `PUT`.
 - Las lecturas son `GET`.
 - Los endpoints de larga duracion pueden empezar sin jobs y evolucionar despues
@@ -51,7 +53,6 @@ Query params:
 
 | Nombre | Tipo | Default | Descripcion |
 | --- | --- | --- | --- |
-| `persist` | boolean | `true` | Si recalcular metricas debe persistir artefactos derivados. |
 | `include_positions` | boolean | `true` | Incluye posiciones actuales. |
 | `include_history` | boolean | `false` | Incluye serie diaria resumida. |
 | `as_of_date` | date/null | `null` | Fecha de corte. Si se omite, ultima fecha disponible. |
@@ -106,6 +107,8 @@ Respuesta:
 Notas:
 
 - La API no debe devolver DataFrames crudos.
+- La API fija `persist=False` con DuckDB de solo lectura y rechaza `persist`
+  enviado por el cliente. Sin cartera devuelve 404 `portfolio_data_unavailable`.
 - `GetPortfolioStateUseCase` ya transforma fechas, valores no finitos y tipos
   de pandas/numpy a un read model JSON estable.
 - `data_quality.warnings` contiene codigos estables como
@@ -817,16 +820,16 @@ sin acceder directamente al archivo ni al dominio de cartera.
 
 ## 9. Analitica avanzada
 
-Los casos de uso siguientes estan implementados; las rutas HTTP son contratos
-previstos, **no endpoints FastAPI ya disponibles**.
+Los casos de uso y las siguientes rutas GET estan implementados en FastAPI.
 
-| Ruta GET prevista | Caso de uso |
+| Ruta GET | Caso de uso |
 | --- | --- |
 | `/api/v1/analytics/summary` | `GetAnalyticsSummaryUseCase` |
 | `/api/v1/analytics/performance` | `GetPortfolioPerformanceUseCase` |
 | `/api/v1/analytics/risk` | `GetPortfolioRiskUseCase` |
 | `/api/v1/analytics/benchmarks` | `GetBenchmarkComparisonUseCase` |
 | `/api/v1/analytics/metric-definitions` | `GetMetricDefinitionsUseCase` |
+| `/api/v1/analytics/metrics/{metric_id}` | `GetMetricDefinitionsUseCase` (una definicion) |
 
 Las primeras cuatro rutas comparten `AnalyticsRequest`, con parametros query:
 

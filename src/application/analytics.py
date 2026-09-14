@@ -38,6 +38,10 @@ class AnalyticsRequest:
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
 
+    def validate(self) -> None:
+        """Validate transport input independently of loading potentially malformed data."""
+        _validate_request(self)
+
 
 @dataclass(frozen=True)
 class AnalyticsResult:

@@ -165,8 +165,15 @@ La nota `docs/architecture_v2.md` define que una futura API FastAPI deberia
 entrar por esta capa. El roadmap v2 contempla FastAPI local y React +
 TypeScript + Vite; estos contratos preparan la migracion manteniendo Streamlit operativo.
 
-Los contratos HTTP previstos antes de implementar FastAPI estan en
-`docs/api_contracts.md`. Si un contrato necesita logica que todavia no existe
+La API de lectura ya usa esta capa; ver [API local](../../docs/local_api.md).
+`GetPortfolioStateUseCase(persist=False)` usa DuckDB read-only y traduce falta
+de datos a `PortfolioStateUnavailableError` (subclase de `ValueError`).
+`ListReportsUseCase`, `ReadReportUseCase`, `ListAuditRunsUseCase` y
+`ReadAgentAuditUseCase` en `artifact_reads.py` exponen proyecciones de informes
+y auditoria con IDs contenidos en directorios configurados, sin metadata de
+rutas y sin modificar artefactos originales. Son datos privados aun redactados.
+
+Los contratos HTTP estan en `docs/api_contracts.md`. Si un contrato necesita logica que todavia no existe
 en esta capa, primero debe crearse el caso de uso correspondiente aqui y despues
 adaptar la interfaz.
 

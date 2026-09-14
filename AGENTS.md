@@ -17,7 +17,13 @@ Separacion publico/privado:
   `search_provider=static` solo cuando necesites fixtures de busqueda
   sinteticos. No uses proveedores externos salvo que la tarea lo pida.
 
-La UI actual es Streamlit. Una futura API/FastAPI debe entrar casi siempre por `src/application/`, no por modulos internos de dominio.
+La UI actual es Streamlit. FastAPI debe entrar por `src/application/`, no por modulos internos de dominio.
+
+La API de lectura (#53) ya vive en `src/api/`; entra exclusivamente por casos
+de uso de `src/application/`. Lee `docs/local_api.md` antes de ampliarla.
+Conserva GET sin escrituras, DuckDB read-only, errores sin detalles privados,
+validacion de Host/Origin y configuracion de entorno solo en el servidor.
+No anadas operaciones HTTP de escritura fuera del alcance de la #54.
 
 ## Directrices de trabajo
 
@@ -54,6 +60,11 @@ La UI actual es Streamlit. Una futura API/FastAPI debe entrar casi siempre por `
 - Si cambia comportamiento de agentes, actualiza tests y, cuando aplique, prompts versionados o documentacion de agentes.
 - Si cambias comandos documentados, valida que siguen existiendo.
 - Si tocas docs, evita duplicar manuales largos: enlaza a `docs/` o README de dominio.
+- Antes de disenar la UI v2 (#55), lee la decision "comprension primero" en
+  `docs/roadmap.md`: resumen sencillo, explicaciones desplegables y detalle
+  avanzado opcional, sin ocultar limites ni presentar la IA como autoridad.
+  El stack acordado es React + TypeScript + Vite con FastAPI local; esta
+  decision prevalece sobre propuestas antiguas de Angular en las docs.
 
 Invariantes y errores tipicos:
 
@@ -128,6 +139,7 @@ Mapa rapido de tests por area:
 | Market data/FX | `tests\test_market_data.py`, `tests\test_fx_refresh.py`, `tests\test_benchmark_market_data.py` |
 | Analitica de riesgo | `tests\test_risk_analytics.py` |
 | Contratos de analitica | `tests\test_analytics_application.py`, `tests\test_interface_boundaries.py` |
+| API local | `tests\test_api.py`, `tests\test_interface_boundaries.py` |
 | Analitica en agentes | `tests\test_agent_analytics.py`, `tests\test_agent_prompts.py`, `tests\test_agent_audit_trail.py` |
 | Defaults offline | `tests\test_agent_safe_defaults.py`, `tests\test_demo_workspace.py` |
 | Documentacion/publicacion | `tests\test_public_documentation.py`, `tests\test_dev_commands.py` |
@@ -178,7 +190,8 @@ no dupliques aqui el pipeline completo de CI.
 | `scripts/` | Entradas CLI/PowerShell | Ver `scripts/README.md` para comandos humanos. |
 | `tests/` | Suite pytest | Configurada en `pyproject.toml`. |
 | `docs/architecture.md` | Arquitectura v1 | Componentes y flujo de datos. |
-| `docs/api_contracts.md` | Contratos futuros API local | No implementa FastAPI; define contratos. |
+| `docs/api_contracts.md` | Contratos API local | Distingue lecturas implementadas y operaciones futuras. |
+| `docs/local_api.md` | FastAPI local de lectura | Arranque, seguridad, endpoints y limites. |
 | `docs/streamlit_dashboard.md` | Uso del dashboard | Flujos UI, auditoria y uploads. |
 | `docs/privacy.md` | Privacidad y secretos | Leer antes de publicar, demo o capturas. |
 | `docs/monthly_pipeline.md` | Flujo mensual completo | Datos, informes y agentes. |

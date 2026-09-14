@@ -8,6 +8,8 @@ proyecto usa [versionado semántico](https://semver.org/lang/es/).
 
 ### Añadido
 
+- API FastAPI local de solo lectura (#53), esquemas OpenAPI, consultas de
+  cartera/analitica/definiciones/informes/auditoria y launcher Windows/POSIX.
 - Documentación de contribución, seguridad, conducta y licencia MIT.
 - Matriz de CI para Python 3.11–3.14 en Windows y Python 3.12 en Ubuntu.
 - Puertas de calidad para Ruff, tipado gradual, cobertura de ramas, secretos,
@@ -45,6 +47,8 @@ proyecto usa [versionado semántico](https://semver.org/lang/es/).
 
 ### Corregido
 
+- Lecturas de cartera sin persistencia ya no inicializan DuckDB ni schemas.
+- Valoracion sin precios externos conserva el schema de la tabla vacia.
 - La demo ya acepta sus providers sintéticos también al usar los botones de
   refresh.
 - La inferencia FX no se ejecuta cuando el usuario selecciona exclusivamente
