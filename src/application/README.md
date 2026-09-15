@@ -73,10 +73,9 @@ los pesos restantes para atribuir riesgo. Buckets se resuelven por ID/ISIN
 exactos; mappings contradictorios quedan sin clasificar.
 
 La demo usa benchmarks sinteticos solo con `Settings.price_provider=synthetic`.
-En local real, un backend puede inyectar `LoadedBenchmarkProvider` construido
-con datos ya cargados; si no lo hace, se devuelve
-`benchmark_provider_unavailable`, sin usar red ni sustituirlo por la demo.
-El adaptador de fuente real y su persistencia siguen pendientes.
+En real se lee la cache validada de #60, si existe; tambien se admite inyeccion
+de `LoadedBenchmarkProvider`. Sin fuente se devuelve `benchmark_provider_unavailable`,
+sin usar red ni sustituirlo por la demo. Ver [benchmarks](../../docs/benchmarks.md).
 
 Ver los payloads y rutas HTTP previstas en [contratos API](../../docs/api_contracts.md#9-analitica-avanzada).
 Tests: `tests/test_analytics_application.py` y `tests/test_interface_boundaries.py`.
@@ -162,6 +161,10 @@ por separado.
 ## Relacion con v2
 
 ### Operaciones y jobs (#54)
+
+La UI React #56 consume estos casos via HTTP; ver [paridad](../../docs/react_operations.md).
+`GetWorkspaceStatusUseCase` publica solo modo/entorno para el banner y las
+confirmaciones de la UI; no expone rutas, credenciales ni configuracion libre.
 
 `LocalJobManager` coordina un worker y el almacen `jobs.duckdb` separado, con
 `SubmitJobUseCase`, `GetJobUseCase`, `ListJobsUseCase` y `RetryJobUseCase`.

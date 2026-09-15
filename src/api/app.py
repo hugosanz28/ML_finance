@@ -27,6 +27,7 @@ from src.application.local_jobs import LocalJobManager
 from src.application.operational_workspace import OperationalWorkspace, OperationError
 from src.api.body_limit import BodyLimitMiddleware
 from src.api.operations import operation_router
+from src.application.workspace_status import GetWorkspaceStatusUseCase, WorkspaceStatusRequest
 from src.api.schemas import (
     AnalyticsQuery, AnalyticsResponse, AuditResponse, ErrorResponse, HealthResponse,
     ListQuery, MetricDefinition, MetricDefinitionsResponse, PortfolioQuery, PortfolioResponse,
@@ -123,7 +124,7 @@ def create_app(*, settings: Settings | None = None, workspace_mode: str | None =
 
     @router.get("/health", response_model=HealthResponse)
     def health():
-        return HealthResponse(mode="operations" if manager else "read_only")
+        return HealthResponse(**GetWorkspaceStatusUseCase(settings=resolved).execute(WorkspaceStatusRequest(workspace_mode)))
 
     @router.get("/portfolio/state", response_model=PortfolioResponse)
     def portfolio(query: Annotated[PortfolioQuery, Query()]):

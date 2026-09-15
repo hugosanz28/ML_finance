@@ -23,6 +23,9 @@ Para desarrollar o ejecutar la suite usa `requirements-dev.txt`; consulta
 
 ## Flujos
 
+- `run_frontend_e2e_api.py`: servidor exclusivo de tests Playwright, con copia
+  sintetica temporal y red externa bloqueada. No acepta configuracion real.
+  Se lanza mediante `npm run test:e2e`, no como servidor habitual del usuario.
 - `refresh_benchmarks.py`: descarga explicita de proxies ETF y €STR oficiales
   a cache local real. Requiere fechas, `--provider yfinance_ecb` y `--confirm`;
   comparte el bloqueo del worker. Ver [benchmarks](../docs/benchmarks.md).

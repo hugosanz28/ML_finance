@@ -37,7 +37,9 @@ viven en rutas locales ignoradas por Git y la demo publica usa datos sinteticos.
   [API local](docs/local_api.md). Streamlit sigue operativo.
 - [UI React local de analitica](frontend/README.md) (#55): tema oscuro,
   resumen de cartera, rendimiento, benchmarks, riesgo y explicaciones.
-  Requiere Node.js 22.12+; operaciones siguen en Streamlit hasta la #56.
+  Requiere Node.js 22.12+. [Operaciones React](docs/react_operations.md) (#56)
+  disponibles con API opt-in: importacion, aportaciones, informes, agentes y
+  configuracion segura. Streamlit sigue disponible hasta #58.
 
 ## Puesta en marcha
 

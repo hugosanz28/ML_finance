@@ -147,7 +147,8 @@ Alternativamente, con API `--operations real`, usa POST
 `start_date`, `end_date` e `Idempotency-Key`; devuelve un job. Ver
 [jobs locales](local_jobs.md). La CLI comparte el bloqueo del worker. El refresh
 general de precios no descarga benchmarks y no hay reintentos automaticos.
-La UI de lectura muestra el resultado; su boton operativo queda para #56.
+La UI muestra el resultado y ofrece el refresh en Operaciones → Datos (#56),
+con seleccion explicita de fuente, fechas y confirmacion; ver [UI operativa](react_operations.md).
 
 ### Cache, auditoria y limites
 

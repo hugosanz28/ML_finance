@@ -12,6 +12,98 @@
   --teal: #68d9bc;
   --amber: #ebc388;
 }
+[hidden] {
+  display: none !important;
+}
+.environment-banner {
+  padding: 10px 14px;
+  margin-bottom: 20px;
+  border: 1px solid #365b50;
+  border-radius: 8px;
+  color: var(--teal);
+  font-size: 0.78rem;
+}
+.environment-banner.real {
+  border-color: #705333;
+  color: var(--amber);
+}
+.operation-nav,
+.job-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+  margin: 18px 0;
+}
+.operation-nav button[aria-current="page"] {
+  border-color: var(--teal);
+  color: var(--teal);
+}
+.operations-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 330px), 1fr));
+  gap: 20px;
+}
+.operations .panel {
+  margin: 16px 0;
+  min-width: 0;
+}
+.operations fieldset {
+  padding: 0;
+  margin: 0;
+  border: 0;
+  min-width: 0;
+  display: grid;
+  gap: 14px;
+}
+.operations input,
+.operations textarea {
+  display: block;
+  box-sizing: border-box;
+  width: 100%;
+  background: #151d23;
+  color: inherit;
+  border: 1px solid #354249;
+  border-radius: 6px;
+  padding: 10px;
+  font: inherit;
+  margin-top: 5px;
+}
+.operations textarea {
+  resize: vertical;
+  font-family: monospace;
+}
+.operations .check-label {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+.operations input[type="checkbox"] {
+  width: auto;
+}
+.operations .confirmation {
+  border: 2px solid var(--amber);
+}
+.operations .confirmation button {
+  margin: 8px 10px 0 0;
+}
+.artifact-text {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-size: 0.8rem;
+  max-height: 650px;
+  overflow: auto;
+  padding: 14px;
+  background: #0c1115;
+  border-radius: 6px;
+}
+.operations progress {
+  width: 100%;
+  accent-color: var(--teal);
+}
+.operations .table-scroll {
+  overflow-x: auto;
+}
 * {
   box-sizing: border-box;
 }

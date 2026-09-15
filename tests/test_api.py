@@ -48,7 +48,7 @@ def files_snapshot(root):
 
 
 def test_empty_workspace_health_catalog_and_queries_never_create_data(client, workspace):
-    assert client.get("/api/v1/health").json() == {"status": "ok", "mode": "read_only", "api_version": "v1"}
+    assert client.get("/api/v1/health").json() == {"status": "ok", "mode": "read_only", "api_version": "v1", "workspace_mode": "real"}
     definitions = client.get("/api/v1/analytics/metric-definitions")
     assert definitions.status_code == 200
     metric = definitions.json()["definitions"][0]
@@ -63,6 +63,30 @@ def test_empty_workspace_health_catalog_and_queries_never_create_data(client, wo
         assert response.status_code == 200
         assert response.json()["reason_code"] == "portfolio_data_unavailable"
     assert not workspace.data_dir.exists()
+
+
+def test_reports_accept_generated_ids_and_legacy_only(client, workspace):
+    workspace.reports_dir.mkdir(parents=True)
+    ids = ["monthly_legacy", "2026-04-30-monthly-20260430T120000123456"]
+    for report_id in ids:
+        (workspace.reports_dir / f"{report_id}.md").write_text("Synthetic report", encoding="utf-8")
+    (workspace.reports_dir / "private_notes.md").write_text("not a report", encoding="utf-8")
+    before = files_snapshot(workspace.data_dir)
+    assert {item["report_id"] for item in client.get("/api/v1/reports").json()["reports"]} == set(ids)
+    for report_id in ids:
+        assert client.get(f"/api/v1/reports/{report_id}").json()["content_markdown"] == "Synthetic report"
+    assert client.get("/api/v1/reports/private_notes").status_code == 404
+    assert before == files_snapshot(workspace.data_dir)
+
+
+def test_workspace_label_is_not_inferred_from_synthetic_benchmark(tmp_path):
+    synthetic_real = settings_for(tmp_path)
+    with TestClient(create_app(settings=synthetic_real), base_url="http://localhost") as client:
+        assert client.get("/api/v1/health").json()["workspace_mode"] == "real"
+    demo = replace(synthetic_real, data_dir=tmp_path / "demo/local_data", degiro_exports_dir=tmp_path / "demo/synthetic_degiro_exports")
+    with TestClient(create_app(settings=demo), base_url="http://localhost") as client:
+        assert client.get("/api/v1/health").json()["workspace_mode"] == "demo"
+    assert not demo.data_dir.exists()
 
 
 @pytest.mark.parametrize("query", [

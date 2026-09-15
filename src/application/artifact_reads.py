@@ -65,6 +65,11 @@ def _safe_payload(value: Any, settings: Settings) -> Any:
     return value
 
 
+def _monthly_id(value: str) -> bool:
+    # Support both legacy names and IDs produced by the current report generator.
+    return value.startswith("monthly_") or bool(re.fullmatch(r"\d{4}-\d{2}-\d{2}-monthly-\d{8}T\d{12}", value))
+
+
 class ListReportsUseCase:
     def __init__(self, *, settings: Settings) -> None:
         self.settings = settings
@@ -72,9 +77,11 @@ class ListReportsUseCase:
     def execute(self, request: ListArtifactsRequest | None = None) -> ArtifactReadResult:
         request = request or ListArtifactsRequest()
         reports = []
-        for path in sorted(self.settings.reports_dir.glob("monthly_*.md"), reverse=True):
+        for path in sorted(self.settings.reports_dir.glob("*.md"), reverse=True):
             try:
                 _identifier(path.stem)
+                if not _monthly_id(path.stem):
+                    continue
                 contained = _contained(path, self.settings.reports_dir)
             except (ValueError, FileNotFoundError):
                 continue
@@ -91,7 +98,7 @@ class ReadReportUseCase:
 
     def execute(self, request: ReadArtifactRequest) -> ArtifactReadResult:
         report_id = _identifier(request.artifact_id)
-        if not report_id.startswith("monthly_"):
+        if not _monthly_id(report_id):
             raise FileNotFoundError("Report not found")
         path = _contained(self.settings.reports_dir / f"{report_id}.md", self.settings.reports_dir)
         return ArtifactReadResult({

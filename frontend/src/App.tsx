@@ -3,8 +3,10 @@ import { api, ApiError } from "./api";
 import type { Analytics, Definition, Period, Portfolio } from "./contracts";
 import { Explanation, LineChart, MetricCard, Notices } from "./components";
 import { dateLabel, format, reason } from "./format";
+import { Operations } from "./Operations";
+import { opsApi, type Health } from "./operations-api";
 
-type View = "Resumen" | "Rentabilidad" | "Riesgo y activos";
+type View = "Resumen" | "Rentabilidad" | "Riesgo y activos" | "Operaciones";
 type Loaded = {
   analytics?: Analytics;
   portfolio?: Portfolio;
@@ -27,7 +29,24 @@ export function App() {
   const [reload, setReload] = useState(0);
   const [loaded, setLoaded] = useState<Loaded>();
   const [loading, setLoading] = useState(true);
+  const [health, setHealth] = useState<Health>();
+  const operationalView = view === "Operaciones";
   useEffect(() => {
+    const controller = new AbortController();
+    setHealth(undefined);
+    void opsApi
+      .health(AbortSignal.any([controller.signal, AbortSignal.timeout(15000)]))
+      .then((value) => {
+        if (!controller.signal.aborted) setHealth(value);
+      })
+      .catch(() => {});
+    return () => controller.abort();
+  }, [reload]);
+  useEffect(() => {
+    if (operationalView) {
+      setLoading(false);
+      return;
+    }
     const controller = new AbortController();
     const timeout = setTimeout(() => {
       controller.abort();
@@ -82,7 +101,7 @@ export function App() {
       clearTimeout(timeout);
       controller.abort();
     };
-  }, [period, benchmark, reload]);
+  }, [period, benchmark, reload, operationalView]);
   const analytics = loaded?.analytics,
     portfolio = loaded?.portfolio,
     definitions = loaded?.definitions ?? [];
@@ -116,18 +135,23 @@ export function App() {
         </a>
         <p className="nav-label">TU CARTERA</p>
         <nav aria-label="Navegación principal">
-          {(["Resumen", "Rentabilidad", "Riesgo y activos"] as View[]).map(
-            (item, index) => (
-              <button
-                key={item}
-                aria-current={view === item ? "page" : undefined}
-                onClick={() => setView(item)}
-              >
-                <span aria-hidden="true">{["◫", "↗", "◈"][index]}</span>
-                {item}
-              </button>
-            ),
-          )}
+          {(
+            [
+              "Resumen",
+              "Rentabilidad",
+              "Riesgo y activos",
+              "Operaciones",
+            ] as View[]
+          ).map((item, index) => (
+            <button
+              key={item}
+              aria-current={view === item ? "page" : undefined}
+              onClick={() => setView(item)}
+            >
+              <span aria-hidden="true">{["◫", "↗", "◈", "⇄"][index]}</span>
+              {item}
+            </button>
+          ))}
         </nav>
         <div className="sidebar-note">
           <span className="status-dot" /> Entorno local
@@ -136,7 +160,12 @@ export function App() {
             <br />
             Sin ejecución de órdenes.
           </p>
-          <span className="version">UI v2 · Solo lectura</span>
+          <span className="version">
+            UI v2 ·{" "}
+            {health?.mode === "operations"
+              ? "Operaciones habilitadas"
+              : "Solo lectura"}
+          </span>
         </div>
       </aside>
       <div className="workspace">
@@ -147,22 +176,39 @@ export function App() {
           <span className="local-badge">● LOCAL FIRST</span>
         </header>
         <main id="content" tabIndex={-1}>
+          <div
+            className={
+              health?.workspace_mode === "real"
+                ? "environment-banner real"
+                : "environment-banner"
+            }
+          >
+            {health
+              ? health.workspace_mode === "demo"
+                ? "DEMO SINTÉTICA · No subas datos reales"
+                : "DATOS REALES · Información privada, no compartir capturas"
+              : "ENTORNO NO VERIFICADO · Escrituras bloqueadas"}
+          </div>
           <div className="page-heading">
             <div>
               <p className="eyebrow">PERSPECTIVA, NO PREDICCIONES</p>
               <h1>
-                {view === "Resumen"
-                  ? "Tu cartera, de un vistazo"
-                  : view === "Rentabilidad"
-                    ? "Pon tu evolución en contexto"
-                    : "Entiende dónde está el riesgo"}
+                {operationalView
+                  ? "Tu revisión mensual"
+                  : view === "Resumen"
+                    ? "Tu cartera, de un vistazo"
+                    : view === "Rentabilidad"
+                      ? "Pon tu evolución en contexto"
+                      : "Entiende dónde está el riesgo"}
               </h1>
               <p className="subtitle">
-                {view === "Resumen"
-                  ? "Separa lo que aportas de lo que genera tu inversión."
-                  : view === "Rentabilidad"
-                    ? "Rentabilidad, aportaciones y referencias. Cada cifra, con sus límites."
-                    : "Concentración y comportamiento histórico de tus activos."}
+                {operationalView
+                  ? "Datos, aportaciones y agentes. Tú confirmas cada paso."
+                  : view === "Resumen"
+                    ? "Separa lo que aportas de lo que genera tu inversión."
+                    : view === "Rentabilidad"
+                      ? "Rentabilidad, aportaciones y referencias. Cada cifra, con sus límites."
+                      : "Concentración y comportamiento histórico de tus activos."}
               </p>
             </div>
             <button
@@ -173,7 +219,7 @@ export function App() {
               ↻ Actualizar lectura
             </button>
           </div>
-          <div className="toolbar">
+          <div className="toolbar" hidden={operationalView}>
             <label>
               Periodo de análisis
               <select
@@ -213,7 +259,8 @@ export function App() {
               </strong>
             </div>
           </div>
-          {loading ? (
+          <Operations health={health} visible={operationalView} />
+          {operationalView ? null : loading ? (
             <section className="loading" role="status">
               <span className="loading-dot" />
               <h2>Leyendo tu cartera…</h2>

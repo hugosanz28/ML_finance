@@ -13,14 +13,16 @@ export class ApiError extends Error {
   }
 }
 // Runtime validation prevents a changed/malformed API response becoming financial data.
-async function get<T>(
+export async function get<T>(
   path: string,
   schema: z.ZodType<T>,
   signal: AbortSignal,
+  init: RequestInit = {},
 ): Promise<T> {
   let response: Response;
   try {
     response = await fetch(`${base}${path}`, {
+      ...init,
       signal,
       cache: "no-store",
       credentials: "omit",

@@ -32,7 +32,8 @@ La serie `v0.1.x` consolida la v1 local con Streamlit. Ya estan disponibles:
   [jobs locales](local_jobs.md);
 - UI React local de analitica (#55), oscura y educativa, con resumen,
   rendimiento, benchmarks y riesgo; ver [frontend](../frontend/README.md).
-  La siguiente fase (#56) migra flujos operativos; Streamlit sigue disponible;
+  Flujos operativos #56 disponibles; ver [paridad y limites](react_operations.md).
+  Streamlit sigue disponible hasta revisar la retirada #58;
 - CI multiplataforma con lint, typecheck gradual, secret scanning, cobertura,
   bootstrap demo offline, auditoria de dependencias y build de wheel.
 
@@ -49,7 +50,7 @@ Las prioridades de mantenimiento son:
 Antes de #56 se ha conectado la [fuente real de benchmarks](benchmarks.md) (#60):
 proxies ETF y €STR/FX BCE, refresh explicito y cache offline con procedencia.
 La UI #55 muestra los resultados y sus limites; el control de actualizacion
-desde React queda dentro de las operaciones de #56. Despues siguen showcase
+desde React esta incluido en las operaciones de #56. Despues siguen showcase
 (#57) y retirada de Streamlit tras paridad verificada (#58).
 
 ### Decision de producto: comprension primero (UI #55)

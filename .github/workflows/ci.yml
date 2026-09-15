@@ -46,6 +46,11 @@ jobs:
       - name: Audit frontend dependencies
         working-directory: frontend
         run: npm audit --audit-level=moderate
+      - name: Browser demo end-to-end (isolated offline workspace)
+        working-directory: frontend
+        run: |
+          npx playwright install --with-deps chromium
+          npm run test:e2e
 
   supported-python:
     name: ${{ matrix.os }} / Python ${{ matrix.python-version }}

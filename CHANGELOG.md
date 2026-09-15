@@ -8,6 +8,9 @@ proyecto usa [versionado semántico](https://semver.org/lang/es/).
 
 ### Añadido
 
+- Operaciones React (#56): importacion, refresh, aportaciones, informes, agentes,
+  configuracion con hash, confirmacion e historial de jobs; prueba E2E offline.
+  Health identifica demo/real y el lector admite IDs de informes actuales y legacy.
 - Benchmarks reales locales (#60): proxies ETF via yfinance y €STR/FX del BCE,
   refresh explicito por CLI/job, cache atomica validada y fuentes/hashes en React.
   Los huecos limitan la comparacion al ultimo tramo continuo, sin relleno ficticio.

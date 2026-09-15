@@ -6,6 +6,10 @@ escribir al mismo tiempo que la API sobre el mismo entorno.
 
 ## Activacion explicita
 
+La [UI React operativa](react_operations.md) ofrece estos flujos con confirmacion,
+polling, resultados y control de hash. `/health` identifica el entorno desde el
+servidor; el frontend no lo selecciona ni deduce de los benchmarks.
+
 El comando original conserva el modo de solo lectura. Para habilitar operaciones
 hay que elegir el entorno al arrancar, nunca mediante una peticion HTTP:
 

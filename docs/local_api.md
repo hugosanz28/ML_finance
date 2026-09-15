@@ -4,8 +4,8 @@ La issue #53 incorpora FastAPI como adaptador de `src/application/`.
 Streamlit sigue operativo. El modo por defecto sigue siendo de solo lectura.
 La #54 incorpora [operaciones y jobs](local_jobs.md), que requieren activacion
 explicita con `--operations demo` o `--operations real`.
-La [UI React de analitica](../frontend/README.md) (#55) consume solo las
-lecturas; utiliza API:8000 y Vite:5173 en loopback.
+La [UI React](../frontend/README.md) (#55/#56) consume analitica de lectura y
+operaciones opt-in; utiliza API:8000 y Vite:5173 en loopback.
 
 ## Arranque
 
@@ -55,7 +55,7 @@ Todas las rutas siguientes llevan el prefijo `/api/v1` y usan GET:
 
 | Ruta | Respuesta |
 | --- | --- |
-| `/health` | Salud del proceso, version API y modo `read_only` |
+| `/health` | Salud, version API, modo `read_only`/`operations` y entorno `demo`/`real` |
 | `/portfolio/state` | Resumen, posiciones, historico opcional y avisos |
 | `/analytics/summary` | Resumen analitico completo |
 | `/analytics/performance` | Rendimiento, TWR/MWR y flujos |
@@ -68,7 +68,8 @@ Todas las rutas siguientes llevan el prefijo `/api/v1` y usan GET:
 | `/agents/runs` | Runs persistidos, `limit` entre 1 y 100 |
 | `/agents/runs/{run_id}` | Auditoria compatible con legacy, sin metadata de rutas |
 
-Los IDs de informe son los nombres sin `.md` de archivos `monthly_*.md` en
+Los IDs de informe son los nombres sin `.md` de archivos legacy `monthly_*.md`
+o actuales `YYYY-MM-DD-monthly-YYYYMMDDTHHMMSSffffff.md` en
 `Settings.reports_dir`; no se siguen rutas externas guardadas en el historial.
 Los IDs de run son los directorios de auditoria configurados. No se aceptan
 rutas arbitrarias ni saltos de directorio; enlaces fuera del directorio

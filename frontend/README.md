@@ -1,7 +1,7 @@
 # ML Finance UI
 
-Primera UI v2 (#55): React + TypeScript estricto + Vite sobre FastAPI local.
-Solo lectura. Streamlit permanece disponible para las operaciones (#56).
+UI v2 (#55/#56): React + TypeScript estricto + Vite sobre FastAPI local.
+Analitica y flujos operativos opt-in. Streamlit permanece disponible hasta #58.
 
 ## Arranque
 
@@ -36,7 +36,10 @@ python scripts/run_api.py --env-file demo/synthetic_config/.env.demo
 
 Los comandos npm son identicos. Para datos reales, usa `python scripts/run_api.py`
 con la configuracion privada del servidor y sin la variable de demo en esa
-terminal. El frontend no elige rutas, providers ni archivos de entorno.
+terminal. El frontend no elige rutas ni archivos de entorno. Para habilitar
+acciones, anade `--operations demo` al comando de demo o `--operations real` al
+comando real. No arranques dos APIs ni escribas desde Streamlit/CLI a la vez.
+La API fija el entorno; la UI no puede cambiarlo. Ver [jobs locales](../docs/local_jobs.md).
 
 ## Pantallas y limites
 
@@ -48,6 +51,8 @@ terminal. El frontend no elige rutas, providers ni archivos de entorno.
   crecimiento del indice base, drawdown y metricas comparativas avanzadas.
 - **Riesgo y activos**: volatilidad, caidas, concentracion por dimension,
   posiciones, correlaciones y detalle opcional de riesgo por activo.
+- **Operaciones**: datos, aportaciones, informes, agentes, configuracion y
+  ejecuciones. Ver [matriz de paridad y seguridad](../docs/react_operations.md).
 
 Las explicaciones vienen del catalogo de la API. Los avisos permanecen visibles
 y los datos ausentes nunca se convierten en cero. Los graficos SVG solo escalan
@@ -64,7 +69,7 @@ obsoletas se descartan al cambiar filtros. Si falla una seccion, las otras
 siguen disponibles; hay reintento manual y timeout de 60 segundos.
 
 Los benchmarks reales necesitan una [descarga explicita a cache](../docs/benchmarks.md)
-por CLI o API operativa. La UI muestra fuentes, proxies ETF, fechas y hashes;
+por CLI, API operativa o el panel Operaciones → Datos. La UI muestra fuentes, proxies ETF, fechas y hashes;
 abrir una pantalla no descarga datos. Si falta la cache,
 se muestra `benchmark_provider_unavailable`, nunca una curva sintetica de
 respaldo. La etiqueta de benchmark sintetico describe **la referencia**, no
@@ -73,7 +78,8 @@ exclusivamente la configuracion demo documentada arriba.
 
 Sharpe/Sortino requieren tasa explicita; esta primera UI no la configura.
 Las series de activos son `valuation_price_proxy`, no total return. Las
-correlaciones pueden tener muestras distintas. No se ejecutan agentes ni se
+correlaciones pueden tener muestras distintas. La analitica no ejecuta agentes;
+su ejecucion se confirma por separado en Operaciones. Nunca se
 ofrece IA como autoridad de inversion. La facilidad de comprension en dos
 minutos sigue siendo un objetivo pendiente de validar con usuarios.
 
@@ -85,10 +91,15 @@ npm run typecheck
 npm test
 npm run build
 npm audit --audit-level=moderate
+npx playwright install chromium
+npm run test:e2e
 ```
 
 `npm run preview` sirve el build solo en loopback y necesita la API arrancada.
 El frontend se distribuye separado del wheel Python; no modifica su instalacion.
+E2E exige puertos 8000/5173 libres, crea una copia sintetica temporal y no reutiliza
+servidores existentes. En CI instala Chromium con `--with-deps`. No usa datos
+reales ni proveedores externos. Ver [webServer de Playwright](https://playwright.dev/docs/test-webserver).
 
 Para incluir la prueba de integracion con respuestas actuales, desde la raiz,
 despues del bootstrap sintetico:
@@ -105,10 +116,12 @@ una proyeccion obtenida de FastAPI sobre la demo de abril de 2026, con historial
 y crecimiento reducidos a sus extremos para los tests de componentes. No es
 un fallback en runtime, ni un fichero de cartera real.
 
-Arquitectura: `api.ts` GET local; `contracts.ts` validacion Zod y tipos inferidos;
+Arquitectura: `api.ts` transporte local; `contracts.ts` validacion Zod y tipos inferidos;
 `App.tsx` navegacion/estados; `components.tsx` metricas, ayuda y graficos;
 `format.ts` presentacion y mensajes; `styles.css` tema grafito/verde azulado,
-fuentes del sistema y responsive. No duplicar formulas financieras aqui.
+fuentes del sistema y responsive. `Operations.tsx` coordina confirmacion/polling;
+`operation-forms.tsx`, `operation-results.tsx` y `operations-api.ts` separan
+formularios, resultados y contratos operativos. No duplicar formulas financieras aqui.
 
 Referencias del stack: [React/TypeScript](https://react.dev/learn/typescript),
 [Vite](https://vite.dev/guide/) y [API local](../docs/local_api.md).
