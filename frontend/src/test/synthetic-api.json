@@ -1,0 +1,1570 @@
+{
+  "portfolio": {
+    "as_of_date": "2026-04-30",
+    "base_currency": "EUR",
+    "summary": {
+      "total_market_value_base": 9172.7,
+      "total_unrealized_pnl_base": 354.3,
+      "portfolio_return_pct": 0.04017736,
+      "drawdown_pct": 0,
+      "valuation_coverage_ratio": 1,
+      "net_external_contributions_base": 8800
+    },
+    "broker_snapshot": {
+      "snapshot_date": "2026-04-30",
+      "total_market_value_base": 9172.7
+    },
+    "positions": [
+      {
+        "asset_id": "degiro:isin:IE00SYNCORE1",
+        "asset_name": "Synthetic Global Core UCITS ETF",
+        "asset_type": "etf",
+        "isin": "IE00SYNCORE1",
+        "quantity": 48,
+        "market_value_base": 4152,
+        "weight": 0.45264753,
+        "cost_basis_base": 3875,
+        "unrealized_pnl_base": 277,
+        "unrealized_return_pct": 0.07148387,
+        "valuation_status": "valued_anchored"
+      },
+      {
+        "asset_id": "degiro:cash:eur",
+        "asset_name": "CASH & CASH FUND & FTX CASH (EUR)",
+        "asset_type": "cash",
+        "isin": null,
+        "quantity": 2680.7,
+        "market_value_base": 2680.7,
+        "weight": 0.29224765,
+        "cost_basis_base": 2680.7,
+        "unrealized_pnl_base": 0,
+        "unrealized_return_pct": 0,
+        "valuation_status": "valued_cash"
+      },
+      {
+        "asset_id": "degiro:isin:IE00SYNBOND1",
+        "asset_name": "Synthetic Defensive Bond UCITS ETF",
+        "asset_type": "etf",
+        "isin": "IE00SYNBOND1",
+        "quantity": 30,
+        "market_value_base": 1524,
+        "weight": 0.16614519,
+        "cost_basis_base": 1501.5,
+        "unrealized_pnl_base": 22.5,
+        "unrealized_return_pct": 0.01498501,
+        "valuation_status": "valued_anchored"
+      },
+      {
+        "asset_id": "degiro:isin:NL00SYNTECH1",
+        "asset_name": "Synthetic Quality Tech NV",
+        "asset_type": "stock",
+        "isin": "NL00SYNTECH1",
+        "quantity": 8,
+        "market_value_base": 816,
+        "weight": 0.08895963,
+        "cost_basis_base": 761.2,
+        "unrealized_pnl_base": 54.8,
+        "unrealized_return_pct": 0.07199159,
+        "valuation_status": "valued_anchored"
+      }
+    ],
+    "history": [
+      {
+        "valuation_date": "2026-01-15",
+        "total_market_value_base": 3200,
+        "drawdown_pct": 0,
+        "valuation_coverage_ratio": 1
+      },
+      {
+        "valuation_date": "2026-04-30",
+        "total_market_value_base": 9172.7,
+        "drawdown_pct": 0,
+        "valuation_coverage_ratio": 1
+      }
+    ],
+    "data_quality": {
+      "warnings": []
+    }
+  },
+  "analytics": {
+    "schema_version": 1,
+    "section": "summary",
+    "status": "partial",
+    "reason_code": "valuation_price_proxy",
+    "base_currency": "EUR",
+    "period": {
+      "period_id": "since_inception",
+      "requested_start": null,
+      "actual_start": "2026-01-15",
+      "end_date": "2026-04-30"
+    },
+    "warnings": [
+      "valuation_price_proxy",
+      "risk_free_rate_missing",
+      "zero_drawdown",
+      "partial_exposure_coverage",
+      "classification_missing",
+      "insufficient_observations",
+      "incomplete_return_path",
+      "partial_return_coverage"
+    ],
+    "data": {
+      "performance": {
+        "period": {
+          "period_id": "since_inception",
+          "requested_start": null,
+          "actual_start": "2026-01-15",
+          "end_date": "2026-04-30",
+          "valuation_count": 106,
+          "external_flow_count": 3,
+          "net_external_flow_base": 1800,
+          "twr": {
+            "metric_id": "twr",
+            "value": 1.026508950217,
+            "unit": "decimal",
+            "period_start": "2026-01-15",
+            "period_end": "2026-04-30",
+            "observations": 105,
+            "coverage_ratio": 1,
+            "status": "available",
+            "reason_code": "ok"
+          },
+          "mwr": {
+            "metric_id": "mwr_xirr",
+            "value": 11.857611622063,
+            "unit": "decimal",
+            "period_start": "2026-01-15",
+            "period_end": "2026-04-30",
+            "observations": 5,
+            "coverage_ratio": 1,
+            "status": "available",
+            "reason_code": "ok"
+          },
+          "reason_codes": []
+        },
+        "cash_flow_issues": []
+      },
+      "risk": {
+        "portfolio": {
+          "metrics": [
+            {
+              "metric_id": "volatility_annualized",
+              "value": 1.002603048595,
+              "unit": "decimal_annualized",
+              "period_start": "2026-01-15",
+              "period_end": "2026-04-30",
+              "observations": 105,
+              "coverage_ratio": 1,
+              "status": "available",
+              "reason_code": "ok"
+            },
+            {
+              "metric_id": "downside_volatility_annualized",
+              "value": 0,
+              "unit": "decimal_annualized",
+              "period_start": "2026-01-15",
+              "period_end": "2026-04-30",
+              "observations": 105,
+              "coverage_ratio": 1,
+              "status": "available",
+              "reason_code": "ok"
+            },
+            {
+              "metric_id": "sharpe",
+              "value": null,
+              "unit": "ratio",
+              "period_start": "2026-01-15",
+              "period_end": "2026-04-30",
+              "observations": 105,
+              "coverage_ratio": 1,
+              "status": "unavailable",
+              "reason_code": "risk_free_rate_missing"
+            },
+            {
+              "metric_id": "sortino",
+              "value": null,
+              "unit": "ratio",
+              "period_start": "2026-01-15",
+              "period_end": "2026-04-30",
+              "observations": 105,
+              "coverage_ratio": 1,
+              "status": "unavailable",
+              "reason_code": "risk_free_rate_missing"
+            },
+            {
+              "metric_id": "max_drawdown",
+              "value": 0,
+              "unit": "decimal",
+              "period_start": "2026-01-15",
+              "period_end": "2026-04-30",
+              "observations": 105,
+              "coverage_ratio": 1,
+              "status": "available",
+              "reason_code": "ok"
+            },
+            {
+              "metric_id": "drawdown_duration_days",
+              "value": 0,
+              "unit": "days",
+              "period_start": "2026-01-15",
+              "period_end": "2026-04-30",
+              "observations": 105,
+              "coverage_ratio": 1,
+              "status": "available",
+              "reason_code": "ok"
+            },
+            {
+              "metric_id": "calmar",
+              "value": null,
+              "unit": "ratio",
+              "period_start": "2026-01-15",
+              "period_end": "2026-04-30",
+              "observations": 105,
+              "coverage_ratio": 1,
+              "status": "unavailable",
+              "reason_code": "zero_drawdown"
+            }
+          ],
+          "periods_per_year": 365,
+          "risk_free_rate_annual": null
+        },
+        "positions": {
+          "concentration": {
+            "groups": [
+              {
+                "dimension": "asset_id",
+                "group": "degiro:cash:eur",
+                "weight": {
+                  "metric_id": "exposure_weight",
+                  "value": 0.292247647912,
+                  "unit": "decimal",
+                  "period_start": "2026-04-30",
+                  "period_end": "2026-04-30",
+                  "observations": 4,
+                  "coverage_ratio": 1,
+                  "status": "available",
+                  "reason_code": "ok"
+                }
+              },
+              {
+                "dimension": "asset_id",
+                "group": "degiro:isin:IE00SYNBOND1",
+                "weight": {
+                  "metric_id": "exposure_weight",
+                  "value": 0.16614519171,
+                  "unit": "decimal",
+                  "period_start": "2026-04-30",
+                  "period_end": "2026-04-30",
+                  "observations": 4,
+                  "coverage_ratio": 1,
+                  "status": "available",
+                  "reason_code": "ok"
+                }
+              },
+              {
+                "dimension": "asset_id",
+                "group": "degiro:isin:IE00SYNCORE1",
+                "weight": {
+                  "metric_id": "exposure_weight",
+                  "value": 0.452647530171,
+                  "unit": "decimal",
+                  "period_start": "2026-04-30",
+                  "period_end": "2026-04-30",
+                  "observations": 4,
+                  "coverage_ratio": 1,
+                  "status": "available",
+                  "reason_code": "ok"
+                }
+              },
+              {
+                "dimension": "asset_id",
+                "group": "degiro:isin:NL00SYNTECH1",
+                "weight": {
+                  "metric_id": "exposure_weight",
+                  "value": 0.088959630207,
+                  "unit": "decimal",
+                  "period_start": "2026-04-30",
+                  "period_end": "2026-04-30",
+                  "observations": 4,
+                  "coverage_ratio": 1,
+                  "status": "available",
+                  "reason_code": "ok"
+                }
+              },
+              {
+                "dimension": "bucket",
+                "group": "cash",
+                "weight": {
+                  "metric_id": "exposure_weight",
+                  "value": 0.292247647912,
+                  "unit": "decimal",
+                  "period_start": "2026-04-30",
+                  "period_end": "2026-04-30",
+                  "observations": 4,
+                  "coverage_ratio": 1,
+                  "status": "available",
+                  "reason_code": "ok"
+                }
+              },
+              {
+                "dimension": "bucket",
+                "group": "core_global_equity",
+                "weight": {
+                  "metric_id": "exposure_weight",
+                  "value": 0.452647530171,
+                  "unit": "decimal",
+                  "period_start": "2026-04-30",
+                  "period_end": "2026-04-30",
+                  "observations": 4,
+                  "coverage_ratio": 1,
+                  "status": "available",
+                  "reason_code": "ok"
+                }
+              },
+              {
+                "dimension": "bucket",
+                "group": "defensive_bonds",
+                "weight": {
+                  "metric_id": "exposure_weight",
+                  "value": 0.16614519171,
+                  "unit": "decimal",
+                  "period_start": "2026-04-30",
+                  "period_end": "2026-04-30",
+                  "observations": 4,
+                  "coverage_ratio": 1,
+                  "status": "available",
+                  "reason_code": "ok"
+                }
+              },
+              {
+                "dimension": "bucket",
+                "group": "satellites",
+                "weight": {
+                  "metric_id": "exposure_weight",
+                  "value": 0.088959630207,
+                  "unit": "decimal",
+                  "period_start": "2026-04-30",
+                  "period_end": "2026-04-30",
+                  "observations": 4,
+                  "coverage_ratio": 1,
+                  "status": "available",
+                  "reason_code": "ok"
+                }
+              },
+              {
+                "dimension": "currency",
+                "group": "EUR",
+                "weight": {
+                  "metric_id": "exposure_weight",
+                  "value": 1,
+                  "unit": "decimal",
+                  "period_start": "2026-04-30",
+                  "period_end": "2026-04-30",
+                  "observations": 4,
+                  "coverage_ratio": 1,
+                  "status": "available",
+                  "reason_code": "ok"
+                }
+              },
+              {
+                "dimension": "asset_type",
+                "group": "cash",
+                "weight": {
+                  "metric_id": "exposure_weight",
+                  "value": 0.292247647912,
+                  "unit": "decimal",
+                  "period_start": "2026-04-30",
+                  "period_end": "2026-04-30",
+                  "observations": 4,
+                  "coverage_ratio": 1,
+                  "status": "available",
+                  "reason_code": "ok"
+                }
+              },
+              {
+                "dimension": "asset_type",
+                "group": "etf",
+                "weight": {
+                  "metric_id": "exposure_weight",
+                  "value": 0.618792721881,
+                  "unit": "decimal",
+                  "period_start": "2026-04-30",
+                  "period_end": "2026-04-30",
+                  "observations": 4,
+                  "coverage_ratio": 1,
+                  "status": "available",
+                  "reason_code": "ok"
+                }
+              },
+              {
+                "dimension": "asset_type",
+                "group": "stock",
+                "weight": {
+                  "metric_id": "exposure_weight",
+                  "value": 0.088959630207,
+                  "unit": "decimal",
+                  "period_start": "2026-04-30",
+                  "period_end": "2026-04-30",
+                  "observations": 4,
+                  "coverage_ratio": 1,
+                  "status": "available",
+                  "reason_code": "ok"
+                }
+              },
+              {
+                "dimension": "sector",
+                "group": "unclassified",
+                "weight": {
+                  "metric_id": "exposure_weight",
+                  "value": 1,
+                  "unit": "decimal",
+                  "period_start": "2026-04-30",
+                  "period_end": "2026-04-30",
+                  "observations": 4,
+                  "coverage_ratio": 0,
+                  "status": "partial",
+                  "reason_code": "partial_exposure_coverage"
+                }
+              }
+            ],
+            "hhi_by_dimension": {
+              "asset_id": {
+                "metric_id": "concentration_hhi",
+                "value": 0.325816514815,
+                "unit": "coefficient",
+                "period_start": "2026-04-30",
+                "period_end": "2026-04-30",
+                "observations": 4,
+                "coverage_ratio": 1,
+                "status": "available",
+                "reason_code": "ok"
+              },
+              "bucket": {
+                "metric_id": "concentration_hhi",
+                "value": 0.325816514815,
+                "unit": "coefficient",
+                "period_start": "2026-04-30",
+                "period_end": "2026-04-30",
+                "observations": 4,
+                "coverage_ratio": 1,
+                "status": "available",
+                "reason_code": "ok"
+              },
+              "currency": {
+                "metric_id": "concentration_hhi",
+                "value": 1,
+                "unit": "coefficient",
+                "period_start": "2026-04-30",
+                "period_end": "2026-04-30",
+                "observations": 4,
+                "coverage_ratio": 1,
+                "status": "available",
+                "reason_code": "ok"
+              },
+              "asset_type": {
+                "metric_id": "concentration_hhi",
+                "value": 0.47622693617,
+                "unit": "coefficient",
+                "period_start": "2026-04-30",
+                "period_end": "2026-04-30",
+                "observations": 4,
+                "coverage_ratio": 1,
+                "status": "available",
+                "reason_code": "ok"
+              },
+              "sector": {
+                "metric_id": "concentration_hhi",
+                "value": null,
+                "unit": "coefficient",
+                "period_start": "2026-04-30",
+                "period_end": "2026-04-30",
+                "observations": 4,
+                "coverage_ratio": 0,
+                "status": "unavailable",
+                "reason_code": "classification_missing"
+              }
+            }
+          },
+          "asset_risk": {
+            "degiro:cash:eur": {
+              "metrics": [
+                {
+                  "metric_id": "volatility_annualized",
+                  "value": null,
+                  "unit": "decimal_annualized",
+                  "period_start": "2026-01-15",
+                  "period_end": "2026-04-30",
+                  "observations": 0,
+                  "coverage_ratio": 0,
+                  "status": "unavailable",
+                  "reason_code": "insufficient_observations"
+                },
+                {
+                  "metric_id": "downside_volatility_annualized",
+                  "value": null,
+                  "unit": "decimal_annualized",
+                  "period_start": "2026-01-15",
+                  "period_end": "2026-04-30",
+                  "observations": 0,
+                  "coverage_ratio": 0,
+                  "status": "unavailable",
+                  "reason_code": "insufficient_observations"
+                },
+                {
+                  "metric_id": "sharpe",
+                  "value": null,
+                  "unit": "ratio",
+                  "period_start": "2026-01-15",
+                  "period_end": "2026-04-30",
+                  "observations": 0,
+                  "coverage_ratio": 0,
+                  "status": "unavailable",
+                  "reason_code": "insufficient_observations"
+                },
+                {
+                  "metric_id": "sortino",
+                  "value": null,
+                  "unit": "ratio",
+                  "period_start": "2026-01-15",
+                  "period_end": "2026-04-30",
+                  "observations": 0,
+                  "coverage_ratio": 0,
+                  "status": "unavailable",
+                  "reason_code": "insufficient_observations"
+                },
+                {
+                  "metric_id": "max_drawdown",
+                  "value": null,
+                  "unit": "decimal",
+                  "period_start": "2026-01-15",
+                  "period_end": "2026-04-30",
+                  "observations": 0,
+                  "coverage_ratio": 0,
+                  "status": "unavailable",
+                  "reason_code": "incomplete_return_path"
+                },
+                {
+                  "metric_id": "drawdown_duration_days",
+                  "value": null,
+                  "unit": "days",
+                  "period_start": "2026-01-15",
+                  "period_end": "2026-04-30",
+                  "observations": 0,
+                  "coverage_ratio": 0,
+                  "status": "unavailable",
+                  "reason_code": "incomplete_return_path"
+                },
+                {
+                  "metric_id": "calmar",
+                  "value": null,
+                  "unit": "ratio",
+                  "period_start": "2026-01-15",
+                  "period_end": "2026-04-30",
+                  "observations": 0,
+                  "coverage_ratio": 0,
+                  "status": "unavailable",
+                  "reason_code": "incomplete_return_path"
+                }
+              ],
+              "periods_per_year": 365,
+              "risk_free_rate_annual": null
+            },
+            "degiro:isin:IE00SYNBOND1": {
+              "metrics": [
+                {
+                  "metric_id": "volatility_annualized",
+                  "value": 0.021441144683,
+                  "unit": "decimal_annualized",
+                  "period_start": "2026-01-15",
+                  "period_end": "2026-04-30",
+                  "observations": 74,
+                  "coverage_ratio": 0.7047619,
+                  "status": "partial",
+                  "reason_code": "partial_return_coverage"
+                },
+                {
+                  "metric_id": "downside_volatility_annualized",
+                  "value": 0,
+                  "unit": "decimal_annualized",
+                  "period_start": "2026-01-15",
+                  "period_end": "2026-04-30",
+                  "observations": 74,
+                  "coverage_ratio": 0.7047619,
+                  "status": "partial",
+                  "reason_code": "partial_return_coverage"
+                },
+                {
+                  "metric_id": "sharpe",
+                  "value": null,
+                  "unit": "ratio",
+                  "period_start": "2026-01-15",
+                  "period_end": "2026-04-30",
+                  "observations": 74,
+                  "coverage_ratio": 0.7047619,
+                  "status": "unavailable",
+                  "reason_code": "risk_free_rate_missing"
+                },
+                {
+                  "metric_id": "sortino",
+                  "value": null,
+                  "unit": "ratio",
+                  "period_start": "2026-01-15",
+                  "period_end": "2026-04-30",
+                  "observations": 74,
+                  "coverage_ratio": 0.7047619,
+                  "status": "unavailable",
+                  "reason_code": "risk_free_rate_missing"
+                },
+                {
+                  "metric_id": "max_drawdown",
+                  "value": null,
+                  "unit": "decimal",
+                  "period_start": "2026-01-15",
+                  "period_end": "2026-04-30",
+                  "observations": 74,
+                  "coverage_ratio": 0.7047619,
+                  "status": "unavailable",
+                  "reason_code": "incomplete_return_path"
+                },
+                {
+                  "metric_id": "drawdown_duration_days",
+                  "value": null,
+                  "unit": "days",
+                  "period_start": "2026-01-15",
+                  "period_end": "2026-04-30",
+                  "observations": 74,
+                  "coverage_ratio": 0.7047619,
+                  "status": "unavailable",
+                  "reason_code": "incomplete_return_path"
+                },
+                {
+                  "metric_id": "calmar",
+                  "value": null,
+                  "unit": "ratio",
+                  "period_start": "2026-01-15",
+                  "period_end": "2026-04-30",
+                  "observations": 74,
+                  "coverage_ratio": 0.7047619,
+                  "status": "unavailable",
+                  "reason_code": "incomplete_return_path"
+                }
+              ],
+              "periods_per_year": 365,
+              "risk_free_rate_annual": null
+            },
+            "degiro:isin:IE00SYNCORE1": {
+              "metrics": [
+                {
+                  "metric_id": "volatility_annualized",
+                  "value": 0.086228369088,
+                  "unit": "decimal_annualized",
+                  "period_start": "2026-01-15",
+                  "period_end": "2026-04-30",
+                  "observations": 105,
+                  "coverage_ratio": 1,
+                  "status": "partial",
+                  "reason_code": "partial_return_coverage"
+                },
+                {
+                  "metric_id": "downside_volatility_annualized",
+                  "value": 0,
+                  "unit": "decimal_annualized",
+                  "period_start": "2026-01-15",
+                  "period_end": "2026-04-30",
+                  "observations": 105,
+                  "coverage_ratio": 1,
+                  "status": "partial",
+                  "reason_code": "partial_return_coverage"
+                },
+                {
+                  "metric_id": "sharpe",
+                  "value": null,
+                  "unit": "ratio",
+                  "period_start": "2026-01-15",
+                  "period_end": "2026-04-30",
+                  "observations": 105,
+                  "coverage_ratio": 1,
+                  "status": "unavailable",
+                  "reason_code": "risk_free_rate_missing"
+                },
+                {
+                  "metric_id": "sortino",
+                  "value": null,
+                  "unit": "ratio",
+                  "period_start": "2026-01-15",
+                  "period_end": "2026-04-30",
+                  "observations": 105,
+                  "coverage_ratio": 1,
+                  "status": "unavailable",
+                  "reason_code": "risk_free_rate_missing"
+                },
+                {
+                  "metric_id": "max_drawdown",
+                  "value": 0,
+                  "unit": "decimal",
+                  "period_start": "2026-01-15",
+                  "period_end": "2026-04-30",
+                  "observations": 105,
+                  "coverage_ratio": 1,
+                  "status": "partial",
+                  "reason_code": "partial_return_coverage"
+                },
+                {
+                  "metric_id": "drawdown_duration_days",
+                  "value": 0,
+                  "unit": "days",
+                  "period_start": "2026-01-15",
+                  "period_end": "2026-04-30",
+                  "observations": 105,
+                  "coverage_ratio": 1,
+                  "status": "partial",
+                  "reason_code": "partial_return_coverage"
+                },
+                {
+                  "metric_id": "calmar",
+                  "value": null,
+                  "unit": "ratio",
+                  "period_start": "2026-01-15",
+                  "period_end": "2026-04-30",
+                  "observations": 105,
+                  "coverage_ratio": 1,
+                  "status": "unavailable",
+                  "reason_code": "zero_drawdown"
+                }
+              ],
+              "periods_per_year": 365,
+              "risk_free_rate_annual": null
+            },
+            "degiro:isin:NL00SYNTECH1": {
+              "metrics": [
+                {
+                  "metric_id": "volatility_annualized",
+                  "value": 0.144580584059,
+                  "unit": "decimal_annualized",
+                  "period_start": "2026-01-15",
+                  "period_end": "2026-04-30",
+                  "observations": 46,
+                  "coverage_ratio": 0.43809524,
+                  "status": "partial",
+                  "reason_code": "partial_return_coverage"
+                },
+                {
+                  "metric_id": "downside_volatility_annualized",
+                  "value": 0,
+                  "unit": "decimal_annualized",
+                  "period_start": "2026-01-15",
+                  "period_end": "2026-04-30",
+                  "observations": 46,
+                  "coverage_ratio": 0.43809524,
+                  "status": "partial",
+                  "reason_code": "partial_return_coverage"
+                },
+                {
+                  "metric_id": "sharpe",
+                  "value": null,
+                  "unit": "ratio",
+                  "period_start": "2026-01-15",
+                  "period_end": "2026-04-30",
+                  "observations": 46,
+                  "coverage_ratio": 0.43809524,
+                  "status": "unavailable",
+                  "reason_code": "risk_free_rate_missing"
+                },
+                {
+                  "metric_id": "sortino",
+                  "value": null,
+                  "unit": "ratio",
+                  "period_start": "2026-01-15",
+                  "period_end": "2026-04-30",
+                  "observations": 46,
+                  "coverage_ratio": 0.43809524,
+                  "status": "unavailable",
+                  "reason_code": "risk_free_rate_missing"
+                },
+                {
+                  "metric_id": "max_drawdown",
+                  "value": null,
+                  "unit": "decimal",
+                  "period_start": "2026-01-15",
+                  "period_end": "2026-04-30",
+                  "observations": 46,
+                  "coverage_ratio": 0.43809524,
+                  "status": "unavailable",
+                  "reason_code": "incomplete_return_path"
+                },
+                {
+                  "metric_id": "drawdown_duration_days",
+                  "value": null,
+                  "unit": "days",
+                  "period_start": "2026-01-15",
+                  "period_end": "2026-04-30",
+                  "observations": 46,
+                  "coverage_ratio": 0.43809524,
+                  "status": "unavailable",
+                  "reason_code": "incomplete_return_path"
+                },
+                {
+                  "metric_id": "calmar",
+                  "value": null,
+                  "unit": "ratio",
+                  "period_start": "2026-01-15",
+                  "period_end": "2026-04-30",
+                  "observations": 46,
+                  "coverage_ratio": 0.43809524,
+                  "status": "unavailable",
+                  "reason_code": "incomplete_return_path"
+                }
+              ],
+              "periods_per_year": 365,
+              "risk_free_rate_annual": null
+            }
+          },
+          "diversification": {
+            "correlations": [
+              {
+                "left_asset_id": "degiro:cash:eur",
+                "right_asset_id": "degiro:cash:eur",
+                "metric": {
+                  "metric_id": "asset_correlation",
+                  "value": null,
+                  "unit": "coefficient",
+                  "period_start": "2026-01-15",
+                  "period_end": "2026-04-30",
+                  "observations": 0,
+                  "coverage_ratio": 0,
+                  "status": "unavailable",
+                  "reason_code": "insufficient_observations"
+                }
+              },
+              {
+                "left_asset_id": "degiro:cash:eur",
+                "right_asset_id": "degiro:isin:IE00SYNBOND1",
+                "metric": {
+                  "metric_id": "asset_correlation",
+                  "value": null,
+                  "unit": "coefficient",
+                  "period_start": "2026-01-15",
+                  "period_end": "2026-04-30",
+                  "observations": 0,
+                  "coverage_ratio": 0,
+                  "status": "unavailable",
+                  "reason_code": "insufficient_observations"
+                }
+              },
+              {
+                "left_asset_id": "degiro:isin:IE00SYNBOND1",
+                "right_asset_id": "degiro:cash:eur",
+                "metric": {
+                  "metric_id": "asset_correlation",
+                  "value": null,
+                  "unit": "coefficient",
+                  "period_start": "2026-01-15",
+                  "period_end": "2026-04-30",
+                  "observations": 0,
+                  "coverage_ratio": 0,
+                  "status": "unavailable",
+                  "reason_code": "insufficient_observations"
+                }
+              },
+              {
+                "left_asset_id": "degiro:cash:eur",
+                "right_asset_id": "degiro:isin:IE00SYNCORE1",
+                "metric": {
+                  "metric_id": "asset_correlation",
+                  "value": null,
+                  "unit": "coefficient",
+                  "period_start": "2026-01-15",
+                  "period_end": "2026-04-30",
+                  "observations": 0,
+                  "coverage_ratio": 0,
+                  "status": "unavailable",
+                  "reason_code": "insufficient_observations"
+                }
+              },
+              {
+                "left_asset_id": "degiro:isin:IE00SYNCORE1",
+                "right_asset_id": "degiro:cash:eur",
+                "metric": {
+                  "metric_id": "asset_correlation",
+                  "value": null,
+                  "unit": "coefficient",
+                  "period_start": "2026-01-15",
+                  "period_end": "2026-04-30",
+                  "observations": 0,
+                  "coverage_ratio": 0,
+                  "status": "unavailable",
+                  "reason_code": "insufficient_observations"
+                }
+              },
+              {
+                "left_asset_id": "degiro:cash:eur",
+                "right_asset_id": "degiro:isin:NL00SYNTECH1",
+                "metric": {
+                  "metric_id": "asset_correlation",
+                  "value": null,
+                  "unit": "coefficient",
+                  "period_start": "2026-01-15",
+                  "period_end": "2026-04-30",
+                  "observations": 0,
+                  "coverage_ratio": 0,
+                  "status": "unavailable",
+                  "reason_code": "insufficient_observations"
+                }
+              },
+              {
+                "left_asset_id": "degiro:isin:NL00SYNTECH1",
+                "right_asset_id": "degiro:cash:eur",
+                "metric": {
+                  "metric_id": "asset_correlation",
+                  "value": null,
+                  "unit": "coefficient",
+                  "period_start": "2026-01-15",
+                  "period_end": "2026-04-30",
+                  "observations": 0,
+                  "coverage_ratio": 0,
+                  "status": "unavailable",
+                  "reason_code": "insufficient_observations"
+                }
+              },
+              {
+                "left_asset_id": "degiro:isin:IE00SYNBOND1",
+                "right_asset_id": "degiro:isin:IE00SYNBOND1",
+                "metric": {
+                  "metric_id": "asset_correlation",
+                  "value": 1,
+                  "unit": "coefficient",
+                  "period_start": "2026-01-15",
+                  "period_end": "2026-04-30",
+                  "observations": 74,
+                  "coverage_ratio": 0.7047619,
+                  "status": "partial",
+                  "reason_code": "partial_return_coverage"
+                }
+              },
+              {
+                "left_asset_id": "degiro:isin:IE00SYNBOND1",
+                "right_asset_id": "degiro:isin:IE00SYNCORE1",
+                "metric": {
+                  "metric_id": "asset_correlation",
+                  "value": 0.865879356699,
+                  "unit": "coefficient",
+                  "period_start": "2026-01-15",
+                  "period_end": "2026-04-30",
+                  "observations": 74,
+                  "coverage_ratio": 0.7047619,
+                  "status": "partial",
+                  "reason_code": "partial_return_coverage"
+                }
+              },
+              {
+                "left_asset_id": "degiro:isin:IE00SYNCORE1",
+                "right_asset_id": "degiro:isin:IE00SYNBOND1",
+                "metric": {
+                  "metric_id": "asset_correlation",
+                  "value": 0.865879356699,
+                  "unit": "coefficient",
+                  "period_start": "2026-01-15",
+                  "period_end": "2026-04-30",
+                  "observations": 74,
+                  "coverage_ratio": 0.7047619,
+                  "status": "partial",
+                  "reason_code": "partial_return_coverage"
+                }
+              },
+              {
+                "left_asset_id": "degiro:isin:IE00SYNBOND1",
+                "right_asset_id": "degiro:isin:NL00SYNTECH1",
+                "metric": {
+                  "metric_id": "asset_correlation",
+                  "value": 0.986725991591,
+                  "unit": "coefficient",
+                  "period_start": "2026-01-15",
+                  "period_end": "2026-04-30",
+                  "observations": 46,
+                  "coverage_ratio": 0.43809524,
+                  "status": "partial",
+                  "reason_code": "partial_return_coverage"
+                }
+              },
+              {
+                "left_asset_id": "degiro:isin:NL00SYNTECH1",
+                "right_asset_id": "degiro:isin:IE00SYNBOND1",
+                "metric": {
+                  "metric_id": "asset_correlation",
+                  "value": 0.986725991591,
+                  "unit": "coefficient",
+                  "period_start": "2026-01-15",
+                  "period_end": "2026-04-30",
+                  "observations": 46,
+                  "coverage_ratio": 0.43809524,
+                  "status": "partial",
+                  "reason_code": "partial_return_coverage"
+                }
+              },
+              {
+                "left_asset_id": "degiro:isin:IE00SYNCORE1",
+                "right_asset_id": "degiro:isin:IE00SYNCORE1",
+                "metric": {
+                  "metric_id": "asset_correlation",
+                  "value": 1,
+                  "unit": "coefficient",
+                  "period_start": "2026-01-15",
+                  "period_end": "2026-04-30",
+                  "observations": 105,
+                  "coverage_ratio": 1,
+                  "status": "partial",
+                  "reason_code": "partial_return_coverage"
+                }
+              },
+              {
+                "left_asset_id": "degiro:isin:IE00SYNCORE1",
+                "right_asset_id": "degiro:isin:NL00SYNTECH1",
+                "metric": {
+                  "metric_id": "asset_correlation",
+                  "value": 0.572166486011,
+                  "unit": "coefficient",
+                  "period_start": "2026-01-15",
+                  "period_end": "2026-04-30",
+                  "observations": 46,
+                  "coverage_ratio": 0.43809524,
+                  "status": "partial",
+                  "reason_code": "partial_return_coverage"
+                }
+              },
+              {
+                "left_asset_id": "degiro:isin:NL00SYNTECH1",
+                "right_asset_id": "degiro:isin:IE00SYNCORE1",
+                "metric": {
+                  "metric_id": "asset_correlation",
+                  "value": 0.572166486011,
+                  "unit": "coefficient",
+                  "period_start": "2026-01-15",
+                  "period_end": "2026-04-30",
+                  "observations": 46,
+                  "coverage_ratio": 0.43809524,
+                  "status": "partial",
+                  "reason_code": "partial_return_coverage"
+                }
+              },
+              {
+                "left_asset_id": "degiro:isin:NL00SYNTECH1",
+                "right_asset_id": "degiro:isin:NL00SYNTECH1",
+                "metric": {
+                  "metric_id": "asset_correlation",
+                  "value": 1,
+                  "unit": "coefficient",
+                  "period_start": "2026-01-15",
+                  "period_end": "2026-04-30",
+                  "observations": 46,
+                  "coverage_ratio": 0.43809524,
+                  "status": "partial",
+                  "reason_code": "partial_return_coverage"
+                }
+              }
+            ],
+            "risk_contributions": {
+              "degiro:cash:eur": {
+                "metric_id": "risk_contribution_share",
+                "value": null,
+                "unit": "decimal",
+                "period_start": "2026-01-15",
+                "period_end": "2026-04-30",
+                "observations": 0,
+                "coverage_ratio": 0,
+                "status": "unavailable",
+                "reason_code": "insufficient_observations"
+              },
+              "degiro:isin:IE00SYNBOND1": {
+                "metric_id": "risk_contribution_share",
+                "value": null,
+                "unit": "decimal",
+                "period_start": "2026-01-15",
+                "period_end": "2026-04-30",
+                "observations": 0,
+                "coverage_ratio": 0,
+                "status": "unavailable",
+                "reason_code": "insufficient_observations"
+              },
+              "degiro:isin:IE00SYNCORE1": {
+                "metric_id": "risk_contribution_share",
+                "value": null,
+                "unit": "decimal",
+                "period_start": "2026-01-15",
+                "period_end": "2026-04-30",
+                "observations": 0,
+                "coverage_ratio": 0,
+                "status": "unavailable",
+                "reason_code": "insufficient_observations"
+              },
+              "degiro:isin:NL00SYNTECH1": {
+                "metric_id": "risk_contribution_share",
+                "value": null,
+                "unit": "decimal",
+                "period_start": "2026-01-15",
+                "period_end": "2026-04-30",
+                "observations": 0,
+                "coverage_ratio": 0,
+                "status": "unavailable",
+                "reason_code": "insufficient_observations"
+              }
+            }
+          },
+          "diversification_reason_code": "valuation_price_proxy",
+          "series_kind": "valuation_price_proxy"
+        }
+      },
+      "benchmarks": {
+        "selection": {
+          "primary_benchmark_id": "msci_world",
+          "secondary_benchmark_ids": [],
+          "composite_weights": {}
+        },
+        "catalog": [
+          {
+            "benchmark_id": "msci_world",
+            "name": "MSCI World",
+            "description": "Renta variable de mercados desarrollados; referencia amplia, no recomendacion universal.",
+            "native_currency": "EUR",
+            "series_kind": "total_return",
+            "source_reference": "MSCI World Net Total Return EUR",
+            "selectable": true,
+            "components": [],
+            "rebalance_frequency": "none"
+          },
+          {
+            "benchmark_id": "sp500",
+            "name": "S&P 500",
+            "description": "Renta variable estadounidense de gran capitalizacion.",
+            "native_currency": "USD",
+            "series_kind": "total_return",
+            "source_reference": "S&P 500 Total Return Index USD",
+            "selectable": true,
+            "components": [],
+            "rebalance_frequency": "none"
+          },
+          {
+            "benchmark_id": "portfolio_60_40",
+            "name": "Cartera 60/40",
+            "description": "60 % renta variable global y 40 % bonos globales aggregate cubiertos a EUR.",
+            "native_currency": "EUR",
+            "series_kind": "composite_total_return",
+            "source_reference": "Composite defined by ML_finance",
+            "selectable": true,
+            "components": [
+              {
+                "benchmark_id": "msci_world",
+                "target_weight": 0.6
+              },
+              {
+                "benchmark_id": "global_aggregate_bonds_eur_hedged",
+                "target_weight": 0.4
+              }
+            ],
+            "rebalance_frequency": "monthly"
+          },
+          {
+            "benchmark_id": "estr_cash",
+            "name": "EUR cash (€STR)",
+            "description": "Referencia defensiva de efectivo en euros basada en una tasa €STR compuesta.",
+            "native_currency": "EUR",
+            "series_kind": "cash_return",
+            "source_reference": "€STR compounded cash return",
+            "selectable": true,
+            "components": [],
+            "rebalance_frequency": "none"
+          }
+        ],
+        "comparison": {
+          "base_currency": "EUR",
+          "as_of_date": "2026-04-30",
+          "primary_benchmark_id": "msci_world",
+          "comparisons": [
+            {
+              "benchmark_id": "msci_world",
+              "benchmark_name": "MSCI World",
+              "role": "primary",
+              "source_reference": "MSCI World Net Total Return EUR",
+              "source_currency": "EUR",
+              "base_currency": "EUR",
+              "series_kind": "total_return",
+              "provider_name": "synthetic",
+              "period_start": "2026-01-15",
+              "period_end": "2026-04-30",
+              "observations": 75,
+              "coverage_ratio": 1,
+              "status": "available",
+              "reason_codes": [],
+              "growth": [
+                {
+                  "observation_date": "2026-01-15",
+                  "portfolio_index": 100,
+                  "benchmark_index": 100,
+                  "portfolio_drawdown": 0,
+                  "benchmark_drawdown": 0
+                },
+                {
+                  "observation_date": "2026-04-30",
+                  "portfolio_index": 202.65089502,
+                  "benchmark_index": 102.02946018,
+                  "portfolio_drawdown": 0,
+                  "benchmark_drawdown": 0
+                }
+              ],
+              "metrics": [
+                {
+                  "metric_id": "portfolio_total_return",
+                  "value": 1.026508950217,
+                  "unit": "decimal",
+                  "observations": 75,
+                  "coverage_ratio": 1,
+                  "status": "available",
+                  "reason_code": "ok"
+                },
+                {
+                  "metric_id": "benchmark_total_return",
+                  "value": 0.020294601791,
+                  "unit": "decimal",
+                  "observations": 75,
+                  "coverage_ratio": 1,
+                  "status": "available",
+                  "reason_code": "ok"
+                },
+                {
+                  "metric_id": "relative_return",
+                  "value": 0.986199815876,
+                  "unit": "decimal",
+                  "observations": 75,
+                  "coverage_ratio": 1,
+                  "status": "available",
+                  "reason_code": "ok"
+                },
+                {
+                  "metric_id": "portfolio_max_drawdown",
+                  "value": 0,
+                  "unit": "decimal",
+                  "observations": 75,
+                  "coverage_ratio": 1,
+                  "status": "available",
+                  "reason_code": "ok"
+                },
+                {
+                  "metric_id": "benchmark_max_drawdown",
+                  "value": -0.044645909567,
+                  "unit": "decimal",
+                  "observations": 75,
+                  "coverage_ratio": 1,
+                  "status": "available",
+                  "reason_code": "ok"
+                },
+                {
+                  "metric_id": "drawdown_difference",
+                  "value": 0.044645909567,
+                  "unit": "decimal",
+                  "observations": 75,
+                  "coverage_ratio": 1,
+                  "status": "available",
+                  "reason_code": "ok"
+                },
+                {
+                  "metric_id": "correlation",
+                  "value": 0.127272566769,
+                  "unit": "coefficient",
+                  "observations": 75,
+                  "coverage_ratio": 1,
+                  "status": "available",
+                  "reason_code": "ok"
+                },
+                {
+                  "metric_id": "tracking_error_annualized",
+                  "value": 0.978301488122,
+                  "unit": "decimal_annualized",
+                  "observations": 75,
+                  "coverage_ratio": 1,
+                  "status": "available",
+                  "reason_code": "ok"
+                },
+                {
+                  "metric_id": "beta",
+                  "value": 2.680037775865,
+                  "unit": "coefficient",
+                  "observations": 75,
+                  "coverage_ratio": 1,
+                  "status": "available",
+                  "reason_code": "ok"
+                },
+                {
+                  "metric_id": "alpha_annualized",
+                  "value": 2.581506411594,
+                  "unit": "decimal_annualized",
+                  "observations": 75,
+                  "coverage_ratio": 1,
+                  "status": "available",
+                  "reason_code": "ok"
+                }
+              ]
+            }
+          ]
+        },
+        "reason_code": "ok"
+      }
+    }
+  },
+  "definitions": {
+    "schema_version": 1,
+    "definitions": [
+      {
+        "metric_id": "twr",
+        "name": "Rentabilidad ponderada por tiempo",
+        "description": "Retorno compuesto ajustado por aportaciones y retiradas externas.",
+        "formula": "producto((valor_final - flujo_externo) / valor_inicial) - 1",
+        "unit": "decimal",
+        "interpretation": "Describe la evolucion sin atribuir las aportaciones a ganancias.",
+        "limitations": "Aproximacion diaria con flujos al cierre; no es rentabilidad intradia exacta.",
+        "required_data": "Retornos diarios ajustados por flujos, en la misma moneda base. Movimientos externos fechados.",
+        "validity_conditions": "Al menos dos valoraciones y aperturas positivas; cobertura y clasificacion conocidas."
+      },
+      {
+        "metric_id": "mwr_xirr",
+        "name": "Rentabilidad ponderada por dinero (XIRR)",
+        "description": "Tasa anual que equilibra los flujos del inversor.",
+        "formula": "suma(flujo_t / (1 + tasa)^((fecha_t - fecha_0)/365)) = 0",
+        "unit": "decimal",
+        "interpretation": "Refleja el importe y momento de las aportaciones y retiradas.",
+        "limitations": "Puede no existir solucion o haber varias; no equivale al TWR acumulado.",
+        "required_data": "Valor inicial/final y flujos externos fechados.",
+        "validity_conditions": "Solucion identificable dentro del dominio del solver; signos opuestos y fechas distintas."
+      },
+      {
+        "metric_id": "volatility_annualized",
+        "name": "Volatilidad anualizada",
+        "description": "Dispersion de los retornos diarios.",
+        "formula": "stdev_muestral(r) * sqrt(365)",
+        "unit": "decimal_annualized",
+        "interpretation": "Mayor valor indica mas variacion historica.",
+        "limitations": "Describe el historico disponible; no predice rendimientos futuros.",
+        "required_data": "Retornos diarios ajustados por flujos, en la misma moneda base.",
+        "validity_conditions": "Al menos 30 observaciones; calendario diario, 365 periodos al ano."
+      },
+      {
+        "metric_id": "downside_volatility_annualized",
+        "name": "Volatilidad negativa",
+        "description": "Desviacion por debajo de retorno cero.",
+        "formula": "sqrt(mean(min(r, 0)^2) * 365)",
+        "unit": "decimal_annualized",
+        "interpretation": "Resume oscilaciones negativas, incluyendo ceros en el denominador.",
+        "limitations": "Umbral cero; no es la desviacion tipica calculada solo sobre dias negativos.",
+        "required_data": "Retornos diarios ajustados por flujos, en la misma moneda base.",
+        "validity_conditions": "Al menos 30 observaciones; calendario diario, 365 periodos al ano."
+      },
+      {
+        "metric_id": "sharpe",
+        "name": "Sharpe",
+        "description": "Exceso de retorno por unidad de volatilidad.",
+        "formula": "mean(r - rf_diario) * 365 / volatilidad_anual",
+        "unit": "ratio",
+        "interpretation": "Compara exceso medio y dispersion bajo los supuestos indicados.",
+        "limitations": "Sensible a muestra, referencia y anualizacion; no es una calificacion de compra.",
+        "required_data": "Retornos diarios ajustados por flujos, en la misma moneda base. Tasa libre de riesgo anual explicita.",
+        "validity_conditions": "Al menos 30 observaciones; calendario diario, 365 periodos al ano. Volatilidad distinta de cero."
+      },
+      {
+        "metric_id": "sortino",
+        "name": "Sortino",
+        "description": "Exceso de retorno por unidad de desviacion bajo la referencia.",
+        "formula": "mean(r - rf_diario) * 365 / sqrt(mean(min(r - rf_diario, 0)^2) * 365)",
+        "unit": "ratio",
+        "interpretation": "Distingue la variabilidad por debajo de la referencia.",
+        "limitations": "La tasa explicita actua tambien como retorno minimo aceptable.",
+        "required_data": "Retornos diarios ajustados por flujos, en la misma moneda base. Tasa anual explicita.",
+        "validity_conditions": "Al menos 30 observaciones; calendario diario, 365 periodos al ano. Desviacion negativa no nula."
+      },
+      {
+        "metric_id": "max_drawdown",
+        "name": "Maximo drawdown",
+        "description": "Mayor caida desde un maximo del indice TWR.",
+        "formula": "min(indice_TWR / maximo_acumulado - 1)",
+        "unit": "decimal",
+        "interpretation": "Un valor de -0.20 representa una caida del 20 %.",
+        "limitations": "Depende de las fechas elegidas; no une tramos con huecos.",
+        "required_data": "Retornos diarios ajustados por flujos, en la misma moneda base.",
+        "validity_conditions": "Trayectoria completa; al menos un retorno."
+      },
+      {
+        "metric_id": "drawdown_duration_days",
+        "name": "Duracion del drawdown",
+        "description": "Mayor tiempo desde un maximo hasta recuperar o terminar el periodo.",
+        "formula": "max(dias desde maximo anterior hasta recuperacion o final)",
+        "unit": "days",
+        "interpretation": "Incluye episodios aun no recuperados.",
+        "limitations": "Mide dias naturales dentro de la ventana; no cuenta caidas anteriores al inicio.",
+        "required_data": "Retornos diarios ajustados por flujos, en la misma moneda base.",
+        "validity_conditions": "Trayectoria diaria completa."
+      },
+      {
+        "metric_id": "calmar",
+        "name": "Calmar",
+        "description": "Retorno compuesto anualizado relativo a la mayor caida.",
+        "formula": "(producto(1+r)^(365/dias) - 1) / abs(max_drawdown)",
+        "unit": "ratio",
+        "interpretation": "Relaciona crecimiento historico con caida maxima.",
+        "limitations": "Anualizar ventanas cortas amplifica resultados.",
+        "required_data": "Retornos diarios ajustados por flujos, en la misma moneda base.",
+        "validity_conditions": "Al menos 30 observaciones; calendario diario, 365 periodos al ano. Trayectoria completa y drawdown no nulo."
+      },
+      {
+        "metric_id": "exposure_weight",
+        "name": "Peso de exposicion",
+        "description": "Fraccion del valor conocido por activo, bucket, moneda, tipo o sector.",
+        "formula": "valor_grupo / suma_valores_conocidos",
+        "unit": "decimal",
+        "interpretation": "Muestra cuanto del valor observado corresponde al grupo.",
+        "limitations": "Si falta valoracion los pesos son parciales; no hay look-through de ETFs. Sector exige fuente declarada.",
+        "required_data": "Posiciones, valores en moneda base y clasificaciones explicitas.",
+        "validity_conditions": "Cartera long-only; valor total positivo."
+      },
+      {
+        "metric_id": "concentration_hhi",
+        "name": "Concentracion HHI",
+        "description": "Suma de los pesos de los grupos al cuadrado.",
+        "formula": "suma(peso_grupo^2)",
+        "unit": "coefficient",
+        "interpretation": "1 corresponde a toda la exposicion en un unico grupo.",
+        "limitations": "Depende de como se agrupe; no mide por si solo el riesgo financiero.",
+        "required_data": "Pesos por dimension.",
+        "validity_conditions": "Clasificacion completa; valoracion parcial se identifica."
+      },
+      {
+        "metric_id": "asset_correlation",
+        "name": "Correlacion entre activos",
+        "description": "Asociacion lineal entre retornos simultaneos.",
+        "formula": "cov(r_i,r_j) / (std(r_i)*std(r_j))",
+        "unit": "coefficient",
+        "interpretation": "Valores de -1 a 1 describen co-movimiento historico.",
+        "limitations": "Muestras por pares pueden diferir; la matriz no garantiza ser semidefinida positiva.",
+        "required_data": "Retornos diarios ajustados por flujos, en la misma moneda base. Retornos de precio o totales por activo, nunca variaciones de cantidad.",
+        "validity_conditions": "Al menos 30 observaciones; calendario diario, 365 periodos al ano. Varianzas positivas."
+      },
+      {
+        "metric_id": "risk_contribution_share",
+        "name": "Contribucion aproximada al riesgo",
+        "description": "Participacion del activo en la varianza de la cartera de pesos fijos.",
+        "formula": "w_i * cov(r_i, suma(w_j*r_j)) / var(suma(w_j*r_j))",
+        "unit": "decimal",
+        "interpretation": "Las participaciones suman uno y pueden ser negativas por diversificacion.",
+        "limitations": "Usa pesos actuales fijos y fechas comunes; no reproduce pesos historicos ni atribucion exacta.",
+        "required_data": "Retornos diarios ajustados por flujos, en la misma moneda base. Pesos long-only sumando uno.",
+        "validity_conditions": "Al menos 30 observaciones; calendario diario, 365 periodos al ano. Muestra comun a todos los activos con peso positivo y varianza positiva."
+      },
+      {
+        "metric_id": "portfolio_total_return",
+        "name": "Retorno de cartera comparado",
+        "description": "Comparacion historica contra la referencia seleccionada.",
+        "formula": "producto(1+r_cartera)-1",
+        "unit": "decimal",
+        "interpretation": "Se interpreta junto al benchmark, periodo y cobertura de la comparacion.",
+        "limitations": "Provider y calendario afectan el resultado; alpha es intercepto de regresion, no Jensen ajustado por tasa libre de riesgo.",
+        "required_data": "Retornos alineados de cartera y benchmark en la misma moneda.",
+        "validity_conditions": "Contrato de benchmarks: 252 sesiones/ano; estadisticas requieren 30 pares; denominadores no nulos."
+      },
+      {
+        "metric_id": "benchmark_total_return",
+        "name": "Retorno del benchmark",
+        "description": "Comparacion historica contra la referencia seleccionada.",
+        "formula": "producto(1+r_benchmark)-1",
+        "unit": "decimal",
+        "interpretation": "Se interpreta junto al benchmark, periodo y cobertura de la comparacion.",
+        "limitations": "Provider y calendario afectan el resultado; alpha es intercepto de regresion, no Jensen ajustado por tasa libre de riesgo.",
+        "required_data": "Retornos alineados de cartera y benchmark en la misma moneda.",
+        "validity_conditions": "Contrato de benchmarks: 252 sesiones/ano; estadisticas requieren 30 pares; denominadores no nulos."
+      },
+      {
+        "metric_id": "relative_return",
+        "name": "Retorno relativo",
+        "description": "Comparacion historica contra la referencia seleccionada.",
+        "formula": "(1+R_cartera)/(1+R_benchmark)-1",
+        "unit": "decimal",
+        "interpretation": "Se interpreta junto al benchmark, periodo y cobertura de la comparacion.",
+        "limitations": "Provider y calendario afectan el resultado; alpha es intercepto de regresion, no Jensen ajustado por tasa libre de riesgo.",
+        "required_data": "Retornos alineados de cartera y benchmark en la misma moneda.",
+        "validity_conditions": "Contrato de benchmarks: 252 sesiones/ano; estadisticas requieren 30 pares; denominadores no nulos."
+      },
+      {
+        "metric_id": "portfolio_max_drawdown",
+        "name": "Drawdown de cartera comparado",
+        "description": "Comparacion historica contra la referencia seleccionada.",
+        "formula": "min(indice_cartera/maximo-1)",
+        "unit": "decimal",
+        "interpretation": "Se interpreta junto al benchmark, periodo y cobertura de la comparacion.",
+        "limitations": "Provider y calendario afectan el resultado; alpha es intercepto de regresion, no Jensen ajustado por tasa libre de riesgo.",
+        "required_data": "Retornos alineados de cartera y benchmark en la misma moneda.",
+        "validity_conditions": "Contrato de benchmarks: 252 sesiones/ano; estadisticas requieren 30 pares; denominadores no nulos."
+      },
+      {
+        "metric_id": "benchmark_max_drawdown",
+        "name": "Drawdown del benchmark",
+        "description": "Comparacion historica contra la referencia seleccionada.",
+        "formula": "min(indice_benchmark/maximo-1)",
+        "unit": "decimal",
+        "interpretation": "Se interpreta junto al benchmark, periodo y cobertura de la comparacion.",
+        "limitations": "Provider y calendario afectan el resultado; alpha es intercepto de regresion, no Jensen ajustado por tasa libre de riesgo.",
+        "required_data": "Retornos alineados de cartera y benchmark en la misma moneda.",
+        "validity_conditions": "Contrato de benchmarks: 252 sesiones/ano; estadisticas requieren 30 pares; denominadores no nulos."
+      },
+      {
+        "metric_id": "drawdown_difference",
+        "name": "Diferencia de drawdowns",
+        "description": "Comparacion historica contra la referencia seleccionada.",
+        "formula": "drawdown_cartera-drawdown_benchmark",
+        "unit": "decimal",
+        "interpretation": "Se interpreta junto al benchmark, periodo y cobertura de la comparacion.",
+        "limitations": "Provider y calendario afectan el resultado; alpha es intercepto de regresion, no Jensen ajustado por tasa libre de riesgo.",
+        "required_data": "Retornos alineados de cartera y benchmark en la misma moneda.",
+        "validity_conditions": "Contrato de benchmarks: 252 sesiones/ano; estadisticas requieren 30 pares; denominadores no nulos."
+      },
+      {
+        "metric_id": "correlation",
+        "name": "Correlacion con benchmark",
+        "description": "Comparacion historica contra la referencia seleccionada.",
+        "formula": "cov(r_p,r_b)/(std(r_p)*std(r_b))",
+        "unit": "coefficient",
+        "interpretation": "Se interpreta junto al benchmark, periodo y cobertura de la comparacion.",
+        "limitations": "Provider y calendario afectan el resultado; alpha es intercepto de regresion, no Jensen ajustado por tasa libre de riesgo.",
+        "required_data": "Retornos alineados de cartera y benchmark en la misma moneda.",
+        "validity_conditions": "Contrato de benchmarks: 252 sesiones/ano; estadisticas requieren 30 pares; denominadores no nulos."
+      },
+      {
+        "metric_id": "tracking_error_annualized",
+        "name": "Tracking error",
+        "description": "Comparacion historica contra la referencia seleccionada.",
+        "formula": "std(r_p-r_b)*sqrt(252)",
+        "unit": "decimal_annualized",
+        "interpretation": "Se interpreta junto al benchmark, periodo y cobertura de la comparacion.",
+        "limitations": "Provider y calendario afectan el resultado; alpha es intercepto de regresion, no Jensen ajustado por tasa libre de riesgo.",
+        "required_data": "Retornos alineados de cartera y benchmark en la misma moneda.",
+        "validity_conditions": "Contrato de benchmarks: 252 sesiones/ano; estadisticas requieren 30 pares; denominadores no nulos."
+      },
+      {
+        "metric_id": "beta",
+        "name": "Beta",
+        "description": "Comparacion historica contra la referencia seleccionada.",
+        "formula": "cov(r_p,r_b)/var(r_b)",
+        "unit": "coefficient",
+        "interpretation": "Se interpreta junto al benchmark, periodo y cobertura de la comparacion.",
+        "limitations": "Provider y calendario afectan el resultado; alpha es intercepto de regresion, no Jensen ajustado por tasa libre de riesgo.",
+        "required_data": "Retornos alineados de cartera y benchmark en la misma moneda.",
+        "validity_conditions": "Contrato de benchmarks: 252 sesiones/ano; estadisticas requieren 30 pares; denominadores no nulos."
+      },
+      {
+        "metric_id": "alpha_annualized",
+        "name": "Alpha de regresion",
+        "description": "Comparacion historica contra la referencia seleccionada.",
+        "formula": "(mean(r_p)-beta*mean(r_b))*252",
+        "unit": "decimal_annualized",
+        "interpretation": "Se interpreta junto al benchmark, periodo y cobertura de la comparacion.",
+        "limitations": "Provider y calendario afectan el resultado; alpha es intercepto de regresion, no Jensen ajustado por tasa libre de riesgo.",
+        "required_data": "Retornos alineados de cartera y benchmark en la misma moneda.",
+        "validity_conditions": "Contrato de benchmarks: 252 sesiones/ano; estadisticas requieren 30 pares; denominadores no nulos."
+      }
+    ]
+  }
+}

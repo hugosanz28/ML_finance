@@ -23,6 +23,10 @@ Para desarrollar o ejecutar la suite usa `requirements-dev.txt`; consulta
 
 ## Flujos
 
+- `export_frontend_demo_contract.py`: exporta 16 respuestas sinteticas de
+  FastAPI a `.test_tmp/frontend-api.json` para verificar los contratos del
+  frontend. Requiere el bootstrap demo previo y dependencias de desarrollo.
+  No admite paths ni entornos reales. Ver [UI React](../frontend/README.md).
 - `run_api.py`: inicia FastAPI de solo lectura en `127.0.0.1:8000`.
   Windows: `.\.venv\Scripts\python.exe scripts\run_api.py`;
   POSIX con entorno activo: `python scripts/run_api.py`.

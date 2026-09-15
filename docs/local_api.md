@@ -4,6 +4,8 @@ La issue #53 incorpora FastAPI como adaptador de `src/application/`.
 Streamlit sigue operativo. El modo por defecto sigue siendo de solo lectura.
 La #54 incorpora [operaciones y jobs](local_jobs.md), que requieren activacion
 explicita con `--operations demo` o `--operations real`.
+La [UI React de analitica](../frontend/README.md) (#55) consume solo las
+lecturas; utiliza API:8000 y Vite:5173 en loopback.
 
 ## Arranque
 

@@ -8,6 +8,10 @@ proyecto usa [versionado semántico](https://semver.org/lang/es/).
 
 ### Añadido
 
+- UI React + TypeScript + Vite (#55), oscura y local de solo lectura, con
+  resumen, rendimiento/benchmarks, riesgo, explicaciones y tablas de graficos.
+- Contratos TypeScript validados en runtime, tests de componentes y CI con
+  respuestas reales de FastAPI sobre la demo sintetica (16 filtros).
 - Operaciones FastAPI opt-in (#54) con worker local, jobs persistidos en DuckDB,
   idempotencia, controles de entorno/confirmacion y actualizaciones por hash.
 - Copias editables de la demo sin modificar fixtures, limites de uploads,

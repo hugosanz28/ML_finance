@@ -33,6 +33,9 @@ viven en rutas locales ignoradas por Git y la demo publica usa datos sinteticos.
 - API FastAPI local para cartera, analitica, informes y auditoria, con
   [operaciones/jobs opcionales](docs/local_jobs.md). Arranque y contratos:
   [API local](docs/local_api.md). Streamlit sigue operativo.
+- [UI React local de analitica](frontend/README.md) (#55): tema oscuro,
+  resumen de cartera, rendimiento, benchmarks, riesgo y explicaciones.
+  Requiere Node.js 22.12+; operaciones siguen en Streamlit hasta la #56.
 
 ## Puesta en marcha
 
@@ -165,7 +168,8 @@ Consulta `docs/streamlit_dashboard.md`, `docs/monthly_pipeline.md` y
 ## Documentacion
 
 - `docs/architecture.md`: arquitectura v1 y flujo de datos.
-- `docs/architecture_v2.md`: direccion futura FastAPI + Angular, sin migracion iniciada.
+- `docs/architecture_v2.md`: propuesta historica; el stack vigente es FastAPI + React.
+- [frontend/README.md](frontend/README.md): arranque, pantallas y limites de la UI React.
 - `docs/api_contracts.md`: contratos futuros de API local.
 - `docs/privacy.md`: separacion publico/privado y checklist de secretos.
 - `docs/streamlit_dashboard.md`: uso del dashboard local.

@@ -30,6 +30,9 @@ La serie `v0.1.x` consolida la v1 local con Streamlit. Ya estan disponibles:
 - operaciones/jobs locales (#54) opt-in, con estado persistido, worker unico,
   control de concurrencia y recuperacion sin reejecucion automatica; ver
   [jobs locales](local_jobs.md);
+- UI React local de analitica (#55), oscura y educativa, con resumen,
+  rendimiento, benchmarks y riesgo; ver [frontend](../frontend/README.md).
+  La siguiente fase (#56) migra flujos operativos; Streamlit sigue disponible;
 - CI multiplataforma con lint, typecheck gradual, secret scanning, cobertura,
   bootstrap demo offline, auditoria de dependencias y build de wheel.
 

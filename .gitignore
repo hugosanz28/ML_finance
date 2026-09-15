@@ -40,6 +40,8 @@ env/
 ENV/
 
 # Build artifacts
+node_modules/
+*.tsbuildinfo
 build/
 dist/
 *.egg-info/

@@ -30,6 +30,11 @@ La matriz de CI cubre Windows con Python 3.11, 3.12, 3.13 y 3.14, además de
 Ubuntu con Python 3.12. Windows sigue siendo la ruta principal de los wrappers
 PowerShell.
 
+El frontend tiene su entorno Node independiente. Consulta
+[frontend/README.md](frontend/README.md) para arranque, lint, tipos, tests,
+build y contratos de integracion regenerados sobre la demo. No se incluyen
+dependencias npm en el wheel Python.
+
 ## Validación local
 
 Ejecuta primero el test focalizado del área modificada y después la suite:

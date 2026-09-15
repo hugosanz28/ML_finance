@@ -19,6 +19,17 @@ Separacion publico/privado:
 
 La UI actual es Streamlit. FastAPI debe entrar por `src/application/`, no por modulos internos de dominio.
 
+La UI v2 de analitica (#55) vive en `frontend/`: React + TypeScript + Vite,
+tema oscuro y solo GET. Lee `frontend/README.md` antes de cambiarla.
+No calcular rentabilidad/riesgo ni guardar cartera en localStorage; mantener
+contratos Zod, cancelacion de lecturas obsoletas, fechas alineadas y avisos
+visibles. Graficos solo escalan valores del servidor y ofrecen tabla accesible.
+No confundir un benchmark sintetico con una cartera completamente sintetica.
+Conservar loopback API:8000 y UI:5173, sin providers, secretos ni rutas en Vite.
+Validar con `npm run lint`, `npm run typecheck`, `npm test`, `npm run build`
+desde `frontend/`. CI regenera contratos HTTP offline con
+`scripts/export_frontend_demo_contract.py`. Streamlit no se retira en #55.
+
 La API de lectura (#53) ya vive en `src/api/`; entra exclusivamente por casos
 de uso de `src/application/`. Lee `docs/local_api.md` antes de ampliarla.
 Conserva GET sin escrituras, DuckDB read-only, errores sin detalles privados,

@@ -3,9 +3,9 @@
 `src/analytics/` contiene calculos offline de dominio y un catalogo explicativo
 reutilizable. No carga datos privados, consulta proveedores ni implementa una UI.
 La integracion en casos de uso esta en `src/application/analytics.py`; los
-agentes consumen un [snapshot compacto](agent_analytics.md). API y nueva UI
-pertenecen a las siguientes tareas del roadmap. Estas metricas todavia no
-aparecen en el dashboard.
+agentes consumen un [snapshot compacto](agent_analytics.md). La API de lectura
+y la [UI React](../frontend/README.md) ya exponen estas metricas; el dashboard
+Streamlit permanece disponible durante la transicion.
 
 ## Entradas y resultados
 
