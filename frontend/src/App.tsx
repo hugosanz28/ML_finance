@@ -470,6 +470,25 @@ function Performance({
               Moneda: {comparison.source_currency} → {comparison.base_currency}
             </p>
             <Notices codes={comparison.reason_codes} />
+            {comparison.sources?.map((source) => (
+              <div key={source.source_id} className="source-provenance">
+                <p>
+                  {source.is_proxy ? "Aproximación ETF" : "Fuente oficial"} ·{" "}
+                  {source.source_id} · {source.currency}
+                  <br />
+                  Datos disponibles: {dateLabel(
+                    source.first_observation,
+                  )} — {dateLabel(source.last_observation)}
+                  <br />
+                  Descarga (UTC): {source.fetched_at}
+                </p>
+                <details>
+                  <summary>Procedencia y huella de los datos</summary>
+                  <p>{source.reference}</p>
+                  <code>{source.content_sha256}</code>
+                </details>
+              </div>
+            ))}
           </>
         ) : (
           <p className="metric-warning">

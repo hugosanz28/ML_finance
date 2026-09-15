@@ -46,6 +46,12 @@ Las prioridades de mantenimiento son:
 
 ## Siguiente
 
+Antes de #56 se ha conectado la [fuente real de benchmarks](benchmarks.md) (#60):
+proxies ETF y €STR/FX BCE, refresh explicito y cache offline con procedencia.
+La UI #55 muestra los resultados y sus limites; el control de actualizacion
+desde React queda dentro de las operaciones de #56. Despues siguen showcase
+(#57) y retirada de Streamlit tras paridad verificada (#58).
+
 ### Decision de producto: comprension primero (UI #55)
 
 Esta decision concreta la direccion v2 y prevalece sobre las propuestas

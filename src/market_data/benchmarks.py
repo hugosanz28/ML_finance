@@ -70,6 +70,10 @@ class BenchmarkReturnSeries:
     coverage_ratio: float
     status: BenchmarkSeriesStatus
     reason_code: str
+    # Actual input provenance can differ from the conceptual index definition.
+    source_reference: str | None = None
+    sources: tuple[dict[str, str | bool], ...] = ()
+    warning_codes: tuple[str, ...] = ()
 
 
 _CATALOG = {

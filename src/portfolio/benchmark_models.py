@@ -66,6 +66,7 @@ class BenchmarkComparison:
     reason_codes: tuple[str, ...]
     growth: tuple[GrowthComparisonPoint, ...]
     metrics: tuple[BenchmarkComparisonMetric, ...]
+    sources: tuple[dict[str, str | bool], ...] = ()
 
 
 @dataclass(frozen=True)

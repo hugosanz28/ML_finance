@@ -23,6 +23,9 @@ Para desarrollar o ejecutar la suite usa `requirements-dev.txt`; consulta
 
 ## Flujos
 
+- `refresh_benchmarks.py`: descarga explicita de proxies ETF y €STR oficiales
+  a cache local real. Requiere fechas, `--provider yfinance_ecb` y `--confirm`;
+  comparte el bloqueo del worker. Ver [benchmarks](../docs/benchmarks.md).
 - `export_frontend_demo_contract.py`: exporta 16 respuestas sinteticas de
   FastAPI a `.test_tmp/frontend-api.json` para verificar los contratos del
   frontend. Requiere el bootstrap demo previo y dependencias de desarrollo.

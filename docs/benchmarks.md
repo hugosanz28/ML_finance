@@ -8,7 +8,7 @@ una recomendacion ni un objetivo universal para todas las carteras.
 
 El catalogo y los providers viven en `src/market_data/benchmarks.py`. La
 configuracion, el benchmark compuesto y las metricas comparativas viven en
-`src/portfolio/benchmarks.py`. La futura API, UI y los agentes deben acceder a
+`src/portfolio/benchmarks.py`. La API, UI y los agentes deben acceder a
 esta funcionalidad mediante `src/application/`.
 
 ## Catalogo inicial
@@ -25,7 +25,8 @@ opcion independiente. Se usa para construir el 60/40.
 
 Las definiciones documentan de forma explicita si la serie representa precio,
 retorno total, efectivo o una composicion. Cambiar de proveedor no debe cambiar
-el significado del identificador.
+el significado del identificador. El catalogo describe la referencia conceptual;
+la comparacion identifica por separado la fuente realmente utilizada y sus proxies.
 
 ## Seleccion y configuracion
 
@@ -72,6 +73,9 @@ factor_EUR = (1 + retorno_USD) * FX_anterior / FX_actual
 
 Huecos de calendario, FX ausente o cobertura parcial producen estado `partial`
 o `unavailable` y un `reason_code`; no se rellenan con retornos cero.
+Si quedan intervalos desconectados, se compara solo el ultimo tramo continuo,
+con fechas y cobertura explicitas (`benchmark_common_window_truncated`). El
+60/40 comienza ese tramo con los pesos objetivo, sin inventar su historia anterior.
 
 ## Metricas
 
@@ -95,8 +99,71 @@ cero. En esos casos el valor es `null`, nunca un cero ficticio.
 cuatro opciones. La demo selecciona las cuatro en
 `demo/synthetic_config/benchmark_selection.json`.
 
-No se crea una tabla nueva: el dominio puede consumir retornos cargados mediante
-`LoadedBenchmarkProvider` o el provider sintetico. La persistencia de una fuente
-real se decidira junto con su adapter para evitar duplicar las tablas de precios
-y FX existentes.
+El dominio tambien admite `LoadedBenchmarkProvider` para series inyectadas.
+En real, `CachedBenchmarkProvider` lee exclusivamente una cache validada: nunca
+descarga en un GET ni usa datos sinteticos como respaldo.
 
+## Fuentes reales locales
+
+| Referencia | Fuente descargada | Limite |
+| --- | --- | --- |
+| MSCI World | EUNL.DE, IE00B4L5Y983 | ETF de acumulacion, aproximacion al indice |
+| S&P 500 | SXR8.DE, IE00B5BMR087 | ETF de acumulacion, aproximacion al indice |
+| Bonos del 60/40 | EUNA.DE, IE00BDBRDM35 | ETF global aggregate cubierto a EUR |
+| Efectivo | BCE `EST.B.EU000A2QQF08.CI` | Indice compuesto €STR, no rentabilidad de un deposito |
+
+Los ETF usan el cierre ajustado de Yahoo a traves de `yfinance` (dependencia ya
+existente), con cotizacion Xetra EUR verificada. Son aproximaciones que incluyen
+costes y desviaciones del fondo, **no historicos oficiales de los indices**.
+Cotizar en EUR no implica que la renta variable este cubierta de divisa.
+El 60/40 combina los proxies anteriores con rebalanceo mensual.
+
+Fuentes de referencia: [MSCI World / iShares](https://www.ishares.com/uk/individual/en/products/251882/ishares-core-msci-world-ucits-etf?siteEntryPassthrough=true),
+[S&P 500 / iShares](https://www.ishares.com/de/privatanleger/de/produkte/253743/ishares-sp-500-b-ucits-etf-acc-fund?siteEntryPassthrough=true&switchLocale=y),
+[bonos EUR hedged / BlackRock](https://www.blackrock.com/ch/privatanleger/de/produkt/291770/ishares-core-global-aggregate-bond-ucits-etf-eur-hedged-acc-fund?switchLocale=Y)
+y [serie €STR del BCE](https://data.ecb.europa.eu/data/datasets/EST/EST.B.EU000A2QQF08.CI).
+No se reconstruye €STR antes de su disponibilidad en octubre de 2019.
+
+Para carteras USD, GBP, CHF o JPY se descarga ademas el FX diario oficial BCE
+`EXR.D.<MONEDA>.EUR.SP00.A`. EUR no necesita conversion. No se rellenan extremos
+FX ausentes ni observaciones nulas. Otras monedas se rechazan antes de descargar.
+
+### Actualizacion explicita
+
+Con la configuracion real habitual y sin el worker operativo ni otro escritor
+Streamlit/CLI activo, ejecuta (ajusta las fechas a todo el historial necesario):
+
+```powershell
+.\.venv\Scripts\python.exe scripts\refresh_benchmarks.py --start-date 2020-01-01 --end-date 2026-09-14 --provider yfinance_ecb --confirm
+```
+
+La fecha final debe ser anterior a hoy. Incluye una fecha inicial de referencia
+para calcular el primer retorno. Cada actualizacion **reemplaza la ventana
+completa**, no mezcla revisiones de cierres ajustados con descargas anteriores.
+No se modifica el estado de cartera, el precio absoluto del broker ni su FX.
+
+Alternativamente, con API `--operations real`, usa POST
+`/api/v1/benchmarks/refresh` con `confirm: true`, `provider: "yfinance_ecb"`,
+`start_date`, `end_date` e `Idempotency-Key`; devuelve un job. Ver
+[jobs locales](local_jobs.md). La CLI comparte el bloqueo del worker. El refresh
+general de precios no descarga benchmarks y no hay reintentos automaticos.
+La UI de lectura muestra el resultado; su boton operativo queda para #56.
+
+### Cache, auditoria y limites
+
+`benchmark_cache.json` se guarda dentro de `DATA_DIR` real (privado e ignorado),
+con niveles normalizados, proveedor, ticker/serie, ISIN en la referencia, moneda,
+fechas y hashes SHA-256 de contenido. La sustitucion es atomica: si falla una
+fuente, se conserva el ultimo snapshot completo. La cache auxiliar de yfinance
+tambien queda dentro de `DATA_DIR`. No se guardan credenciales.
+
+API y React exponen fuentes, cobertura, momento de descarga y hashes. Los hashes
+detectan cambios de contenido; no son una firma del proveedor ni prueban que el
+dato sea correcto. Los ajustes historicos pueden revisarse en futuras descargas;
+esto no es una base point-in-time para backtesting. Una cache ausente, corrupta,
+de otra moneda o antigua produce avisos explicitos, nunca una curva inventada.
+
+Esta integracion se destina a uso personal/local, sin servicio de pago ni SLA.
+La disponibilidad depende de Yahoo/BCE. Antes de publicar o redistribuir datos
+debe revisarse la licencia de cada proveedor; descarga gratuita no equivale a
+permiso de redistribucion. Demo y tests permanecen offline y sinteticos.

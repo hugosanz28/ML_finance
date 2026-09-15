@@ -5,7 +5,7 @@ from typing import Annotated
 from fastapi import APIRouter, Header, Path, Query
 
 from src.api.operation_schemas import (
-    AgentsBody, BriefBody, BriefResponse, JobResponse, JobsResponse, OperationBody,
+    AgentsBody, BenchmarkRefreshBody, BriefBody, BriefResponse, JobResponse, JobsResponse, OperationBody,
     RefreshBody, ReportBody, SimulationBody, TargetsBody, TargetsResponse, UploadsBody,
 )
 from src.api.schemas import ErrorResponse, ListQuery
@@ -39,6 +39,10 @@ def operation_router(manager):
     @router.post("/market-data/refresh", response_model=JobResponse, status_code=202)
     def refresh(body: RefreshBody, key: Key):
         return submit("refresh", body, key)
+
+    @router.post("/benchmarks/refresh", response_model=JobResponse, status_code=202)
+    def refresh_benchmarks(body: BenchmarkRefreshBody, key: Key):
+        return submit("benchmarks", body, key)
 
     @router.post("/reports/monthly", response_model=JobResponse, status_code=202)
     def report(body: ReportBody, key: Key):

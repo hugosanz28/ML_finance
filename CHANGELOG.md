@@ -8,6 +8,9 @@ proyecto usa [versionado semántico](https://semver.org/lang/es/).
 
 ### Añadido
 
+- Benchmarks reales locales (#60): proxies ETF via yfinance y €STR/FX del BCE,
+  refresh explicito por CLI/job, cache atomica validada y fuentes/hashes en React.
+  Los huecos limitan la comparacion al ultimo tramo continuo, sin relleno ficticio.
 - UI React + TypeScript + Vite (#55), oscura y local de solo lectura, con
   resumen, rendimiento/benchmarks, riesgo, explicaciones y tablas de graficos.
 - Contratos TypeScript validados en runtime, tests de componentes y CI con

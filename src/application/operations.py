@@ -6,6 +6,7 @@ from datetime import date
 from typing import Any
 
 from src.application.agents import RunMonthlyAgentsRequest, RunMonthlyAgentsUseCase
+from src.application.benchmarks import RefreshBenchmarksRequest, RefreshBenchmarksUseCase
 from src.application.artifact_reads import _safe_payload
 from src.application.contribution_lab import SimulateContributionRequest, SimulateContributionUseCase
 from src.application.degiro import ImportDegiroRequest, ImportDegiroUseCase
@@ -19,7 +20,7 @@ from src.application.uploads import DegiroUpload, SaveDegiroUploadsRequest, Save
 
 MAX_UPLOAD_BYTES = 5 * 1024 * 1024
 MAX_TOTAL_UPLOAD_BYTES = 10 * 1024 * 1024
-OPERATIONS = {"uploads", "import", "refresh", "report", "simulation", "agents", "brief", "targets"}
+OPERATIONS = {"uploads", "import", "refresh", "benchmarks", "report", "simulation", "agents", "brief", "targets"}
 
 
 @dataclass(frozen=True)
@@ -36,6 +37,11 @@ def validate_operation(request: ExecuteOperationRequest, workspace: OperationalW
         raise OperationError("workspace_mode_mismatch", 422)
     if values.get("confirm") is not True:
         raise OperationError("confirmation_required", 422)
+    if request.operation == "benchmarks":
+        if workspace.mode != "real":
+            raise OperationError("external_provider_forbidden_in_demo", 422)
+        if values.get("provider") != "yfinance_ecb":
+            raise OperationError("provider_required", 422)
     if request.operation == "refresh":
         for field in ("fx_provider", "price_provider"):
             if values[field] not in {"synthetic", "yfinance"}:
@@ -115,6 +121,12 @@ class ExecuteOperationUseCase:
                 payload["status"] = "partial"
             payload["warnings"] = list(dict.fromkeys([*payload["warnings"], *fx.result.warnings]))
             return payload
+        elif operation == "benchmarks":
+            output = RefreshBenchmarksUseCase(settings=self.settings).execute(RefreshBenchmarksRequest(
+                start_date=date.fromisoformat(values["start_date"]), end_date=date.fromisoformat(values["end_date"]),
+                provider=values["provider"],
+            ))
+            return self._result(output)
         elif operation == "report":
             output = GenerateMonthlyReportUseCase(settings=self.settings).execute(GenerateMonthlyReportRequest(
                 as_of_date=date.fromisoformat(values["as_of_date"]) if values.get("as_of_date") else None,

@@ -16,6 +16,7 @@ from src.application.serialization import json_ready_value
 from src.config import Settings, get_settings
 from src.market_data.benchmarks import BenchmarkProvider, SyntheticBenchmarkProvider, selectable_benchmarks
 from src.market_data.repository import DuckDBMarketDataRepository
+from src.market_data.benchmark_cache import CachedBenchmarkProvider
 from src.portfolio.benchmarks import (
     benchmark_selection_from_mapping, compare_portfolio_to_benchmarks, load_benchmark_selection,
 )
@@ -155,6 +156,9 @@ class _AnalyticsUseCase:
             provider = self.benchmark_provider
             if provider is None and self.settings.price_provider == "synthetic":
                 provider = SyntheticBenchmarkProvider()
+            elif provider is None and (self.settings.data_dir / "benchmark_cache.json").exists():
+                # Reads consume a validated cache only. Never download during GET or agents.
+                provider = CachedBenchmarkProvider(self.settings.data_dir)
             failure = "benchmark_not_selected" if selection is None else "benchmark_provider_unavailable" if provider is None else "insufficient_observations" if not rows else None
             comparison = compare_portfolio_to_benchmarks(performance, selection, provider=provider) if failure is None else None
             data["benchmarks"] = {

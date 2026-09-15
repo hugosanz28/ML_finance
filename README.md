@@ -22,6 +22,8 @@ viven en rutas locales ignoradas por Git y la demo publica usa datos sinteticos.
 - Reconstruccion diaria de posiciones y metricas agregadas de cartera.
 - Base de rendimiento ajustado por flujos con retornos diarios, TWR y MWR/XIRR.
 - Comparacion configurable con MSCI World, S&P 500, cartera 60/40 y efectivo €STR.
+  [Fuentes reales locales](docs/benchmarks.md): proxies ETF y BCE, descarga
+  explicita, cache validada y procedencia visible; demo siempre sintetica.
 - Refresco de FX y precios con politica `broker_snapshot_anchored`.
 - Informe mensual en Markdown.
 - Laboratorio determinista para simular aportaciones sobre posiciones actuales,

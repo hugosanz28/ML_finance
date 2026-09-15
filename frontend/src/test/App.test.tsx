@@ -216,6 +216,38 @@ describe("read-only workspace", () => {
       ).toBe(true);
     }
   });
+  it("shows real proxy provenance and an inspectable content hash", async () => {
+    const data = analyticsSchema.parse(structuredClone(fixture.analytics));
+    const comparison = data.data.benchmarks!.comparison!.comparisons.find(
+      (item) => item.benchmark_id === "msci_world",
+    )!;
+    comparison.provider_name = "cached_yfinance_ecb";
+    comparison.reason_codes = ["benchmark_etf_proxy"];
+    comparison.sources = [
+      {
+        source_id: "EUNL.DE",
+        reference: "MSCI World ETF Acc, test fixture",
+        provider: "yfinance",
+        is_proxy: true,
+        currency: "EUR",
+        fetched_at: "2026-04-30T12:00:00+00:00",
+        first_observation: "2026-01-02",
+        last_observation: "2026-04-29",
+        content_sha256: "sha256:" + "a".repeat(64),
+      },
+    ];
+    mockApi();
+    vi.spyOn(api, "analytics").mockResolvedValue(data);
+    render(<App />);
+    await ready();
+    await userEvent.click(screen.getByRole("button", { name: "Rentabilidad" }));
+    expect(screen.getByText(/Aproximación ETF · EUNL.DE/)).toBeVisible();
+    expect(screen.queryByText(/BENCHMARK SINTÉTICO/)).not.toBeInTheDocument();
+    await userEvent.click(
+      screen.getByText("Procedencia y huella de los datos"),
+    );
+    expect(screen.getByText("sha256:" + "a".repeat(64))).toBeVisible();
+  });
   it("never substitutes a missing real benchmark with synthetic curves", async () => {
     const data = structuredClone(fixture);
     const analytic = analyticsSchema.parse(data.analytics);
@@ -239,7 +271,7 @@ describe("read-only workspace", () => {
     render(<App />);
     await ready();
     await userEvent.click(screen.getByRole("button", { name: "Rentabilidad" }));
-    expect(screen.getByText(/fuente del benchmark real/)).toBeVisible();
+    expect(screen.getByText(/Falta descargar el histórico real/)).toBeVisible();
     expect(screen.queryByRole("img")).not.toBeInTheDocument();
     expect(screen.queryByText(/BENCHMARK SINTÉTICO/)).not.toBeInTheDocument();
   });

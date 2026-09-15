@@ -221,6 +221,12 @@ def _compose_benchmark_series(
     }
     common_intervals = set.intersection(*(set(values) for values in component_maps.values())) if component_maps else set()
     ordered_intervals = sorted(common_intervals, key=lambda interval: (interval[1], interval[0]))
+    # A composite cannot drift weights across unobserved returns. Start a fresh,
+    # explicitly shortened common window after the last gap instead.
+    breaks = [index for index in range(1, len(ordered_intervals))
+              if ordered_intervals[index][0] != ordered_intervals[index - 1][1]]
+    if breaks:
+        ordered_intervals = ordered_intervals[breaks[-1]:]
     current_weights = dict(weights)
     observations: list[BenchmarkReturnObservation] = []
     last_observation_date: date | None = None
@@ -258,7 +264,7 @@ def _compose_benchmark_series(
     component_coverages = [series.coverage_ratio for series in component_series]
     overlap_coverage = min(
         (
-            len(common_intervals) / len(series.observations)
+            len(ordered_intervals) / len(series.observations)
             if series.observations
             else 0.0
         )
@@ -284,6 +290,11 @@ def _compose_benchmark_series(
         coverage_ratio=round(coverage, 8),
         status=status,
         reason_code=reason_code,
+        source_reference="; ".join(series.source_reference for series in component_series if series.source_reference) or None,
+        sources=tuple({(source["source_id"], source["content_sha256"]): source
+                       for series in component_series for source in series.sources}.values()),
+        warning_codes=tuple(dict.fromkeys([*(code for series in component_series for code in series.warning_codes),
+                                          *( ["benchmark_common_window_truncated"] if breaks else [])])),
     )
 
 
@@ -320,10 +331,16 @@ def _compare_one_benchmark(
             )
         )
 
+    breaks = [index for index in range(1, len(aligned)) if aligned[index][0] != aligned[index - 1][1]]
+    if breaks:
+        aligned = aligned[breaks[-1]:]
     alignment_coverage = len(aligned) / len(series.observations) if series.observations else 0.0
     portfolio_coverage = min((row[4] for row in aligned), default=0.0)
     coverage = min(series.coverage_ratio, alignment_coverage, portfolio_coverage)
     reason_codes: list[str] = []
+    reason_codes.extend(series.warning_codes)
+    if breaks:
+        reason_codes.append("benchmark_common_window_truncated")
     if series.reason_code != "ok":
         reason_codes.append(series.reason_code)
     if alignment_coverage < 1.0:
@@ -363,10 +380,10 @@ def _compare_one_benchmark(
         benchmark_id=definition.benchmark_id,
         benchmark_name=definition.name,
         role=role,
-        source_reference=definition.source_reference,
+        source_reference=series.source_reference or definition.source_reference,
         source_currency=series.source_currency,
         base_currency=base_currency,
-        series_kind=definition.series_kind,
+        series_kind=series.series_kind,
         provider_name=series.provider_name,
         period_start=period_start,
         period_end=period_end,
@@ -376,6 +393,7 @@ def _compare_one_benchmark(
         reason_codes=tuple(reason_codes),
         growth=growth,
         metrics=metrics,
+        sources=series.sources,
     )
 
 

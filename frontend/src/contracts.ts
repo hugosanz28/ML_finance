@@ -38,6 +38,21 @@ const comparison = z.object({
   reason_codes: z.array(z.string()),
   growth: z.array(growth),
   metrics: z.array(metricSchema),
+  sources: z
+    .array(
+      z.object({
+        source_id: z.string(),
+        reference: z.string(),
+        provider: z.string(),
+        is_proxy: z.boolean(),
+        currency,
+        fetched_at: z.string(),
+        first_observation: date,
+        last_observation: date,
+        content_sha256: z.string(),
+      }),
+    )
+    .optional(),
 });
 export const analyticsSchema = z.object({
   schema_version: z.literal(1),

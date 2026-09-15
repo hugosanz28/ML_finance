@@ -94,7 +94,11 @@ Invariantes y errores tipicos:
   `daily_return_pct` como TWR ni reclasifiques dividendos, comisiones, FX o
   transferencias internas como aportaciones.
 - Los benchmarks son referencias, no recomendaciones. Conserva IDs, tipo de
-  serie, moneda, cobertura y `reason_code`; no calcules alpha, beta o tracking
+  serie y fuentes reales: `benchmark_cache.py` descarga proxies ETF y BCE solo
+  mediante refresh explicito real. GET lee cache validada, nunca red. CLI comparte
+  bloqueo del worker; demo rechaza este refresh. No mezclar ventanas revisadas,
+  rellenar nulos ni encadenar tramos desconectados. Ver `docs/benchmarks.md`.
+- En comparaciones conserva moneda, cobertura y `reason_code`; no calcules alpha, beta o tracking
   error con menos de 30 observaciones alineadas.
 - Analitica de riesgo: lee `docs/risk_analytics.md`; usa retornos de un dia
   natural y anualizacion 365, no variaciones de cantidades ni intervalos

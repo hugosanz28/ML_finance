@@ -188,8 +188,12 @@ def test_missing_portfolio_interval_reports_partial_alignment() -> None:
     ).comparisons[0]
 
     assert comparison.status == "partial"
-    assert comparison.coverage_ratio == pytest.approx(2 / 3)
+    # Do not compound the two disconnected intervals into an invented path.
+    assert comparison.coverage_ratio == pytest.approx(1 / 3)
     assert "incomplete_calendar_alignment" in comparison.reason_codes
+    assert "benchmark_common_window_truncated" in comparison.reason_codes
+    assert comparison.period_start == date(2026, 1, 5)
+    assert comparison.growth[-1].portfolio_index == pytest.approx(102)
 
 
 def _performance(

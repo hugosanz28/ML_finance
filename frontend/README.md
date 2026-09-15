@@ -63,7 +63,9 @@ La cartera se solicita con la fecha final de la analitica. Las respuestas
 obsoletas se descartan al cambiar filtros. Si falla una seccion, las otras
 siguen disponibles; hay reintento manual y timeout de 60 segundos.
 
-Los benchmarks reales necesitan un proveedor cargado en el backend. Si falta,
+Los benchmarks reales necesitan una [descarga explicita a cache](../docs/benchmarks.md)
+por CLI o API operativa. La UI muestra fuentes, proxies ETF, fechas y hashes;
+abrir una pantalla no descarga datos. Si falta la cache,
 se muestra `benchmark_provider_unavailable`, nunca una curva sintetica de
 respaldo. La etiqueta de benchmark sintetico describe **la referencia**, no
 certifica que todos los datos de la cartera sean ficticios. Para capturas usa

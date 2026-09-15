@@ -26,6 +26,20 @@ export function dateLabel(date: string | null | undefined): string {
     : "Sin fecha";
 }
 const reasons: Record<string, string> = {
+  benchmark_etf_proxy:
+    "La referencia usa un ETF de acumulación como aproximación, no el índice oficial. Incluye costes del fondo, tracking difference y precios de mercado.",
+  benchmark_cache_missing:
+    "Falta descargar el histórico de benchmarks. Ejecuta una actualización explícita; abrir esta vista no descarga datos.",
+  benchmark_cache_invalid:
+    "La copia local de benchmarks no supera su validación. Vuelve a descargarla; no se usarán datos sin verificar.",
+  benchmark_cache_stale:
+    "El histórico de la referencia termina antes del periodo solicitado. Actualiza la copia local.",
+  benchmark_cache_currency_mismatch:
+    "La copia de benchmarks pertenece a otra moneda base. Descárgala de nuevo para la moneda de tu cartera.",
+  benchmark_missing_observations:
+    "El proveedor ha devuelto cotizaciones ausentes. Se conservan como huecos, no como retornos cero.",
+  benchmark_common_window_truncated:
+    "La comparación empieza después del último hueco: solo usa el tramo común continuo indicado, no todo el periodo solicitado.",
   portfolio_data_unavailable:
     "Todavía no hay una cartera importada. Prepara la demo o importa tus datos desde Streamlit.",
   connection_failed:
@@ -35,7 +49,7 @@ const reasons: Record<string, string> = {
   invalid_response:
     "La API ha devuelto un formato inesperado. No se mostrarán datos sin validar.",
   benchmark_provider_unavailable:
-    "La fuente del benchmark real aún no está conectada. No se sustituye por datos ficticios.",
+    "Falta descargar el histórico real de benchmarks. Usa la actualización explícita; no se sustituye por datos ficticios.",
   cash_flow_data_missing:
     "Faltan movimientos de efectivo: no podemos separar aportaciones y rentabilidad.",
   valuation_price_proxy:

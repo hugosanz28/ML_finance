@@ -87,6 +87,7 @@ financiero final. Consultar `/jobs/{job_id}` hasta un estado terminal.
 | POST `/degiro/uploads` | `uploaded_at` ISO y `uploads`: lista de `filename` + `content_base64` |
 | POST `/degiro/import` | Ninguno; importa el incoming configurado |
 | POST `/market-data/refresh` | `fx_provider` y `price_provider` obligatorios; `start_date`/`end_date` opcionales |
+| POST `/benchmarks/refresh` | Solo real; `provider: "yfinance_ecb"`, `start_date` y `end_date` obligatorios, fechas anteriores a hoy |
 | POST `/reports/monthly` | `as_of_date` opcional |
 | POST `/portfolio/contributions/simulate` | `contribution_amount`, `allow_fractional_units`, `minimum_order_value`, `max_orders`, `as_of_date` opcionales |
 | POST `/agents/monthly-runs` | `llm_provider=static`, `search_provider=null`, presupuesto `monthly_budget` e interes `user_satellite_interest` opcionales |
@@ -111,6 +112,10 @@ Actualizar brief/targets exige primero leer su hash. El control se comprueba
 **al ejecutar el job**, bajo el bloqueo de escritura, no solo al recibirlo. Si
 otro job ya cambio el contenido, el nuevo termina `failed/content_conflict` y
 no sobrescribe nada. Recargar y revisar antes de volver a enviar.
+
+Benchmarks se actualizan por separado, con confirmacion e Idempotency-Key. No
+forman parte del refresh general; no admiten retry de jobs fallidos. La CLI
+`refresh_benchmarks.py` comparte el bloqueo del worker. Ver [fuentes y cache](benchmarks.md).
 
 Providers de refresh: `synthetic` solo para demo, `yfinance` solo con seleccion
 explicita en real. Agentes: defaults `static/null`; `openai`, `tavily` o

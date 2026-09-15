@@ -48,6 +48,18 @@ class ReportBody(OperationBody, DateQuery):
     pass
 
 
+class BenchmarkRefreshBody(OperationBody):
+    provider: Literal["yfinance_ecb"]
+    start_date: str = Field(pattern=r"^\d{4}-\d{2}-\d{2}$")
+    end_date: str = Field(pattern=r"^\d{4}-\d{2}-\d{2}$")
+
+    @model_validator(mode="after")
+    def dates(self):
+        if not date(2000, 1, 1) <= date.fromisoformat(self.start_date) < date.fromisoformat(self.end_date) < date.today():
+            raise ValueError("Invalid benchmark date range; use completed days")
+        return self
+
+
 class SimulationBody(ReportBody):
     contribution_amount: float | None = Field(default=None, ge=0, allow_inf_nan=False)
     allow_fractional_units: bool = False

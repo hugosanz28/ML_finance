@@ -78,8 +78,10 @@ Los parametros y payloads de cartera/analitica estan en
 [contratos API](api_contracts.md). La cartera siempre usa `persist=False` y
 DuckDB de solo lectura; `persist` no es un parametro HTTP admitido. Los
 endpoints reutilizan calculos existentes y no construyen proveedores externos.
-En datos reales, sin adaptador de benchmark cargado la comparacion conserva
-`benchmark_provider_unavailable`: no descarga ni sustituye por datos sinteticos.
+En datos reales se lee la cache local de benchmarks validada, si existe. Sin
+cache se conserva `benchmark_provider_unavailable`: GET no descarga ni sustituye
+por datos sinteticos. Fuentes, proxies, hashes y actualizacion explicita se
+documentan en [benchmarks](benchmarks.md).
 
 OpenAPI con esquemas Pydantic: `GET /openapi.json`. Swagger/ReDoc no se sirven
 por defecto para evitar cargar recursos de un CDN. Referencias del framework:
