@@ -9,7 +9,6 @@ description = "Local portfolio analytics, DEGIRO import, reporting, and agent wo
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
-    "altair==6.0.0",
     "duckdb==1.5.1",
     "fastapi==0.141.1",
     "openai==2.32.0",
@@ -17,7 +16,6 @@ dependencies = [
     "pyarrow==23.0.1",
     "python-dotenv==1.2.2",
     "pydantic==2.13.3",
-    "streamlit==1.56.0",
     "uvicorn==0.53.0",
     "yfinance==1.5.2",
 ]
@@ -63,9 +61,6 @@ addopts = "-q"
 [tool.coverage.run]
 branch = true
 source = ["src"]
-omit = [
-    "src/portfolio/dashboard.py",
-]
 
 [tool.coverage.report]
 fail_under = 70
@@ -87,7 +82,6 @@ select = ["E4", "E7", "E9", "F", "B"]
 [tool.ruff.lint.per-file-ignores]
 # These executable entrypoints add the repository root before importing `src`.
 "scripts/*.py" = ["E402"]
-"src/portfolio/dashboard.py" = ["E402"]
 
 [tool.mypy]
 python_version = "3.11"

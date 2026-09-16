@@ -95,6 +95,6 @@ proveedores externos puede enviar contexto financiero. Bases, informes y
 auditorias reales no se publican. El showcase usa un workspace sintetico nuevo,
 red externa bloqueada y revision visual antes de versionar assets.
 
-Streamlit se conserva hasta revisar paridad. Un servicio publico necesita un
+Streamlit se retira tras la [migracion documentada](react_migration.md). Un servicio publico necesita un
 diseno adicional de autenticacion, aislamiento y operacion. El enfoque educativo
 todavia requiere pruebas con usuarios; no se declara validacion comercial.

@@ -61,7 +61,7 @@ PORTFOLIO_DAILY_METRICS_COLUMNS = [
 
 @dataclass(frozen=True)
 class PortfolioMetricsResult:
-    """Reusable valuation outputs for reporting and Streamlit."""
+    """Reusable valuation outputs for reporting and interfaces."""
 
     start_date: date
     end_date: date

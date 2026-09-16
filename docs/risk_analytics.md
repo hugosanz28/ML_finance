@@ -4,8 +4,7 @@
 reutilizable. No carga datos privados, consulta proveedores ni implementa una UI.
 La integracion en casos de uso esta en `src/application/analytics.py`; los
 agentes consumen un [snapshot compacto](agent_analytics.md). La API de lectura
-y la [UI React](../frontend/README.md) ya exponen estas metricas; el dashboard
-Streamlit permanece disponible durante la transicion.
+y la [UI React](../frontend/README.md) exponen estas metricas. React es la interfaz mantenida.
 
 ## Entradas y resultados
 

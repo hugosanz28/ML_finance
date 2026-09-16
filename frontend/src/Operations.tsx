@@ -143,10 +143,12 @@ export function Operations({
           setReports(next.reports.map((item) => item.report_id));
           setReport(detail?.content_markdown);
         } else if (section === "Agentes") {
+          const availableReports = await opsApi.reports(signal);
           const next = await opsApi.runs(signal);
           const detail = artifact ? await opsApi.audit(artifact, signal) : null;
           if (controller.signal.aborted) return;
           setRuns(next.runs);
+          setReports(availableReports.reports.map((item) => item.report_id));
           setAudit(detail ?? undefined);
         }
       } catch (error) {
@@ -236,8 +238,8 @@ export function Operations({
   return (
     <div hidden={!visible} className="operations">
       <p>
-        Tu revisión mensual, paso a paso. No ejecuta órdenes. No uses Streamlit
-        ni CLI para escribir mientras el worker esté activo.
+        Tu revisión mensual, paso a paso. No ejecuta órdenes. No uses CLI
+        para escribir mientras el worker esté activo.
       </p>
       {!writable && (
         <div className="demo-banner">
@@ -366,7 +368,7 @@ export function Operations({
       )}
       {section === "Agentes" && (
         <>
-          <AgentsForm {...props} />
+          <AgentsForm {...props} reports={reports} />
           <section className="panel">
             <h2>Historial de agentes</h2>
             <button

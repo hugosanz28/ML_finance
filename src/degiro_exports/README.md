@@ -30,7 +30,7 @@ Convención canónica de nombres:
 - `account_YYYY-MM-DD_YYYY-MM-DD.csv`
 - `portfolio_YYYY-MM-DD.csv`
 
-Desde el dashboard Streamlit se pueden subir CSVs con nombres originales de
+Desde React, Operaciones → Datos, se pueden subir CSVs con nombres originales de
 DEGIRO. La UI detecta el tipo por el nombre del archivo y los copia a
 `local/incoming/` mediante `SaveDegiroUploadsUseCase`, usando esta convencion
 canonica. Si no encuentra fechas en el nombre, usa el dia de subida.

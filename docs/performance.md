@@ -9,7 +9,7 @@ auditables, sin sustituir datos ausentes por ceros.
 
 Esta capa es dominio puro y offline. FastAPI, React y el snapshot para agentes
 acceden mediante `src/application/`; no duplican estas formulas. La UI
-Streamlit no incorpora la nueva vista de rendimiento. Ver
+React es la interfaz mantenida. Ver
 [frontend](../frontend/README.md) y [analitica en agentes](agent_analytics.md).
 
 La comparacion de este TWR con referencias configurables se documenta en

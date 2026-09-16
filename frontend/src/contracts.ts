@@ -148,6 +148,19 @@ export const portfolioSchema = z.object({
     }),
   ),
   data_quality: z.object({ warnings: z.array(z.string()) }),
+  asset_history: z
+    .array(
+      z.object({
+        asset_id: z.string(),
+        asset_name: z.string(),
+        asset_type: z.string(),
+        series_kind: z.literal("valuation_price_proxy"),
+        points: z.array(
+          z.object({ valuation_date: date, price_change: number.nullable() }),
+        ),
+      }),
+    )
+    .default([]),
 });
 export type Portfolio = z.infer<typeof portfolioSchema>;
 export const definitionsSchema = z.object({

@@ -10,17 +10,9 @@
 .\.venv\Scripts\python.exe scripts\run_monthly_agents.py --llm-provider static --search-provider null
 ```
 
-El mismo flujo puede ejecutarse desde Streamlit:
-
-```powershell
-.\.venv\Scripts\python.exe -m streamlit run src\portfolio\dashboard.py
-```
-
-Abre `http://localhost:8501` cuando Streamlit termine de arrancar.
-
-La pestaña `Actualizar datos` permite subir CSVs, importar, refrescar FX,
-refrescar precios y generar informes. La pestaña `Agentes` permite revisar los
-inputs y ejecutar la red mensual.
+El mismo flujo se ejecuta en React, Operaciones → Datos, Informes y Agentes.
+Cada paso requiere confirmacion y expone resultado/errores. Consulta el
+[arranque](../frontend/README.md) y la [migracion](react_migration.md).
 
 Las interfaces comparten los mismos casos de uso:
 
@@ -86,7 +78,7 @@ representan la salida parseada. Sirven para detectar cambios reproducibles, no
 para anonimizar datos ni validar una recomendacion.
 
 Los runs sin `schema_version` o sin los artefactos nuevos son legacy v1.
-`GetAgentRunAuditUseCase` y Streamlit los leen sin reescribirlos y muestran como
+`GetAgentRunAuditUseCase` y React los leen sin reescribirlos y muestran como
 no disponible la metadata que no existia entonces.
 
 ## Notas operativas
@@ -116,9 +108,10 @@ no disponible la metadata que no existia entonces.
 - Si el preflight bloquea, el comando termina con codigo `1` y, salvo que se use
   `--no-persist`, guarda el intento sin crear resultados ni prompts de agentes.
   Con solo warnings ejecuta la red y termina con codigo `0`.
-- Streamlit envia sus metricas y el snapshot editable al mismo
-  `RunMonthlyAgentsUseCase` que usa CLI, y muestra el preflight comun. Si las
-  fechas no coinciden, hay que generar un informe nuevo antes de ejecutar.
+- React selecciona un informe por ID y envia controles acotados al mismo
+  `RunMonthlyAgentsUseCase` que usa CLI. El servidor prepara las metricas;
+  no acepta snapshots financieros editables. Si las fechas no coinciden,
+  hay que generar un informe nuevo antes de ejecutar.
 - Antes de llamar a los agentes, `portfolio_metrics_snapshot` se enriquece con
   `asset_overrides.csv`: nombre normalizado, ticker, mercado y divisa de trading.
   Si DEGIRO entrega un nombre truncado, se conserva como `broker_asset_name` y

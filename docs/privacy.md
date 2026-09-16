@@ -7,7 +7,7 @@ financieros ni credenciales. La regla base es simple: el codigo, la
 documentacion y los ejemplos sinteticos pueden versionarse; los datos reales y
 las salidas privadas se quedan en rutas locales ignoradas por Git.
 
-La v2 usa **React y FastAPI locales**; Streamlit sigue disponible como v1. La
+La v2 usa **React y FastAPI locales**; Streamlit ya no forma parte del runtime. La
 aplicacion se ejecuta en el ordenador del usuario y no necesita backend remoto
 ni base de datos externa para funcionar. Aun asi, los agentes pueden enviar
 contexto a proveedores externos si se configuran proveedores reales.
@@ -110,11 +110,7 @@ archivo no contiene secretos y apunta a `demo/local_data/`, que esta ignorado
 por Git. Los CSV bajo `demo/synthetic_degiro_exports/` son ficticios y estan
 disenados para ensenar el flujo sin exponer cartera real.
 
-Para demos publicas, usa:
-
-```powershell
-.\scripts\run_demo.ps1
-```
+Para demos publicas, usa el [quickstart sintetico React/FastAPI](../README.md).
 
 No uses capturas, informes ni audit trails generados desde `src/data/local/`.
 Las capturas y el video versionados se generan en una copia sintetica nueva
@@ -184,7 +180,7 @@ se va a enviar y evita incluir datos personales que no sean necesarios para el
 analisis. Para pruebas publicas o demos, usa proveedores `static` o datos
 sinteticos.
 
-En la v1 local con Streamlit hay dos combinaciones offline:
+En React/CLI hay dos combinaciones offline:
 
 - `LLM provider: static` y `Search provider: null`: baseline seguro sin
   resultados de busqueda;
@@ -197,4 +193,4 @@ equipo local.
 
 Si una credencial aparece por error en un audit trail, deja de compartirlo,
 elimina la copia afectada y rota la credencial en el proveedor. Ocultarla en
-Streamlit o sustituirla solo en una captura no invalida el secreto original.
+la UI o sustituirla solo en una captura no invalida el secreto original.

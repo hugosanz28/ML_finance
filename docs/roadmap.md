@@ -13,14 +13,14 @@ son la unidad de trabajo y deben enlazar los cambios que afecten a este orden.
 ## Ahora
 
 La release `v0.1.0` corresponde a la v1 Streamlit. El codigo actual incluye
-la v2 React/FastAPI local y conserva Streamlit. Ya estan disponibles:
+la v2 React/FastAPI local, sin dependencia de Streamlit. Ya estan disponibles:
 
 - importacion de transacciones, cuenta y snapshots DEGIRO;
 - contratos normalizados y persistencia local DuckDB/Parquet;
 - refresco de FX y precios con overrides;
 - valoracion `broker_snapshot_anchored` y reconstruccion diaria;
 - informes mensuales persistidos;
-- dashboard Streamlit para cartera, datos, informes y agentes;
+- interfaz React para cartera, datos, informes y agentes;
 - pipeline mensual de tres agentes con prompts versionados y audit trail;
 - demo publica reproducible con datos y proveedores sinteticos;
 - frontera `src/application/` para operaciones, uploads, auditoria y read models,
@@ -34,7 +34,7 @@ la v2 React/FastAPI local y conserva Streamlit. Ya estan disponibles:
 - UI React local de analitica (#55), oscura y educativa, con resumen,
   rendimiento, benchmarks y riesgo; ver [frontend](../frontend/README.md).
   Flujos operativos #56 disponibles; ver [paridad y limites](react_operations.md).
-  Streamlit sigue disponible hasta revisar la retirada #58;
+  Retirada #58 y diferencias documentadas en [migracion](react_migration.md);
 - CI multiplataforma con lint, typecheck gradual, secret scanning, cobertura,
   bootstrap demo offline, auditoria de dependencias y build de wheel.
 - [Showcase v2](showcase.md) (#57): README visual, capturas, video y portada
@@ -54,8 +54,8 @@ Antes de #56 se ha conectado la [fuente real de benchmarks](benchmarks.md) (#60)
 proxies ETF y €STR/FX BCE, refresh explicito y cache offline con procedencia.
 La UI #55 muestra los resultados y sus limites; el control de actualizacion
 desde React esta incluido en las operaciones de #56. Con el showcase #57
-disponible, sigue revisar la paridad y retirar Streamlit solo cuando este
-verificada (#58).
+disponible y la retirada #58 implementada, el siguiente foco es validar la
+comprension del flujo mensual con usuarios. No implica publicar un servicio.
 
 ### Decision de producto: comprension primero (UI #55)
 
@@ -116,4 +116,4 @@ necesidades de UX, jobs o distribucion lo justifiquen:
 
 `architecture_v2.md` conserva propuestas historicas: el stack vigente es
 React + TypeScript + Vite con FastAPI local, no Angular. La retirada de
-Streamlit requiere la revision explicita de paridad #58.
+Streamlit queda documentada en la migracion #58.

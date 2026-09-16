@@ -60,6 +60,7 @@ class PortfolioResponse(Schema):
     positions: list[dict[str, JsonValue]]
     history: list[dict[str, JsonValue]]
     data_quality: dict[str, list[str]]
+    asset_history: list[dict[str, JsonValue]] = Field(default_factory=list)
 
 
 class AnalyticsPeriod(Schema):

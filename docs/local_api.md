@@ -1,7 +1,7 @@
 # API local: lectura y operaciones opcionales
 
 La issue #53 incorpora FastAPI como adaptador de `src/application/`.
-Streamlit sigue operativo. El modo por defecto sigue siendo de solo lectura.
+React es la interfaz mantenida. El modo por defecto sigue siendo de solo lectura.
 La #54 incorpora [operaciones y jobs](local_jobs.md), que requieren activacion
 explicita con `--operations demo` o `--operations real`.
 La [UI React](../frontend/README.md) (#55/#56) consume analitica de lectura y
@@ -83,6 +83,13 @@ En datos reales se lee la cache local de benchmarks validada, si existe. Sin
 cache se conserva `benchmark_provider_unavailable`: GET no descarga ni sustituye
 por datos sinteticos. Fuentes, proxies, hashes y actualizacion explicita se
 documentan en [benchmarks](benchmarks.md).
+
+`/portfolio/state?include_history=true` incluye tambien `asset_history`:
+series por ID con `series_kind=valuation_price_proxy` y puntos
+`valuation_date`/`price_change` (fraccion decimal o null). La base es la primera
+valoracion valida desde la primera compra, no el inicio del filtro de UI.
+Sin historico solicitado devuelve una lista vacia. No son retornos totales;
+ver [migracion y limites](react_migration.md).
 
 OpenAPI con esquemas Pydantic: `GET /openapi.json`. Swagger/ReDoc no se sirven
 por defecto para evitar cargar recursos de un CDN. Referencias del framework:

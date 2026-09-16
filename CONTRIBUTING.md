@@ -57,7 +57,7 @@ detect-secrets-hook --baseline .secrets.baseline $trackedFiles
 La cobertura mide ramas y exige al menos el 70 % según `pyproject.toml`.
 `mypy` comprueba por ahora una frontera gradual, también definida allí.
 
-Para validar la demo sin abrir un proceso Streamlit:
+Para validar la demo sin abrir servidores:
 
 ```powershell
 $env:ML_FINANCE_ENV_FILE = "demo/synthetic_config/.env.demo"

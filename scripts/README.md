@@ -1,6 +1,6 @@
 # Scripts
 
-Entradas manuales para la **v2 local FastAPI/React y la v1 Streamlit**. En Windows se recomienda
+Entradas manuales para la **v2 local FastAPI/React**. En Windows se recomienda
 usar los wrappers PowerShell.
 
 Requieren Python 3.11 o posterior y la instalación de ejecución:
@@ -16,8 +16,7 @@ Para desarrollar o ejecutar la suite usa `requirements-dev.txt`; consulta
 
 ```powershell
 .\scripts\test.ps1
-.\scripts\run_dashboard.ps1
-.\scripts\run_demo.ps1
+.\.venv\Scripts\python.exe scripts/run_api.py
 .\scripts\refresh_market_data.ps1 -EndDate 2026-05-14
 ```
 
@@ -40,14 +39,11 @@ Para desarrollar o ejecutar la suite usa `requirements-dev.txt`; consulta
   Admite `--env-file` y `--port`; ver [API local](../docs/local_api.md).
   `--operations demo|real` habilita escrituras y worker persistente; consultar
   [jobs locales](../docs/local_jobs.md) antes de activarlo.
-- `run_dashboard.ps1`: abre Streamlit con `.env` o con `-EnvFile`.
-- `run_demo.ps1`: prepara la demo sintetica y abre Streamlit con
-  `demo/synthetic_config/.env.demo`.
 - `refresh_market_data.ps1`: refresca FX y precios hasta `-EndDate`.
 - `test.ps1`: ejecuta la suite pytest con `.venv`.
 
-`run_dashboard.ps1` y `run_demo.ps1` dejan Streamlit activo hasta que el usuario
-lo cierre. Para una validacion automatizada de la demo ejecuta solo:
+Para la UI usa `npm run dev` desde `frontend/` en otra terminal.
+Ambos servidores permanecen activos hasta Ctrl+C. Para validar la demo sin servidores:
 
 ```powershell
 $env:ML_FINANCE_ENV_FILE = "demo/synthetic_config/.env.demo"
@@ -62,7 +58,7 @@ $env:ML_FINANCE_ENV_FILE = "demo/synthetic_config/.env.demo"
 - `generate_monthly_report.py`: genera informe mensual Markdown.
 - `run_monitor_tematico.py`: ejecuta el monitor tematico.
 - `run_monthly_agents.py`: ejecuta la red mensual de agentes.
-- `bootstrap_demo.py`: prepara datos sinteticos de demo sin abrir Streamlit.
+- `bootstrap_demo.py`: prepara datos sinteticos de demo sin abrir servidores.
 
 Ejemplo de pipeline mensual local:
 
@@ -99,7 +95,7 @@ ejemplo:
 ```bash
 python scripts/refresh_market_data.py --end-date 2026-05-14
 ML_FINANCE_ENV_FILE=demo/synthetic_config/.env.demo python scripts/bootstrap_demo.py
-python -m streamlit run src/portfolio/dashboard.py
+python scripts/run_api.py --env-file demo/synthetic_config/.env.demo --operations demo
 ```
 
 Notas:

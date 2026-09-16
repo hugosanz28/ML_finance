@@ -651,6 +651,10 @@ function Risk({
 }) {
   const risk = analytics?.data.risk;
   const [dimension, setDimension] = useState("asset_id");
+  const [assetId, setAssetId] = useState("");
+  const assetHistory = portfolio?.asset_history ?? [];
+  const selectedAsset =
+    assetHistory.find((asset) => asset.asset_id === assetId) ?? assetHistory[0];
   const labels: Record<string, string> = {
     asset_id: "Activo",
     bucket: "Grupo de inversión",
@@ -756,6 +760,35 @@ function Risk({
       </section>
       <details className="advanced">
         <summary>Riesgo avanzado de cartera y activos</summary>
+        <label>
+          Activo para consultar evolución
+          <select
+            value={selectedAsset?.asset_id ?? ""}
+            onChange={(event) => setAssetId(event.target.value)}
+          >
+            {assetHistory.map((asset) => (
+              <option key={asset.asset_id} value={asset.asset_id}>
+                {asset.asset_name} · {asset.asset_id}
+              </option>
+            ))}
+          </select>
+        </label>
+        <LineChart
+          title="Evolución del precio de valoración por activo"
+          description="Variación desde la primera valoración válida de la posición. Precio aproximado en moneda base (valor / unidades), no rentabilidad total: no incluye dividendos ni costes. La base no se reinicia al filtrar el periodo; los huecos permanecen visibles."
+          labels={[selectedAsset?.asset_name ?? "Activo"]}
+          unit="decimal_ratio"
+          points={(selectedAsset?.points ?? [])
+            .filter(
+              (point) =>
+                !analytics?.period.actual_start ||
+                point.valuation_date >= analytics.period.actual_start,
+            )
+            .map((point) => ({
+              date: point.valuation_date,
+              values: [point.price_change],
+            }))}
+        />
         <p>
           Sharpe y Sortino no se calculan sin tasa explícita. Esta primera UI no
           configura esa tasa.

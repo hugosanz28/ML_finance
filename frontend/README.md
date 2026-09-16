@@ -1,7 +1,8 @@
 # ML Finance UI
 
 UI v2 (#55/#56): React + TypeScript estricto + Vite sobre FastAPI local.
-Analitica y flujos operativos opt-in. Streamlit permanece disponible hasta #58.
+Analitica y flujos operativos opt-in. React sustituye a Streamlit (#58);
+ver [migracion](../docs/react_migration.md).
 
 ## Arranque
 
@@ -38,7 +39,7 @@ Los comandos npm son identicos. Para datos reales, usa `python scripts/run_api.p
 con la configuracion privada del servidor y sin la variable de demo en esa
 terminal. El frontend no elige rutas ni archivos de entorno. Para habilitar
 acciones, anade `--operations demo` al comando de demo o `--operations real` al
-comando real. No arranques dos APIs ni escribas desde Streamlit/CLI a la vez.
+comando real. No arranques dos APIs ni escribas desde CLI a la vez.
 La API fija el entorno; la UI no puede cambiarlo. Ver [jobs locales](../docs/local_jobs.md).
 
 ## Pantallas y limites

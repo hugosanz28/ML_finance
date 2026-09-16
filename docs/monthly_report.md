@@ -25,7 +25,7 @@ Los contratos compartidos del informe (`MonthlyReportResult`,
 `src/reports/monthly_models.py`. `src/reports/monthly.py` mantiene la
 orquestacion de carga, calculo, renderizado y persistencia del informe.
 
-Scripts, Streamlit y futuras interfaces entran por
+Scripts y API entran por
 `GenerateMonthlyReportUseCase`; la lectura del ultimo informe usa
 `GetLatestMonthlyReportUseCase`.
 
