@@ -101,6 +101,10 @@ E2E exige puertos 8000/5173 libres, crea una copia sintetica temporal y no reuti
 servidores existentes. En CI instala Chromium con `--with-deps`. No usa datos
 reales ni proveedores externos. Ver [webServer de Playwright](https://playwright.dev/docs/test-webserver).
 
+`npm run showcase` usa el mismo aislamiento para generar capturas, video y
+portada en `test-results/showcase/`, sin modificar los assets versionados.
+Revisalos antes de publicarlos: [procedimiento](../docs/showcase.md).
+
 Para incluir la prueba de integracion con respuestas actuales, desde la raiz,
 despues del bootstrap sintetico:
 

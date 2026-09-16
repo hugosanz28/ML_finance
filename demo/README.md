@@ -3,9 +3,19 @@
 Esta carpeta permite ensenar el proyecto sin usar datos personales. Todos los
 CSV, objetivos y brief incluidos aqui son ficticios.
 
-La demo representa la **v1 local con Streamlit**: prepara un workspace sintetico
-en `demo/local_data/` y abre el mismo dashboard que se usa con la cartera real,
-pero apuntando a datos ficticios.
+La demo permite recorrer la **v2 local React/FastAPI** y la v1 Streamlit que
+sigue disponible. Ambas usan datos ficticios, nunca la cartera real.
+
+## Demo v2 recomendada
+
+Sigue el [quickstart del README](../README.md) para preparar datos y levantar
+FastAPI con `--operations demo` y React en otra terminal. El detalle de comandos
+Windows/POSIX vive en [frontend](../frontend/README.md).
+
+Para ensenar el proyecto: [recorrido, capturas y video](../docs/showcase.md).
+Los assets publicables se regeneran con `npm run showcase` desde `frontend/`,
+usando una copia temporal nueva y red bloqueada. No captures un workspace al
+que hayas subido datos reales, aunque el banner diga demo.
 
 ## Separacion frente a la cartera real
 
@@ -28,7 +38,7 @@ demo/local_data/
 `demo/local_data/` se genera localmente y esta ignorado por Git. No se mezcla
 con `src/data/local/`.
 
-## Preparar demo
+## Preparar demo v1 (Streamlit)
 
 Desde la raiz del repo:
 
@@ -54,10 +64,10 @@ externos.
 
 La demo incluye tambien la seleccion MSCI World, S&P 500, cartera 60/40 y
 efectivo €STR. `SyntheticBenchmarkProvider` genera esas referencias y el FX
-necesario de forma determinista y sin red. Esta base aun no se muestra en la UI
-Streamlit; queda preparada para la capa de aplicacion y la futura UI.
+necesario de forma determinista y sin red. React ya muestra estas referencias
+con sus limites; Streamlit no incorpora la nueva vista de benchmarks.
 
-Este es el comando recomendado para ensenar el proyecto a otra persona:
+Para ensenar la interfaz v1 conservada:
 
 ```powershell
 .\scripts\run_demo.ps1
@@ -96,9 +106,9 @@ En la demo puedes mostrar:
 - informe mensual demo;
 - agentes con plan interno, acciones usadas, restricciones y trazabilidad.
 
-El repositorio no incluye actualmente capturas del dashboard. Si se anade
-material visual, debe generarse desde este workspace sintetico despues del
-bootstrap y revisarse con el checklist de `docs/privacy.md`.
+El material visual versionado muestra React. Sigue [privacidad](../docs/privacy.md)
+y el procedimiento aislado del showcase para regenerarlo, no el workspace de
+demo editable utilizado en una sesion anterior.
 
 ## Ejecutar agentes demo por consola
 

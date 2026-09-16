@@ -4,7 +4,9 @@ Instrucciones para agentes de programacion que trabajen en este repo. Si necesit
 
 ## Resumen del proyecto
 
-`ML_finance` es una aplicacion local de analitica de cartera para exportaciones oficiales de DEGIRO. La version actual es `v0.1.0`: **v1 local con Streamlit**.
+`ML_finance` es una aplicacion local de analitica de cartera para exportaciones
+oficiales de DEGIRO. La release `v0.1.0` corresponde a la v1 Streamlit; el codigo
+actual incluye la **v2 local React/FastAPI**, conservando Streamlit hasta #58.
 
 El sistema importa CSVs de DEGIRO, normaliza datos, guarda estado local en DuckDB/Parquet, refresca FX/precios, reconstruye cartera historica, genera informes Markdown y ejecuta agentes mensuales con auditoria. La demo publica usa datos sinteticos en `demo/` y no debe tocar datos reales.
 
@@ -17,7 +19,14 @@ Separacion publico/privado:
   `search_provider=static` solo cuando necesites fixtures de busqueda
   sinteticos. No uses proveedores externos salvo que la tarea lo pida.
 
-La UI actual es Streamlit. FastAPI debe entrar por `src/application/`, no por modulos internos de dominio.
+La v2 local usa React/FastAPI; Streamlit sigue disponible hasta #58. FastAPI
+entra por `src/application/`, no por modulos internos de dominio.
+
+Showcase #57: lee `docs/showcase.md` antes de cambiar assets publicos. Genera
+con `npm run showcase` desde `frontend/`: copia sintetica nueva, puertos libres,
+red externa bloqueada. Nunca captures datos locales reales ni reutilices una
+demo editable. Revisa imagenes/video antes de copiar salida a `docs/assets/showcase/`;
+conserva manifiesto SHA-256 y SVG fuente. Hashes y secret scanning no prueban privacidad.
 
 La UI v2 de analitica (#55) vive en `frontend/`: React + TypeScript + Vite,
 tema oscuro, analitica GET y operaciones opt-in (#56). Lee `frontend/README.md` antes de cambiarla.

@@ -13,7 +13,8 @@
     "typecheck": "tsc --noEmit",
     "lint": "eslint . --max-warnings 0",
     "test": "vitest run",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "showcase": "playwright test --config showcase.config.ts"
   },
   "dependencies": {
     "react": "^19.2.0",

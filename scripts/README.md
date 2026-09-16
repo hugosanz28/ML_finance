@@ -1,6 +1,6 @@
 # Scripts
 
-Entradas manuales para la **v1 local con Streamlit**. En Windows se recomienda
+Entradas manuales para la **v2 local FastAPI/React y la v1 Streamlit**. En Windows se recomienda
 usar los wrappers PowerShell.
 
 Requieren Python 3.11 o posterior y la instalación de ejecución:
@@ -25,7 +25,8 @@ Para desarrollar o ejecutar la suite usa `requirements-dev.txt`; consulta
 
 - `run_frontend_e2e_api.py`: servidor exclusivo de tests Playwright, con copia
   sintetica temporal y red externa bloqueada. No acepta configuracion real.
-  Se lanza mediante `npm run test:e2e`, no como servidor habitual del usuario.
+  Se lanza mediante `npm run test:e2e` o `npm run showcase`, no como servidor
+  habitual del usuario. Ver [capturas reproducibles](../docs/showcase.md).
 - `refresh_benchmarks.py`: descarga explicita de proxies ETF y €STR oficiales
   a cache local real. Requiere fechas, `--provider yfinance_ecb` y `--confirm`;
   comparte el bloqueo del worker. Ver [benchmarks](../docs/benchmarks.md).

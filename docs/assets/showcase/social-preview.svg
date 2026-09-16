@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630" role="img" aria-labelledby="title desc">
+  <title id="title">ML Finance — Entiende tu cartera. Prepara tu revisión mensual.</title>
+  <desc id="desc">Portada editorial, no captura de interfaz. Analítica local de exportaciones DEGIRO, simulación de aportaciones y agentes auditables. Python, FastAPI y React.</desc>
+  <rect width="1200" height="630" fill="#10191d"/>
+  <rect x="64" y="64" width="5" height="500" rx="2" fill="#65dcc2"/>
+  <g font-family="Arial, sans-serif">
+    <text x="100" y="100" fill="#65dcc2" font-size="19" letter-spacing="3">LOCAL FIRST · REVISIÓN HUMANA</text>
+    <text x="96" y="204" fill="#eff5f4" font-size="76" font-weight="700">ML Finance</text>
+    <text x="100" y="283" fill="#eff5f4" font-size="39">Entiende tu cartera.</text>
+    <text x="100" y="336" fill="#eff5f4" font-size="39">Prepara tu revisión mensual.</text>
+    <text x="100" y="409" fill="#b0c0c4" font-size="23">DEGIRO → Analítica → Simulación → Agentes auditables</text>
+    <path d="M100 451H1100" stroke="#35454b"/>
+    <text x="100" y="498" fill="#65dcc2" font-size="22">Python / DuckDB / FastAPI / React + TypeScript</text>
+    <text x="100" y="548" fill="#b0c0c4" font-size="19">Sin ejecución de órdenes · Sin promesas de rentabilidad</text>
+  </g>
+</svg>

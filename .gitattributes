@@ -3,3 +3,8 @@
 *.py text eol=lf
 *.toml text eol=lf
 *.yml text eol=lf
+# Keep showcase input/source hashes identical on Windows and POSIX checkouts.
+demo/synthetic_degiro_exports/incoming/*.csv text eol=lf
+docs/assets/showcase/*.svg text eol=lf
+docs/assets/showcase/*.png binary
+docs/assets/showcase/*.webm binary

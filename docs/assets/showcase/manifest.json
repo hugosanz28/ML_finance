@@ -1,0 +1,18 @@
+{
+  "source": "fresh synthetic workspace via scripts/run_frontend_e2e_api.py",
+  "command": "cd frontend && npm run showcase",
+  "as_of_date": "2026-04-30",
+  "inputs_sha256": {
+    "account_2026-01-15_2026-04-30.csv": "95af538dafd4441973a49992a9b9d8442e71f1f4b81d61a17acbc66bd40f2a09",
+    "portfolio_2026-04-30.csv": "4d6753df34463652160ffc198fe05ae0903372110dbb02ef375879151f944501",
+    "transactions_2026-01-15_2026-04-30.csv": "b38edc9b051aaad380fca7114e6fbf87ff43a38626b0d3b6ee738f742e7fad15"
+  },
+  "cover_source_sha256": "b9ccffeefd1c834f47fdae46ce236125a84b6d85a1dac96acca22d8aacdf5db9",
+  "assets_sha256": {
+    "overview.png": "460541d08031b34052b9c3bcd04b57773d89fbd9618ff6bd8c439fb4831b382e",
+    "performance.png": "bb5586a89b687e7139a479100e83551e7ba58064395aa22e7a1f5b63e6dbcdab",
+    "contribution.png": "047150703c1bc792be7c6d22819487241ba9c68598ced94edb3ddbe38394897a",
+    "social-preview.png": "cb637ece3af197375c5edf83f6b5d7e7d673ffb7d34e204993083e19040ed478",
+    "walkthrough.webm": "73fc100c1e1e02993a8495f822c7d7cac8d5835f139d654649734f9e3d981297"
+  }
+}

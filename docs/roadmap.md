@@ -12,7 +12,8 @@ son la unidad de trabajo y deben enlazar los cambios que afecten a este orden.
 
 ## Ahora
 
-La serie `v0.1.x` consolida la v1 local con Streamlit. Ya estan disponibles:
+La release `v0.1.0` corresponde a la v1 Streamlit. El codigo actual incluye
+la v2 React/FastAPI local y conserva Streamlit. Ya estan disponibles:
 
 - importacion de transacciones, cuenta y snapshots DEGIRO;
 - contratos normalizados y persistencia local DuckDB/Parquet;
@@ -36,6 +37,8 @@ La serie `v0.1.x` consolida la v1 local con Streamlit. Ya estan disponibles:
   Streamlit sigue disponible hasta revisar la retirada #58;
 - CI multiplataforma con lint, typecheck gradual, secret scanning, cobertura,
   bootstrap demo offline, auditoria de dependencias y build de wheel.
+- [Showcase v2](showcase.md) (#57): README visual, capturas, video y portada
+  sinteticos, regeneracion offline y [caso de estudio](case_study.md).
 
 Las prioridades de mantenimiento son:
 
@@ -50,8 +53,9 @@ Las prioridades de mantenimiento son:
 Antes de #56 se ha conectado la [fuente real de benchmarks](benchmarks.md) (#60):
 proxies ETF y €STR/FX BCE, refresh explicito y cache offline con procedencia.
 La UI #55 muestra los resultados y sus limites; el control de actualizacion
-desde React esta incluido en las operaciones de #56. Despues siguen showcase
-(#57) y retirada de Streamlit tras paridad verificada (#58).
+desde React esta incluido en las operaciones de #56. Con el showcase #57
+disponible, sigue revisar la paridad y retirar Streamlit solo cuando este
+verificada (#58).
 
 ### Decision de producto: comprension primero (UI #55)
 
@@ -98,21 +102,18 @@ Una vez estable la serie `v0.1.x`, el trabajo previsto es:
   cobertura sin duplicar calculos financieros;
 - reforzar evaluaciones de agentes, captura de respuestas raw cuando el
   contrato lo permita y trazabilidad de fuentes;
-- mejorar el showcase. No hay capturas versionadas actualmente; cualquier
-  captura futura debe obtenerse exclusivamente de la demo sintetica
-  reproducible.
+- mantener el showcase actualizado; cualquier captura nueva debe obtenerse
+  exclusivamente con el procedimiento sintetico aislado y revisarse antes de publicar.
 
 ## Más adelante
 
-La evolucion v2 se evaluara solo cuando las necesidades de UX, jobs o
-distribucion lo justifiquen:
+La publicacion como servicio y otras ampliaciones se evaluaran cuando las
+necesidades de UX, jobs o distribucion lo justifiquen:
 
-- API local sobre los casos de uso de `src/application/`;
-- interfaz web separada, como FastAPI + Angular;
 - ejecuciones programadas y notificaciones con permisos explicitos;
 - soporte para varias cuentas o brokers manteniendo procedencia y aislamiento;
 - opciones de despliegue que conserven un modo local-first.
 
-La direccion tecnica ampliada vive en `docs/architecture_v2.md`. Streamlit sigue
-siendo la interfaz principal hasta que exista una necesidad concreta y probada
-de migracion.
+`architecture_v2.md` conserva propuestas historicas: el stack vigente es
+React + TypeScript + Vite con FastAPI local, no Angular. La retirada de
+Streamlit requiere la revision explicita de paridad #58.

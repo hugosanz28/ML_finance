@@ -9,6 +9,7 @@ const localPython = resolve(
 const python = existsSync(localPython) ? `"${localPython}"` : "python";
 export default defineConfig({
   testDir: "./e2e",
+  testIgnore: "**/showcase.spec.ts",
   workers: 1,
   retries: 0,
   timeout: 180000,

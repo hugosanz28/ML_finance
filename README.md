@@ -1,202 +1,153 @@
-# ML_finance
+# ML Finance
 
-`ML_finance` es una aplicacion local para analizar una cartera importada desde
-exportaciones oficiales de DEGIRO. Permite reconstruir historico, enriquecer
-posiciones con datos de mercado, generar informes mensuales y ejecutar agentes
-de apoyo a la revision manual.
+**Entiende tu cartera. Prepara tu revision mensual.**
 
-Estado actual: **v0.1.0 / v1 local con Streamlit**.
+Una aplicacion local nacida para simplificar la revision de fin de mes de una
+cartera DEGIRO: importar exportaciones, entender resultados y riesgos, simular
+una aportacion y consultar agentes con trazabilidad para la revision manual.
 
-La v1 esta pensada para ejecutarse en el ordenador del usuario. Los datos reales
-viven en rutas locales ignoradas por Git y la demo publica usa datos sinteticos.
+**Hoy:** v2 local con **React + TypeScript + Vite / FastAPI / Python / DuckDB**.
+La release etiquetada `v0.1.0` corresponde a la v1; Streamlit sigue disponible
+hasta verificar su retirada (#58). **No hay servicio publico desplegado**:
+el repositorio es publico, los datos del usuario no.
 
 > [!IMPORTANT]
-> El proyecto ofrece apoyo analitico, no asesoramiento financiero. No ejecuta
-> ordenes. Revisa manualmente exportaciones, precios, FX, supuestos y
-> recomendaciones antes de tomar una decision.
+> No ejecuta ordenes, no es un bot de trading ni un modelo de ML predictivo.
+> Es apoyo analitico, no asesoramiento financiero. La IA no sustituye tu criterio.
 
-## Que incluye
+![UI React real sobre una cartera completamente sintetica](docs/assets/showcase/overview.png)
 
-- Importacion y normalizacion de transacciones, efectivo y snapshots DEGIRO.
-- Base local DuckDB/Parquet para datos derivados.
-- Reconstruccion diaria de posiciones y metricas agregadas de cartera.
-- Base de rendimiento ajustado por flujos con retornos diarios, TWR y MWR/XIRR.
-- Comparacion configurable con MSCI World, S&P 500, cartera 60/40 y efectivo €STR.
-  [Fuentes reales locales](docs/benchmarks.md): proxies ETF y BCE, descarga
-  explicita, cache validada y procedencia visible; demo siempre sintetica.
-- Refresco de FX y precios con politica `broker_snapshot_anchored`.
-- Informe mensual en Markdown.
-- Laboratorio determinista para simular aportaciones sobre posiciones actuales,
-  sin ventas ni ejecucion de ordenes.
-- Dashboard Streamlit para cartera, aportaciones, evolucion, informes,
-  actualizacion de datos y agentes.
-- Agentes mensuales con prompts versionados y auditoria visual.
-- Demo sintetica ejecutable sin exponer datos reales.
-- API FastAPI local para cartera, analitica, informes y auditoria, con
-  [operaciones/jobs opcionales](docs/local_jobs.md). Arranque y contratos:
-  [API local](docs/local_api.md). Streamlit sigue operativo.
-- [UI React local de analitica](frontend/README.md) (#55): tema oscuro,
-  resumen de cartera, rendimiento, benchmarks, riesgo y explicaciones.
-  Requiere Node.js 22.12+. [Operaciones React](docs/react_operations.md) (#56)
-  disponibles con API opt-in: importacion, aportaciones, informes, agentes y
-  configuracion segura. Streamlit sigue disponible hasta #58.
+*Captura de la aplicacion, no un mockup. Cartera, precios y benchmarks ficticios
+de abril de 2026; los porcentajes no representan resultados de inversion.*
 
-## Puesta en marcha
+[Ver el recorrido breve (WebM)](docs/assets/showcase/walkthrough.webm) ·
+[Capturas y guia de dos minutos](docs/showcase.md) ·
+[Caso de estudio tecnico](docs/case_study.md)
 
-Requisitos:
+## Del CSV a una revision informada
 
-- Python 3.11 o posterior.
-- Windows es la ruta principal y dispone de wrappers PowerShell.
-- La matriz de CI esta configurada para Windows con Python 3.11–3.14 y Ubuntu
-  con Python 3.12. macOS puede usar los comandos POSIX, pero no tiene runner
-  dedicado.
+| Pregunta | Que puedes hacer hoy |
+| --- | --- |
+| ¿Que tengo y cuanto he aportado? | Importar transacciones, efectivo y snapshots DEGIRO; consultar posiciones y valor historico. |
+| ¿Aportaciones o rentabilidad? | Separar flujos externos, PnL de posiciones abiertas, TWR y MWR/XIRR con explicaciones desplegables. |
+| ¿Con que lo comparo? | Seleccionar MSCI World, S&P 500, 60/40 o efectivo €STR, con fuentes, cobertura y limites visibles. |
+| ¿Donde se concentra el riesgo? | Consultar drawdown, volatilidad, pesos y correlaciones, sin convertir datos ausentes en ceros. |
+| ¿Como simulo mi proxima aportacion? | Proponer compras sobre posiciones actuales y objetivos explicitos; sin ventas ni ordenes, con caja residual separada. |
+| ¿Puedo revisar de donde sale una conclusion? | Leer informes Markdown, comprobaciones de calidad y auditoria de agentes: inputs, prompts, fuentes, outputs y hashes. |
+
+La UI explica las metricas y ofrece detalle avanzado opcional. Su facilidad de
+comprension en dos minutos es un objetivo de producto, **todavia no validado con usuarios**.
+
+## Pruebalo con datos sinteticos
+
+Requiere **Python 3.11 o posterior**, **Node.js 22.12 o posterior** y puertos
+8000/5173 libres. La instalacion descarga dependencias; despues la demo funciona
+offline, sin API keys. Desde la raiz, en PowerShell:
 
 ```powershell
 python -m venv .venv
-.\.venv\Scripts\Activate.ps1
-python -m pip install -r requirements.txt
-Copy-Item .env.example .env
-python -m pip check
-.\scripts\run_dashboard.ps1
+.\.venv\Scripts\python.exe -m pip install -r requirements.txt
+$env:ML_FINANCE_ENV_FILE = "demo/synthetic_config/.env.demo"
+.\.venv\Scripts\python.exe scripts/bootstrap_demo.py
+.\.venv\Scripts\python.exe scripts/run_api.py --env-file demo/synthetic_config/.env.demo --operations demo
 ```
 
-`requirements.txt` instala solo la aplicacion. Para contribuir o ejecutar tests,
-instala en su lugar el entorno de desarrollo:
+En otra terminal, desde la raiz:
 
 ```powershell
-python -m pip install -r requirements-dev.txt
-.\.venv\Scripts\python.exe -m pytest
+cd frontend
+npm ci
+npm run dev
 ```
 
-En Linux o macOS:
+Abre [ML Finance local](http://127.0.0.1:5173). La API escucha en
+`127.0.0.1:8000`; Ctrl+C detiene cada proceso. Sin `--operations demo`, la API
+es de solo lectura. No publiques los puertos ni los expongas mediante tuneles.
+
+En POSIX crea y activa la venv (`python3 -m venv .venv`,
+`source .venv/bin/activate`), instala `requirements.txt` y ejecuta:
 
 ```bash
-python3 -m venv .venv
-source .venv/bin/activate
-python -m pip install -r requirements.txt
-cp .env.example .env
-python -m pip check
-python -m streamlit run src/portfolio/dashboard.py
+ML_FINANCE_ENV_FILE=demo/synthetic_config/.env.demo python scripts/bootstrap_demo.py
+python scripts/run_api.py --env-file demo/synthetic_config/.env.demo --operations demo
 ```
 
-Para desarrollo, sustituye la instalacion por
-`python -m pip install -r requirements-dev.txt`. Los comandos de lint, tipos,
-cobertura, secretos, build y auditoria estan en
-[CONTRIBUTING.md](CONTRIBUTING.md).
+Los comandos npm son iguales. Windows es la ruta principal; CI prueba Python
+3.11–3.14 en Windows y 3.12 en Ubuntu. macOS no tiene runner dedicado.
 
-## Demo publica
+La demo usa copias editables en `demo/local_data/`. No subas CSV reales a ella.
+Para regenerar las capturas publicables se usa una **copia temporal nueva**,
+no tu directorio de demo: [procedimiento del showcase](docs/showcase.md).
 
-Usa datos sinteticos y no toca `src/data/local/` ni
-`src/degiro_exports/local/`.
+## Arquitectura actual
 
-```powershell
-.\scripts\run_demo.ps1
+```mermaid
+flowchart LR
+    CSV[Exportaciones DEGIRO] --> N[Parsers y contratos validados]
+    N --> D[DuckDB y Parquet locales]
+    D --> A[Valoracion y analitica Python]
+    M[FX y precios: refresh explicito] --> A
+    A --> R[Informes Markdown]
+    A --> S[Snapshot analitico validado]
+    R --> G[Agentes: preflight y auditoria]
+    S --> G
+    A --> U[Casos de uso: application]
+    R --> U
+    G --> U
+    U --> API[FastAPI local: lecturas y jobs opt-in]
+    API --> UI[React + TypeScript + Vite]
 ```
 
-Guia completa: `demo/README.md`.
+El diagrama muestra el flujo de informacion. Las llamadas de UI/API/CLI entran
+por `src/application/`, que coordina el dominio. React no calcula rentabilidad
+ni guarda la cartera en localStorage. Los GET no descargan datos ni ejecutan
+agentes. Las escrituras usan confirmacion, idempotencia y un unico worker local.
 
-## Resultado sintetico reproducible
+## Limites que importan
 
-Tras preparar la demo, el dashboard muestra una cartera ficticia, una simulacion
-determinista de aportacion, su evolucion, un informe mensual y la auditoria de
-los tres agentes. Los datos, el brief, los precios y las respuestas `static`
-estan etiquetados como sinteticos y no representan una cartera ni una
-recomendacion real.
+- **TWR**: encadena retornos ajustados por aportaciones/retiradas con la
+  convencion de flujo al cierre; no es un TWR intradia exacto.
+- **MWR/XIRR**: rentabilidad anualizada ponderada por fechas e importes de
+  flujos; no es directamente comparable con un TWR acumulado.
+- **Benchmarks**: en modo real necesitan descarga explicita de proxies ETF y
+  BCE a cache. Un proxy no es el indice oficial. Nunca se usa la serie
+  sintetica como respaldo de datos reales.
+- **Riesgo**: muestra y cobertura condicionan los resultados. Sharpe/Sortino
+  requieren tasa explicita; esta UI no la configura. Faltantes y avisos se muestran.
+- **Agentes**: `static/null` es el baseline offline; `static/static` añade
+  busqueda sintetica. OpenAI/Tavily/DuckDuckGo son opciones externas explicitas
+  que pueden transmitir contexto privado. Una auditoria no garantiza acierto.
 
-La vista se genera desde `demo/synthetic_config/.env.demo` y
-`demo/local_data/`; no contiene datos de una cartera real. Puedes reproducirla
-con `.\scripts\run_demo.ps1`.
+## Tu cartera privada y la v1
 
-## Uso local privado
+Para usar datos reales, sigue [la guia de API](docs/local_api.md) y
+[operaciones locales](docs/local_jobs.md). No mezcles escrituras de CLI,
+Streamlit y el worker. Los CSV, bases, informes y auditorias reales quedan en
+rutas ignoradas por Git; consulta [privacidad](docs/privacy.md) antes de compartir.
 
-1. Coloca exportaciones reales en `src/degiro_exports/local/incoming/`.
-2. Abre el dashboard:
+Streamlit permanece disponible con `.\scripts\run_dashboard.ps1`;
+su demo con `.\scripts\run_demo.ps1`. Ver [guia v1](docs/streamlit_dashboard.md).
+Publicar una aplicacion multiusuario requiere trabajo adicional de seguridad,
+aislamiento y despliegue; no forma parte de esta demo local.
 
-```powershell
-.\scripts\run_dashboard.ps1
-```
+## Documentacion y desarrollo
 
-3. Desde Streamlit puedes importar DEGIRO, refrescar FX/precios, generar informes
-   y ejecutar agentes.
+Tras instalar `requirements-dev.txt`, ejecuta `.\scripts\test.ps1` (o
+`.\.venv\Scripts\python.exe -m pytest`). Para refrescar FX/precios por CLI,
+consulta [scripts](scripts/README.md); no lo ejecutes mientras el worker escribe.
 
-Guia completa: `docs/streamlit_dashboard.md`.
+- [Demo sintetica](demo/README.md) y [frontend](frontend/README.md): arranque y uso.
+- [Caso de estudio](docs/case_study.md): decisiones de arquitectura y evidencias.
+- [TWR/MWR](docs/performance.md), [benchmarks](docs/benchmarks.md) y
+  [riesgo](docs/risk_analytics.md): formulas, cobertura y limites.
+- [Pipeline mensual](docs/monthly_pipeline.md), [agentes](src/agents/README.md)
+  y [paridad React](docs/react_operations.md): flujo y auditoria.
+- [Arquitectura de dominio/v1](docs/architecture.md), [API](docs/local_api.md)
+  y [roadmap](docs/roadmap.md): presente y siguientes pasos.
+- [CONTRIBUTING](CONTRIBUTING.md): `requirements-dev.txt`, tests, cobertura,
+  lint, tipos, secretos, build y auditoria de dependencias.
+- [AGENTS.md](AGENTS.md): instrucciones para agentes de programacion.
+- [Seguridad](SECURITY.md), [conducta](CODE_OF_CONDUCT.md) y
+  [changelog](CHANGELOG.md).
 
-## Modos de agentes
-
-| LLM / busqueda | Uso | Red |
-| --- | --- | --- |
-| `static` / `null` | Baseline determinista; el monitor queda sin contexto externo y puede ser `partial`. | No |
-| `static` / `static` | Demo publica completa con resultados de busqueda sinteticos. | No |
-| `openai` / `tavily` | Analisis con proveedores externos configurados. | Si |
-| `openai` / `duckduckgo` | Fallback web best-effort sin clave de busqueda. | Si |
-
-El pipeline, los runners y la construccion directa de agentes usan defaults
-offline seguros (`static/null`). Los proveedores externos requieren seleccion
-explicita. Para enseñar la demo usa `static/static`; ambos modos `static` son
-offline y no envian datos fuera del equipo.
-
-## Solucion de problemas
-
-- **PowerShell bloquea scripts:** ejecuta los comandos con
-  `.\.venv\Scripts\python.exe` o habilita scripts solo para la sesion con
-  `Set-ExecutionPolicy -Scope Process Bypass`.
-- **Falta `investment_brief.md`:** copia
-  `src/data/sample/investment_brief.example.md` a
-  `src/data/local/investment_brief.md` o al `DATA_DIR` privado configurado.
-- **Falta `portfolio_targets.yaml`:** copia
-  `src/data/sample/portfolio_targets.example.yaml` a
-  `src/data/local/portfolio_targets.yaml` o crea y guarda el contrato JSON
-  estructurado desde `Agentes` -> `Portfolio targets persistentes`.
-- **Streamlit no abre en `8501`:** usa la URL alternativa que imprime la
-  terminal; el puerto puede estar ocupado.
-- **Los agentes bloquean por fechas:** regenera el informe para que su
-  `as_of_date` coincida con las metricas y el snapshot.
-- **Fallan FX o precios:** revisa red, ticker y overrides. La demo evita
-  proveedores externos y sirve para separar un fallo local de uno de red.
-
-Consulta `docs/streamlit_dashboard.md`, `docs/monthly_pipeline.md` y
-`docs/privacy.md` para diagnóstico detallado.
-
-## Rutas clave
-
-| Ruta | Uso |
-| --- | --- |
-| `src/application/` | Casos de uso para scripts, Streamlit y futura API. |
-| `src/portfolio/` | Metricas de cartera y dashboard Streamlit. |
-| `src/agents/` | Pipeline mensual, agentes, modelos y prompts. |
-| `src/degiro_exports/` | Importadores y parsers DEGIRO. |
-| `src/data/local/` | Datos privados locales, ignorados por Git. |
-| `demo/` | Demo publica sintetica. |
-| `docs/` | Arquitectura, contratos, privacidad y flujos. |
-
-## Documentacion
-
-- `docs/architecture.md`: arquitectura v1 y flujo de datos.
-- `docs/architecture_v2.md`: propuesta historica; el stack vigente es FastAPI + React.
-- [frontend/README.md](frontend/README.md): arranque, pantallas y limites de la UI React.
-- `docs/api_contracts.md`: contratos futuros de API local.
-- `docs/privacy.md`: separacion publico/privado y checklist de secretos.
-- `docs/streamlit_dashboard.md`: uso del dashboard local.
-- `docs/monthly_pipeline.md`: flujo mensual completo con informes y agentes.
-- `docs/performance.md`: contratos, formulas y limites de TWR y MWR/XIRR.
-- `docs/benchmarks.md`: catalogo, configuracion y metricas comparativas.
-- `docs/risk_analytics.md`: riesgo, concentracion, correlaciones y catalogo explicativo.
-- `src/agents/README.md`: detalle funcional de agentes.
-- `src/application/README.md`: capa de casos de uso.
-- `AGENTS.md`: instrucciones compactas para agentes de programacion.
-- [CONTRIBUTING.md](CONTRIBUTING.md): entorno y reglas para contribuir.
-- [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md): normas de participacion.
-- [SECURITY.md](SECURITY.md): comunicacion privada de vulnerabilidades.
-- [CHANGELOG.md](CHANGELOG.md): historial de versiones.
-
-## Para agentes de programacion
-
-Este README esta orientado a personas. Si vas a modificar el repo como agente,
-lee primero `AGENTS.md`; contiene directrices de trabajo, comandos de test y el
-mapa operativo de rutas.
-
-## Release
-
-La primera release local demostrable esta marcada con el tag `v0.1.0`.
-
-Licencia: MIT. Consulta `LICENSE`.
+Licencia [MIT](LICENSE). Primera release local: tag `v0.1.0`.

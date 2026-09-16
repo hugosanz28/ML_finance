@@ -8,6 +8,8 @@ proyecto usa [versionado semántico](https://semver.org/lang/es/).
 
 ### Añadido
 
+- Showcase v2 (#57): README visual, capturas y video de la API/UI reales con
+  datos sinteticos, portada editorial, caso de estudio y regeneracion offline en CI.
 - Operaciones React (#56): importacion, refresh, aportaciones, informes, agentes,
   configuracion con hash, confirmacion e historial de jobs; prueba E2E offline.
   Health identifica demo/real y el lector admite IDs de informes actuales y legacy.

@@ -51,6 +51,9 @@ jobs:
         run: |
           npx playwright install --with-deps chromium
           npm run test:e2e
+      - name: Regenerate showcase on a fresh offline workspace
+        working-directory: frontend
+        run: npm run showcase
 
   supported-python:
     name: ${{ matrix.os }} / Python ${{ matrix.python-version }}

@@ -7,7 +7,7 @@ financieros ni credenciales. La regla base es simple: el codigo, la
 documentacion y los ejemplos sinteticos pueden versionarse; los datos reales y
 las salidas privadas se quedan en rutas locales ignoradas por Git.
 
-La version actual es la **v1 local con Streamlit**. Esto significa que la
+La v2 usa **React y FastAPI locales**; Streamlit sigue disponible como v1. La
 aplicacion se ejecuta en el ordenador del usuario y no necesita backend remoto
 ni base de datos externa para funcionar. Aun asi, los agentes pueden enviar
 contexto a proveedores externos si se configuran proveedores reales.
@@ -117,9 +117,11 @@ Para demos publicas, usa:
 ```
 
 No uses capturas, informes ni audit trails generados desde `src/data/local/`.
-El repositorio no incluye actualmente capturas del dashboard. Cualquier captura
-publica futura debe salir de la demo sintetica recien generada y revisarse para
-confirmar que no muestra rutas, terminales ni datos de una ejecucion real.
+Las capturas y el video versionados se generan en una copia sintetica nueva
+con red externa bloqueada, nunca desde un workspace reutilizado. Sigue el
+[procedimiento del showcase](showcase.md) y revisa todos los assets antes de
+publicarlos: sin rutas, terminales ni datos de una ejecucion real. Ni el hash
+del manifiesto ni secret scanning sustituyen esta revision visual.
 
 ## Secret scanning
 
