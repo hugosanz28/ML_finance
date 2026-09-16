@@ -267,7 +267,7 @@ una prueba de equivalencia financiera ni un mecanismo de anonimato.
 
 Los runs anteriores sin `schema_version`, `provider.json`,
 `audit_metadata.json` o hashes se leen como auditorias legacy v1. No se
-reescriben ni migran al abrirlos; Streamlit muestra lo disponible y marca como
+reescriben ni migran al abrirlos; React muestra lo disponible y marca como
 ausente la metadata que la version antigua nunca persistio.
 
 Estos artefactos viven bajo `src/data/local/`, por tanto son privados y estan
@@ -306,7 +306,7 @@ La construccion directa de los agentes, el pipeline y los runners parten de
 providers offline (`Static*LLMProvider` y `NullSearchProvider`). Usar OpenAI,
 Tavily o DuckDuckGo requiere seleccionarlos explicitamente.
 
-Scripts y Streamlit ejecutan la red mediante `RunMonthlyAgentsUseCase`. La
+Scripts y API ejecutan la red mediante `RunMonthlyAgentsUseCase`. La
 ejecucion aislada del monitor entra por `RunMonitorTematicoUseCase`; ambos
 mantienen `static/null` como default.
 

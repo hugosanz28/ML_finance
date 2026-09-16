@@ -26,6 +26,7 @@ export function dateLabel(date: string | null | undefined): string {
     : "Sin fecha";
 }
 const reasons: Record<string, string> = {
+  pending_portfolio_import: "Hay snapshots de cartera más recientes pendientes de importar. Revisa Operaciones → Datos.",
   benchmark_etf_proxy:
     "La referencia usa un ETF de acumulación como aproximación, no el índice oficial. Incluye costes del fondo, tracking difference y precios de mercado.",
   benchmark_cache_missing:

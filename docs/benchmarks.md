@@ -131,7 +131,7 @@ FX ausentes ni observaciones nulas. Otras monedas se rechazan antes de descargar
 ### Actualizacion explicita
 
 Con la configuracion real habitual y sin el worker operativo ni otro escritor
-Streamlit/CLI activo, ejecuta (ajusta las fechas a todo el historial necesario):
+CLI activo, ejecuta (ajusta las fechas a todo el historial necesario):
 
 ```powershell
 .\.venv\Scripts\python.exe scripts\refresh_benchmarks.py --start-date 2020-01-01 --end-date 2026-09-14 --provider yfinance_ecb --confirm

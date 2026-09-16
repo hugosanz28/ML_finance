@@ -183,22 +183,46 @@ describe("operational safety", () => {
   it("serializes configuration reads to avoid competing for the server lock", async () => {
     setup();
     let release!: (value: Awaited<ReturnType<typeof opsApi.brief>>) => void;
-    vi.mocked(opsApi.brief).mockReturnValue(new Promise(resolve => {release = resolve;}));
-    await userEvent.click(screen.getByRole("button", {name: "Configuración"}));
+    vi.mocked(opsApi.brief).mockReturnValue(
+      new Promise((resolve) => {
+        release = resolve;
+      }),
+    );
+    await userEvent.click(
+      screen.getByRole("button", { name: "Configuración" }),
+    );
     expect(opsApi.targets).not.toHaveBeenCalled();
-    await act(async () => release({content: "Plan secuencial", content_hash: hash, exists: true}));
+    await act(async () =>
+      release({ content: "Plan secuencial", content_hash: hash, exists: true }),
+    );
     await screen.findByDisplayValue("Plan secuencial");
     expect(opsApi.targets).toHaveBeenCalledOnce();
   });
   it("requires explicit real sources and retains optional dates in the confirmed payload", async () => {
-    const send = setup({...health, workspace_mode: "real"});
+    const send = setup({ ...health, workspace_mode: "real" });
     const user = userEvent.setup();
     expect(screen.getByLabelText("Fuente de precios y FX")).toHaveValue("");
-    await user.selectOptions(screen.getByLabelText("Fuente de precios y FX"), "yfinance");
-    await user.click(screen.getByRole("button", {name: "Revisar actualización"}));
-    await user.click(screen.getByRole("button", {name: "Confirmar y ejecutar"}));
+    await user.selectOptions(
+      screen.getByLabelText("Fuente de precios y FX"),
+      "yfinance",
+    );
+    await user.click(
+      screen.getByRole("button", { name: "Revisar actualización" }),
+    );
+    await user.click(
+      screen.getByRole("button", { name: "Confirmar y ejecutar" }),
+    );
     await waitFor(() => expect(send).toHaveBeenCalledOnce());
-    expect(send.mock.calls[0]?.[1]).toEqual({workspace_mode: "real", confirm: true, fx_provider: "yfinance", price_provider: "yfinance", start_date: null, end_date: null});
+    expect(send.mock.calls[0]?.[1]).toEqual({
+      workspace_mode: "real",
+      confirm: true,
+      fx_provider: "yfinance",
+      price_provider: "yfinance",
+      start_date: null,
+      end_date: null,
+      scope: "both",
+      only_missing_base: false,
+    });
   });
   it("renders legacy audit and untrusted HTML as inert text", async () => {
     render(

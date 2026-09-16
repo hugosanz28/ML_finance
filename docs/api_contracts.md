@@ -907,4 +907,4 @@ desplegables educativos compartidos por la nueva UI y agentes.
 Validacion offline: `tests/test_analytics_application.py` cubre JSON estricto,
 igualdad de vistas/resumen, casos sin datos, aislamiento de entornos y demo
 completa sin escrituras durante la lectura; las fronteras de interfaz se
-protegen con `tests/test_interface_boundaries.py`. Streamlit sigue operativo.
+protegen con `tests/test_interface_boundaries.py`. React sustituye a Streamlit; ver [migracion](react_migration.md).

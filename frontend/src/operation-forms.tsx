@@ -52,7 +52,12 @@ export function DataForms({ mode, disabled, prepare }: Props) {
     <div className="operations-grid">
       <section className="panel">
         <h2>1. Subir exportaciones DEGIRO</h2>
-        {mode === "demo" && <p className="metric-warning">Usa exclusivamente CSV ficticios. El modo demo no anonimiza archivos reales.</p>}
+        {mode === "demo" && (
+          <p className="metric-warning">
+            Usa exclusivamente CSV ficticios. El modo demo no anonimiza archivos
+            reales.
+          </p>
+        )}
         <p>
           Transacciones, estado de cuenta y cartera. Subir no importa: revisa el
           resultado y continúa con el paso 2. Máximo 5 CSV, 5 MiB por archivo y
@@ -129,6 +134,8 @@ export function DataForms({ mode, disabled, prepare }: Props) {
                 end_date: text(data, "end_date") || null,
                 fx_provider: provider,
                 price_provider: provider,
+                scope: text(data, "scope"),
+                only_missing_base: data.has("only_missing_base"),
               },
               "Actualizar FX y precios",
             );
@@ -156,6 +163,18 @@ export function DataForms({ mode, disabled, prepare }: Props) {
             </label>
             <DateField name="start_date" label="Desde (opcional)" />
             <DateField name="end_date" label="Hasta (opcional)" />
+            <label>
+              Actualizar
+              <select name="scope" defaultValue="both">
+                <option value="both">FX y precios</option>
+                <option value="fx">Solo FX</option>
+                <option value="prices">Solo precios</option>
+              </select>
+            </label>
+            <label className="check-label">
+              <input type="checkbox" name="only_missing_base" />
+              Inferir FX solo para filas sin importe base
+            </label>
             <button>Revisar actualización</button>
           </fieldset>
         </form>
@@ -309,7 +328,13 @@ export function ReportForm({ disabled, prepare }: Props) {
     </section>
   );
 }
-export function AgentsForm({ mode, disabled, prepare }: Props) {
+export function AgentsForm({
+  mode,
+  disabled,
+  prepare,
+  reports = [],
+}: Props & { reports?: string[] }) {
+  const [error, setError] = useState("");
   return (
     <section className="panel">
       <h2>Revisión mensual con agentes</h2>
@@ -325,6 +350,20 @@ export function AgentsForm({ mode, disabled, prepare }: Props) {
       <form
         onSubmit={(event) => {
           const data = values(event);
+          setError("");
+          let weights: Record<string, number> | null = null;
+          try {
+            if (text(data, "weights_mode") === "custom") {
+              weights = z
+                .record(z.string().min(1), z.number().finite().min(0).max(1))
+                .parse(JSON.parse(text(data, "weights")));
+            }
+          } catch {
+            setError(
+              "Los pesos deben ser un objeto JSON con decimales entre 0 y 1; el servidor valida la suma.",
+            );
+            return;
+          }
           prepare(
             "agents",
             {
@@ -334,6 +373,9 @@ export function AgentsForm({ mode, disabled, prepare }: Props) {
                 ? Number(data.get("budget"))
                 : null,
               user_satellite_interest: text(data, "interest") || null,
+              report_id: text(data, "report_id") || null,
+              target_weights: weights,
+              investment_brief_text: text(data, "run_brief") || null,
             },
             "Ejecutar agentes mensuales",
           );
@@ -374,9 +416,49 @@ export function AgentsForm({ mode, disabled, prepare }: Props) {
               <input name="interest" maxLength={2000} />
             </label>
           </div>
+          <details>
+            <summary>Entradas avanzadas de esta ejecución</summary>
+            <p>
+              Sin cambios se usan el último informe y la configuración guardada
+              al ejecutar. Las métricas y la analítica siempre se construyen en
+              el servidor; las fechas se validan antes de llamar a proveedores.
+              Revisa el informe en Informes y la cartera en Resumen.
+            </p>
+            <label>
+              Informe mensual
+              <select name="report_id" defaultValue="">
+                <option value="">Último informe disponible</option>
+                {reports.map((id) => (
+                  <option key={id} value={id}>
+                    {id}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>
+              Objetivos para esta ejecución
+              <select name="weights_mode" defaultValue="saved">
+                <option value="saved">Objetivos guardados</option>
+                <option value="custom">Pesos personalizados JSON</option>
+              </select>
+            </label>
+            <label>
+              Pesos personalizados (decimales, suma 1)
+              <textarea name="weights" rows={3} defaultValue="{}" />
+            </label>
+            <label>
+              Brief solo para esta ejecución (vacío: guardado)
+              <textarea name="run_brief" rows={4} maxLength={65536} />
+            </label>
+            <p>
+              Estas entradas no sobrescriben la configuración y quedan
+              registradas en la auditoría privada.
+            </p>
+          </details>
           <button>Revisar ejecución de agentes</button>
         </fieldset>
       </form>
+      {error && <p role="alert">{error}</p>}
     </section>
   );
 }

@@ -1,4 +1,4 @@
-"""Reusable application use cases for scripts, Streamlit, and future UIs."""
+"""Reusable application use cases for scripts and local APIs."""
 
 from src.application.analytics_snapshot import (
     BuildPortfolioAnalyticsSnapshotRequest, BuildPortfolioAnalyticsSnapshotResult, BuildPortfolioAnalyticsSnapshotUseCase,

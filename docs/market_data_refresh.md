@@ -9,7 +9,7 @@ El refresh de precios diarios parte de los activos normalizados en:
 
 Esos activos se sincronizan en `assets_master` y despues se consulta el proveedor configurado, actualmente `yfinance`.
 
-El entrypoint de interfaces es `RefreshMarketDataUseCase`. Scripts y Streamlit
+El entrypoint de interfaces es `RefreshMarketDataUseCase`. Scripts y API
 no deben construir directamente el repositorio, el provider ni
 `PriceRefreshService`.
 
@@ -33,7 +33,7 @@ Para actualizar hasta una fecha concreta:
 .\.venv\Scripts\python.exe scripts\refresh_market_data.py --end-date 2026-05-14
 ```
 
-Desde Streamlit, `Vista general` -> `Actualizar a hoy` ejecuta el refresh de FX
+Desde React, `Operaciones` -> `Datos` ejecuta el refresh de FX
 y precios hasta la fecha actual y limpia la cache del dashboard.
 
 Opciones utiles:

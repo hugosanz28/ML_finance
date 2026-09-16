@@ -1,4 +1,4 @@
-"""Application use cases for Streamlit/dashboard read models."""
+"""Shared application read models retained for CLI and compatibility."""
 
 from __future__ import annotations
 

@@ -220,6 +220,9 @@ def test_synthetic_http_pipeline_no_writes_or_network(tmp_path, monkeypatch):
                          output_dir=settings.normalized_data_dir / "degiro", base_currency="EUR", source_root=source)
     load_normalized_degiro_to_duckdb(settings=settings)
     _upsert_synthetic_prices(DuckDBMarketDataRepository(settings=settings))
+    incoming = settings.degiro_exports_dir / "incoming"
+    incoming.mkdir(parents=True, exist_ok=True)
+    (incoming / "portfolio_2026-05-01.csv").write_text("synthetic pending snapshot", encoding="utf-8")
     before = files_snapshot(tmp_path)
 
     def forbidden(*args, **kwargs):
@@ -236,6 +239,11 @@ def test_synthetic_http_pipeline_no_writes_or_network(tmp_path, monkeypatch):
         assert state.status_code == 200, state.text
         assert state.json()["positions"]
         assert state.json()["history"]
+        assert state.json()["asset_history"]
+        assert "pending_portfolio_import" in state.json()["data_quality"]["warnings"]
+        assert all(point["valuation_date"] <= DEMO_AS_OF_DATE.isoformat()
+                   for asset in state.json()["asset_history"] for point in asset["points"])
+        assert client.get("/api/v1/portfolio/state").json()["asset_history"] == []
         summary = client.get("/api/v1/analytics/summary", params={"benchmark_id": "portfolio_60_40"})
         assert summary.status_code == 200, summary.text
         data = summary.json()["data"]

@@ -30,6 +30,8 @@ class UploadsBody(OperationBody):
 
 
 class RefreshBody(OperationBody):
+    scope: Literal["both", "fx", "prices"] = "both"
+    only_missing_base: bool = False
     fx_provider: Literal["synthetic", "yfinance"]
     price_provider: Literal["synthetic", "yfinance"]
     start_date: str | None = Field(default=None, pattern=r"^\d{4}-\d{2}-\d{2}$")
@@ -72,6 +74,23 @@ class AgentsBody(OperationBody):
     search_provider: Literal["null", "static", "tavily", "duckduckgo"] = "null"
     monthly_budget: float | None = Field(default=None, ge=0, allow_inf_nan=False)
     user_satellite_interest: str | None = Field(default=None, max_length=2000)
+    report_id: str | None = Field(default=None, pattern=r"^[A-Za-z0-9][A-Za-z0-9_-]{0,159}$")
+    investment_brief_text: str | None = Field(default=None, max_length=65536)
+    target_weights: dict[str, float] | None = None
+
+    @model_validator(mode="after")
+    def weights(self):
+        if self.target_weights is not None:
+            if not self.target_weights:
+                raise ValueError("Use null for saved targets, or provide explicit weights")
+            if len(self.target_weights) > 100 or any(
+                not key.strip() or len(key) > 100 or not 0 <= value <= 1
+                for key, value in self.target_weights.items()
+            ):
+                raise ValueError("Invalid target weights")
+            if abs(sum(self.target_weights.values()) - 1) > 1e-6:
+                raise ValueError("Target weights must sum to one")
+        return self
 
 
 class BriefBody(OperationBody):

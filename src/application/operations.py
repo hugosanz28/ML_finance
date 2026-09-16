@@ -7,7 +7,7 @@ from typing import Any
 
 from src.application.agents import RunMonthlyAgentsRequest, RunMonthlyAgentsUseCase
 from src.application.benchmarks import RefreshBenchmarksRequest, RefreshBenchmarksUseCase
-from src.application.artifact_reads import _safe_payload
+from src.application.artifact_reads import _safe_payload, resolve_report_path
 from src.application.contribution_lab import SimulateContributionRequest, SimulateContributionUseCase
 from src.application.degiro import ImportDegiroRequest, ImportDegiroUseCase
 from src.application.market_data import RefreshFxRequest, RefreshFxUseCase, RefreshMarketDataRequest, RefreshMarketDataUseCase
@@ -110,7 +110,17 @@ class ExecuteOperationUseCase:
             output = ImportDegiroUseCase(settings=self.settings).execute(ImportDegiroRequest())
         elif operation == "refresh":
             dates = {key: date.fromisoformat(values[key]) if values.get(key) else None for key in ("start_date", "end_date")}
-            fx = RefreshFxUseCase(settings=self.settings).execute(RefreshFxRequest(provider=values["fx_provider"], **dates))
+            scope = values.get("scope", "both")
+            if scope == "prices":
+                output = RefreshMarketDataUseCase(settings=self.settings).execute(RefreshMarketDataRequest(
+                    provider=values["price_provider"], write_overrides_template=False, **dates,
+                ))
+                return self._result(output.result)
+            fx = RefreshFxUseCase(settings=self.settings).execute(RefreshFxRequest(
+                provider=values["fx_provider"], only_missing_base=values.get("only_missing_base", False), **dates,
+            ))
+            if scope == "fx":
+                return self._result(fx.result)
             progress(50, "refresh_prices")
             prices = RefreshMarketDataUseCase(settings=self.settings).execute(RefreshMarketDataRequest(
                 provider=values["price_provider"], write_overrides_template=False, **dates,
@@ -136,6 +146,12 @@ class ExecuteOperationUseCase:
             output = SimulateContributionUseCase(settings=self.settings).execute(SimulateContributionRequest(**values))
             return _safe_payload(output.to_dict(), self.settings)
         elif operation == "agents":
+            report_id = values.pop("report_id", None)
+            if report_id is not None:
+                values["monthly_report_path"] = resolve_report_path(report_id, self.settings)
+            weights = values.pop("target_weights", None)
+            if weights is not None:
+                values["request_parameters"] = {"target_weights": weights}
             output = RunMonthlyAgentsUseCase(settings=self.settings).execute(RunMonthlyAgentsRequest(**values))
         elif operation == "brief":
             current = ReadInvestmentBriefUseCase(settings=self.settings).execute()

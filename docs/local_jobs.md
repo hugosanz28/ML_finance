@@ -1,8 +1,8 @@
 # Operaciones y jobs locales
 
 La #54 anade operaciones a FastAPI sobre casos de uso existentes. No ejecuta
-ordenes de inversion. Streamlit y los CLI siguen disponibles, pero no deben
-escribir al mismo tiempo que la API sobre el mismo entorno.
+ordenes de inversion. Los CLI siguen disponibles, pero no deben escribir
+al mismo tiempo que la API sobre el mismo entorno.
 
 ## Activacion explicita
 
@@ -27,7 +27,7 @@ python scripts/run_api.py --env-file demo/synthetic_config/.env.demo --operation
 
 Ambos siguen escuchando solo en `127.0.0.1`. Usar **una sola instancia operativa**
 por entorno; el bloqueo de sistema operativo rechaza una segunda. No usar
-workers multiples de Uvicorn ni ejecutar importaciones/refresh de Streamlit o
+workers multiples de Uvicorn ni ejecutar importaciones/refresh de
 CLI simultaneamente. El bloqueo de la API no coordina esos programas legacy.
 
 - Real: solo escribe en `src/data/local/` y `src/degiro_exports/local/` dentro
@@ -90,11 +90,11 @@ financiero final. Consultar `/jobs/{job_id}` hasta un estado terminal.
 | --- | --- |
 | POST `/degiro/uploads` | `uploaded_at` ISO y `uploads`: lista de `filename` + `content_base64` |
 | POST `/degiro/import` | Ninguno; importa el incoming configurado |
-| POST `/market-data/refresh` | `fx_provider` y `price_provider` obligatorios; `start_date`/`end_date` opcionales |
+| POST `/market-data/refresh` | `fx_provider` y `price_provider` obligatorios; `start_date`/`end_date`, `scope=both|fx|prices`, `only_missing_base=false` opcionales |
 | POST `/benchmarks/refresh` | Solo real; `provider: "yfinance_ecb"`, `start_date` y `end_date` obligatorios, fechas anteriores a hoy |
 | POST `/reports/monthly` | `as_of_date` opcional |
 | POST `/portfolio/contributions/simulate` | `contribution_amount`, `allow_fractional_units`, `minimum_order_value`, `max_orders`, `as_of_date` opcionales |
-| POST `/agents/monthly-runs` | `llm_provider=static`, `search_provider=null`, presupuesto `monthly_budget` e interes `user_satellite_interest` opcionales |
+| POST `/agents/monthly-runs` | `llm_provider=static`, `search_provider=null`, presupuesto `monthly_budget`, interes `user_satellite_interest`, `report_id`, `investment_brief_text` y `target_weights` opcionales |
 | PUT `/settings/investment-brief` | `content` y `expected_previous_hash` obligatorios |
 | PUT `/settings/portfolio-targets` | `portfolio_targets` como objeto y `expected_previous_hash` obligatorios |
 | GET `/settings/investment-brief` | Texto, existencia y hash; sin path |
@@ -102,6 +102,13 @@ financiero final. Consultar `/jobs/{job_id}` hasta un estado terminal.
 | GET `/jobs` | Query `limit`, default 20, entre 1 y 100 |
 | GET `/jobs/{job_id}` | Estado de un job, o 404 |
 | POST `/jobs/{job_id}/retry` | Confirmacion/entorno; clave nueva; solo simulaciones fallidas |
+
+Los controles de agentes por run aceptan
+`report_id` (mismos IDs contenidos que GET), `investment_brief_text` (hasta
+65.536 caracteres) y `target_weights` (objeto no vacio, hasta 100 claves de
+100 caracteres, decimales finitos en [0,1] que sumen 1). `null` usa los defaults
+guardados. No sobrescriben brief/targets ni aceptan snapshots de cartera o
+informes editados. Se resuelven en el worker y conservan el preflight.
 
 El frontend puede convertir archivos CSV a base64; no hay multipart ni una
 dependencia nueva para uploads. Maximo 5 archivos, 5 MiB por archivo, 10 MiB

@@ -97,13 +97,21 @@ class ReadReportUseCase:
         self.settings = settings
 
     def execute(self, request: ReadArtifactRequest) -> ArtifactReadResult:
-        report_id = _identifier(request.artifact_id)
-        if not _monthly_id(report_id):
-            raise FileNotFoundError("Report not found")
-        path = _contained(self.settings.reports_dir / f"{report_id}.md", self.settings.reports_dir)
+        report_id = request.artifact_id
+        path = resolve_report_path(report_id, self.settings)
         return ArtifactReadResult({
             "report_id": report_id, "content_markdown": _safe_payload(path.read_text(encoding="utf-8"), self.settings),
         })
+
+
+def resolve_report_path(report_id: str, settings: Settings) -> Path:
+    """Resolve the same contained ID for both reads and agent execution."""
+    if not _monthly_id(_identifier(report_id)):
+        raise FileNotFoundError("Report not found")
+    path = _contained(settings.reports_dir / f"{report_id}.md", settings.reports_dir)
+    if not path.is_file():
+        raise FileNotFoundError("Report not found")
+    return path
 
 
 class ReadAgentAuditUseCase:

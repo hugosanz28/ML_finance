@@ -24,7 +24,7 @@ Artefactos relevantes ya en uso:
 - `portfolio_targets.yaml`: objetivos privados de cartera, pesos objetivo,
   aportacion mensual, limites de concentracion y `asset_bucket_mapping` exacto
   para asociar `asset_id` o ISIN con un bucket objetivo. Hay un ejemplo
-  versionado en `sample/portfolio_targets.example.yaml`. Streamlit lo lee y
+  versionado en `sample/portfolio_targets.example.yaml`. La API lo lee y
   actualiza mediante los casos de uso estructurados de `src/application/`, no
   como YAML libre.
 - `investment_brief.md`: mandato narrativo privado de la cuenta. Hay un ejemplo

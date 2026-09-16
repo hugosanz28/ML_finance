@@ -1,7 +1,6 @@
 # Application layer
 
-`src/application/` contiene casos de uso reutilizables por scripts, Streamlit y
-una futura API o aplicacion de escritorio.
+`src/application/` contiene casos de uso reutilizables por scripts y FastAPI local.
 
 Esta capa no implementa calculos financieros nuevos. Coordina modulos ya
 existentes, normaliza entradas/salidas y devuelve resultados estructurados para
@@ -81,7 +80,7 @@ Ver los payloads y rutas HTTP previstas en [contratos API](../../docs/api_contra
 Tests: `tests/test_analytics_application.py` y `tests/test_interface_boundaries.py`.
 
 Las migraciones deben ser progresivas: primero se anade el wrapper, despues se
-adapta el script o la vista de Streamlit correspondiente.
+adapta el script o el endpoint correspondiente.
 
 ## Quality checks
 
@@ -95,8 +94,7 @@ de posiciones valoradas y alineacion de fechas entre metricas, informe mensual y
 
 `RunMonthlyAgentsUseCase` envuelve `src.agents.pipeline.run_monthly_agent_pipeline`
 y devuelve un `ApplicationResult` con estado agregado, warnings y artefactos
-principales (`run_id`, `as_of_date`, `output_dir`). Scripts, Streamlit y futuras
-interfaces deben usar este caso de uso en vez de llamar directamente al pipeline.
+principales (`run_id`, `as_of_date`, `output_dir`). Scripts y API deben usar este caso de uso en vez de llamar directamente al pipeline.
 El caso de uso ejecuta siempre el preflight antes de construir providers. Un
 bloqueo devuelve `pipeline_result=None` y, con `persist=True`, guarda
 `preflight.json` junto con `run_metadata.json`; un warning permite continuar y
@@ -110,7 +108,7 @@ JSON estricto, cobertura y muestra antes de entrar en el pipeline. El contrato,
 limites y reparto por agente estan en [analitica de agentes](../../docs/agent_analytics.md).
 
 `ListAgentRunsUseCase` y `GetAgentRunAuditUseCase` exponen read models de la
-auditoria persistida en disco. Streamlit los usa para visualizar plan interno,
+auditoria persistida en disco. React los consulta por API para visualizar plan interno,
 acciones, fuentes, prompts, warnings, inputs y outputs sin acoplar la UI a la
 estructura fisica de carpetas.
 
@@ -122,7 +120,7 @@ no existian se devuelven como no disponibles y nunca se escriben durante una
 consulta.
 
 La capa de aplicacion no debe exponer credenciales al adaptar esta metadata para
-Streamlit o una futura API. La configuracion de provider procede de una lista
+las interfaces. La configuracion de provider procede de una lista
 permitida y los artefactos completos siguen siendo privados aunque contengan
 solo hashes o providers offline.
 
@@ -179,9 +177,8 @@ recuperacion, limites y concurrencia. Las peticiones de consulta financieras
 se rechazan temporalmente durante una operacion; polling usa otro bloqueo y
 sigue disponible. No anadir reintentos automaticos de operaciones con efectos.
 
-La nota `docs/architecture_v2.md` define que una futura API FastAPI deberia
-entrar por esta capa. El roadmap v2 contempla FastAPI local y React +
-TypeScript + Vite; estos contratos preparan la migracion manteniendo Streamlit operativo.
+FastAPI entra por esta capa y React consume sus contratos. Streamlit se ha
+retirado; ver [migracion](../../docs/react_migration.md).
 
 La API de lectura ya usa esta capa; ver [API local](../../docs/local_api.md).
 `GetPortfolioStateUseCase(persist=False)` usa DuckDB read-only y traduce falta
@@ -195,7 +192,6 @@ Los contratos HTTP estan en `docs/api_contracts.md`. Si un contrato necesita log
 en esta capa, primero debe crearse el caso de uso correspondiente aqui y despues
 adaptar la interfaz.
 
-La v1 de Streamlit ya usa esta capa para acciones operativas y read models
-principales. Los modulos `dashboard_*` pueden mantener transformaciones visuales
-y composicion UI, pero no deberian llamar directamente a importadores, reports,
-agentes o repositorios cuando exista un caso de uso equivalente aqui.
+`dashboard.py` conserva read models compartidos por compatibilidad; no importa
+Streamlit. Las interfaces no deben llamar directamente a importadores, informes,
+agentes o repositorios si existe un caso de uso equivalente.

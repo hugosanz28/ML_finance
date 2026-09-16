@@ -79,6 +79,6 @@ Su subida a LinkedIn/GitHub es manual; generar el archivo no cambia esos perfile
 
 ## Estado del producto
 
-V1: Streamlit disponible. V2: React/FastAPI local con analitica y operaciones
-opt-in. Futuro: revisar paridad y retirada de Streamlit (#58); un despliegue
+V1: historica, conservada en Git. V2: React/FastAPI local con analitica y operaciones
+opt-in; [migracion #58](react_migration.md). Un despliegue
 publico o multiusuario no esta implementado ni habilitado por esta demo.

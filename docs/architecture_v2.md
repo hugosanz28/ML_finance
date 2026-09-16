@@ -5,8 +5,9 @@
 > de analitica (#55) ya estan implementados; ver [API local](local_api.md),
 > [frontend](../frontend/README.md) y [decision de producto](roadmap.md).
 > El resto de esta nota conserva la exploracion historica de alternativas:
-> Angular y aplazar FastAPI ya no son decisiones vigentes. Streamlit se retira
-> solo tras paridad funcional con la nueva UI.
+> Angular y aplazar FastAPI ya no son decisiones vigentes. Streamlit se ha
+> retirado en #58: [migracion y diferencias](react_migration.md). Todo lo que
+> sigue es un registro historico, no instrucciones operativas actuales.
 
 ## Objetivo
 

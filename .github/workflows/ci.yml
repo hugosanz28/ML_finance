@@ -153,6 +153,7 @@ jobs:
           if (-not $wheel) {
             throw "Wheel not found under dist/"
           }
+          python -c "import sys,zipfile; z=zipfile.ZipFile(sys.argv[1]); assert not any(n.startswith('src/portfolio/dashboard') for n in z.namelist()); m=z.read(next(n for n in z.namelist() if n.endswith('/METADATA'))).decode().lower(); assert 'requires-dist: streamlit' not in m and 'requires-dist: altair' not in m" $wheel.FullName
           python -m pip install --force-reinstall --no-deps $wheel.FullName
           Push-Location $env:RUNNER_TEMP
           try {

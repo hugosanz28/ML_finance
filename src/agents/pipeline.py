@@ -1,4 +1,4 @@
-"""Reusable monthly agent pipeline for CLI and Streamlit."""
+"""Reusable monthly agent pipeline for CLI and application adapters."""
 
 from __future__ import annotations
 
@@ -288,7 +288,7 @@ def _request_for_context(request: AgentRequest, context: AgentContext) -> AgentR
 
 
 def build_portfolio_metrics_snapshot(metrics: PortfolioMetricsResult, *, as_of_date: date) -> dict[str, Any]:
-    """Build the compact metrics payload consumed by agents and Streamlit."""
+    """Build the compact metrics payload consumed by agents and interfaces."""
     daily = metrics.portfolio_daily_metrics.copy()
     daily["valuation_date"] = pd.to_datetime(daily["valuation_date"]).dt.date
     positions = metrics.position_metrics.copy()

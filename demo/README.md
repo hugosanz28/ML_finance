@@ -3,8 +3,8 @@
 Esta carpeta permite ensenar el proyecto sin usar datos personales. Todos los
 CSV, objetivos y brief incluidos aqui son ficticios.
 
-La demo permite recorrer la **v2 local React/FastAPI** y la v1 Streamlit que
-sigue disponible. Ambas usan datos ficticios, nunca la cartera real.
+La demo permite recorrer la **v2 local React/FastAPI** con datos ficticios,
+nunca la cartera real.
 
 ## Demo v2 recomendada
 
@@ -38,15 +38,7 @@ demo/local_data/
 `demo/local_data/` se genera localmente y esta ignorado por Git. No se mezcla
 con `src/data/local/`.
 
-## Preparar demo v1 (Streamlit)
-
-Desde la raiz del repo:
-
-```powershell
-.\scripts\run_demo.ps1
-```
-
-Ese comando prepara la demo y abre Streamlit. Si quieres separar los pasos:
+## Preparar los datos sin abrir servidores
 
 ```powershell
 $env:ML_FINANCE_ENV_FILE="demo/synthetic_config/.env.demo"
@@ -65,38 +57,11 @@ externos.
 La demo incluye tambien la seleccion MSCI World, S&P 500, cartera 60/40 y
 efectivo €STR. `SyntheticBenchmarkProvider` genera esas referencias y el FX
 necesario de forma determinista y sin red. React ya muestra estas referencias
-con sus limites; Streamlit no incorpora la nueva vista de benchmarks.
+con sus limites.
 
-Para ensenar la interfaz v1 conservada:
-
-```powershell
-.\scripts\run_demo.ps1
-```
-
-## Abrir dashboard demo
-
-Si ya has ejecutado el bootstrap y no quieres regenerar datos:
-
-```powershell
-.\scripts\run_demo.ps1 -SkipBootstrap
-```
-
-Alternativa manual:
-
-```powershell
-$env:ML_FINANCE_ENV_FILE="demo/synthetic_config/.env.demo"
-.\.venv\Scripts\python.exe -m streamlit run src\portfolio\dashboard.py
-```
-
-Abre `http://localhost:8501`. En la pestana `Agentes`, usa:
-
-- `LLM provider`: `static`
-- `Search provider`: `static`
-
-Asi no se usan claves API ni red y el monitor recibe resultados sinteticos para
-mostrar el flujo completo. `static/null` tambien es offline, pero se reserva
-como baseline: no genera contexto de busqueda y el monitor puede quedar
-`partial`.
+En Operaciones → Agentes, `static/null` es el baseline offline. Selecciona
+`static/static` solo si quieres resultados de busqueda sinteticos; no son
+hechos reales de mercado. No hacen falta API keys.
 
 En la demo puedes mostrar:
 
@@ -129,10 +94,11 @@ En la misma terminal, elimina la variable de entorno:
 Remove-Item Env:\ML_FINANCE_ENV_FILE
 ```
 
-O abre una terminal nueva y ejecuta el dashboard normal:
+Deten primero la API demo. En una terminal nueva ejecuta la API real y usa
+la misma UI React (puerto 5173):
 
 ```powershell
-.\.venv\Scripts\python.exe -m streamlit run src\portfolio\dashboard.py
+.\.venv\Scripts\python.exe scripts/run_api.py --operations real
 ```
 
 ## Datos incluidos

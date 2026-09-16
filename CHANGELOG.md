@@ -6,7 +6,17 @@ proyecto usa [versionado semántico](https://semver.org/lang/es/).
 
 ## [Sin publicar]
 
+### Retirado
+
+- Streamlit y Altair (#58), vistas y launchers exclusivos, tras migrar los
+  flujos a React/FastAPI. Sin cambios en datos privados ni esquemas del almacen.
+  Ver `docs/react_migration.md` para paridad, diferencias y recuperacion.
+
 ### Añadido
+
+- Evolucion por activo en React (precio de valoracion, no retorno total),
+  aviso de snapshots pendientes, refresh separado FX/precios y controles
+  por run de informe, brief y pesos validados para agentes.
 
 - Showcase v2 (#57): README visual, capturas y video de la API/UI reales con
   datos sinteticos, portada editorial, caso de estudio y regeneracion offline en CI.

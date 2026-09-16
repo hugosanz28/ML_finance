@@ -3,8 +3,6 @@ from src.config import default_repo_root
 
 COMMAND_SCRIPTS = (
     "test.ps1",
-    "run_dashboard.ps1",
-    "run_demo.ps1",
     "refresh_market_data.ps1",
 )
 
@@ -25,10 +23,21 @@ def test_development_command_scripts_are_documented() -> None:
         assert script_name in scripts_readme
 
 
-def test_demo_command_uses_synthetic_env_file() -> None:
-    repo_root = default_repo_root()
-    content = (repo_root / "scripts" / "run_demo.ps1").read_text(encoding="utf-8")
-
+def test_react_demo_commands_use_synthetic_configuration() -> None:
+    content = (default_repo_root() / "README.md").read_text(encoding="utf-8")
     assert "demo/synthetic_config/.env.demo" in content
-    assert "scripts\\bootstrap_demo.py" in content
-    assert "src\\portfolio\\dashboard.py" in content
+    assert "scripts/bootstrap_demo.py" in content
+    assert "scripts/run_api.py" in content
+    assert "--operations demo" in content
+    assert "npm run dev" in content
+
+
+def test_retired_ui_is_not_a_runtime_dependency_or_entrypoint() -> None:
+    import tomllib
+
+    repo = default_repo_root()
+    config = tomllib.loads((repo / "pyproject.toml").read_text(encoding="utf-8"))
+    requirements = config["project"]["dependencies"]
+    assert not any(item.startswith(("streamlit", "altair")) for item in requirements)
+    assert not list((repo / "src/portfolio").glob("dashboard*.py"))
+    assert (repo / "src/application/dashboard.py").exists()  # Shared use cases remain.

@@ -2,18 +2,21 @@
 
 from __future__ import annotations
 
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field
 from datetime import date
 from typing import Any
 
 from src.application.serialization import json_ready_value
+from src.application.dashboard import GetPendingDegiroImportStatusUseCase
 from src.config import Settings, get_settings
 from src.market_data.repository import DuckDBMarketDataRepository
 from src.portfolio.metrics_models import PortfolioDataUnavailableError
 from src.portfolio import (
     calculate_portfolio_metrics_from_normalized_degiro,
     load_normalized_degiro_snapshots,
+    load_normalized_degiro_transactions,
 )
+from src.portfolio.asset_history import project_asset_history
 from src.portfolio.contributions import net_external_contributions_until
 from src.portfolio.state_projection import project_portfolio_state
 
@@ -39,6 +42,7 @@ class GetPortfolioStateResult:
     positions: list[dict[str, str | int | float | bool | None]]
     history: list[dict[str, str | int | float | bool | None]]
     data_quality: dict[str, list[str]]
+    asset_history: list[dict[str, Any]] = field(default_factory=list)
 
     def to_dict(self) -> dict[str, Any]:
         """Return a JSON-serializable representation for HTTP or CLI adapters."""
@@ -84,6 +88,9 @@ class GetPortfolioStateUseCase:
             repository=repository,
         )
 
+        warnings = list(projection.warnings)
+        if GetPendingDegiroImportStatusUseCase(settings=self.settings).execute().pending_portfolio_files:
+            warnings.append("pending_portfolio_import")
         return GetPortfolioStateResult(
             as_of_date=projection.as_of_date.isoformat(),
             base_currency=metrics.base_currency,
@@ -91,7 +98,11 @@ class GetPortfolioStateUseCase:
             broker_snapshot=json_ready_value(projection.broker_snapshot),
             positions=json_ready_value(list(projection.positions)),
             history=json_ready_value(list(projection.history)),
-            data_quality={"warnings": list(projection.warnings)},
+            data_quality={"warnings": warnings},
+            asset_history=project_asset_history(
+                metrics.position_metrics, load_normalized_degiro_transactions(settings=self.settings),
+                as_of_date=projection.as_of_date,
+            ) if resolved_request.include_history else [],
         )
 
 

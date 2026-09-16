@@ -49,6 +49,20 @@ test("monthly workflow uses the real local API, only synthetic copies and no ext
   await expect(
     page.getByText("DEMO SINTÉTICA · No subas datos reales"),
   ).toBeVisible();
+  await page
+    .getByRole("button", { name: "Riesgo y activos", exact: true })
+    .click();
+  await page
+    .getByText("Riesgo avanzado de cartera y activos", { exact: true })
+    .click();
+  await expect(
+    page.getByLabel("Activo para consultar evolución").locator("option"),
+  ).not.toHaveCount(0);
+  await expect(
+    page.getByRole("img", {
+      name: /Evolución del precio de valoración por activo/,
+    }),
+  ).toBeVisible();
   await page.getByRole("button", { name: "Operaciones", exact: true }).click();
   await page.getByLabel("Exportaciones CSV").setInputFiles(fixtures);
   await page
@@ -94,6 +108,17 @@ test("monthly workflow uses the real local API, only synthetic copies and no ext
   ).toBeEnabled();
   await execute(page, "Revisar objetivos", "targets");
   await page.getByRole("button", { name: "Agentes", exact: true }).click();
+  await page.getByText("Entradas avanzadas de esta ejecución").click();
+  await expect(
+    page.getByRole("combobox", { name: "Informe mensual", exact: true }).locator("option"),
+  ).toHaveCount(2);
+  await page
+    .getByRole("combobox", { name: "Informe mensual", exact: true })
+    .selectOption({ index: 1 });
+  await page.getByLabel("Objetivos para esta ejecución").selectOption("custom");
+  await page
+    .getByLabel("Pesos personalizados (decimales, suma 1)")
+    .fill('{"core_global_equity":0.8,"cash":0.2}');
   await execute(page, "Revisar ejecución de agentes", "agents");
   await page.getByRole("button", { name: "Actualizar historial" }).click();
   await expect(
@@ -116,11 +141,25 @@ test("monthly workflow uses the real local API, only synthetic copies and no ext
   );
   expect(digest()).toEqual(before);
   expect(external).toEqual([]);
-  await page.getByRole("button", {name: "Datos", exact: true}).click();
+  await page.getByRole("button", { name: "Datos", exact: true }).click();
   await page.keyboard.press("Control+Home");
-  await page.screenshot({path: "test-results/operations-desktop.png", fullPage: true});
-  await page.setViewportSize({width: 390, height: 844});
-  await expect(page.getByRole("button", {name: "Revisar importación"})).toBeVisible();
-  expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true);
-  await page.screenshot({path: "test-results/operations-mobile.png", fullPage: true});
+  await page.screenshot({
+    path: "test-results/operations-desktop.png",
+    fullPage: true,
+  });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect(
+    page.getByRole("button", { name: "Revisar importación" }),
+  ).toBeVisible();
+  expect(
+    await page.evaluate(
+      () =>
+        document.documentElement.scrollWidth <=
+        document.documentElement.clientWidth,
+    ),
+  ).toBe(true);
+  await page.screenshot({
+    path: "test-results/operations-mobile.png",
+    fullPage: true,
+  });
 });

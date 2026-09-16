@@ -7,8 +7,8 @@ cartera DEGIRO: importar exportaciones, entender resultados y riesgos, simular
 una aportacion y consultar agentes con trazabilidad para la revision manual.
 
 **Hoy:** v2 local con **React + TypeScript + Vite / FastAPI / Python / DuckDB**.
-La release etiquetada `v0.1.0` corresponde a la v1; Streamlit sigue disponible
-hasta verificar su retirada (#58). **No hay servicio publico desplegado**:
+La release etiquetada `v0.1.0` corresponde a la v1 historica; Streamlit se ha
+retirado en #58. **No hay servicio publico desplegado**:
 el repositorio es publico, los datos del usuario no.
 
 > [!IMPORTANT]
@@ -122,11 +122,10 @@ agentes. Las escrituras usan confirmacion, idempotencia y un unico worker local.
 
 Para usar datos reales, sigue [la guia de API](docs/local_api.md) y
 [operaciones locales](docs/local_jobs.md). No mezcles escrituras de CLI,
-Streamlit y el worker. Los CSV, bases, informes y auditorias reales quedan en
+y el worker. Los CSV, bases, informes y auditorias reales quedan en
 rutas ignoradas por Git; consulta [privacidad](docs/privacy.md) antes de compartir.
 
-Streamlit permanece disponible con `.\scripts\run_dashboard.ps1`;
-su demo con `.\scripts\run_demo.ps1`. Ver [guia v1](docs/streamlit_dashboard.md).
+Si venias de la v1, consulta la [migracion a React](docs/react_migration.md).
 Publicar una aplicacion multiusuario requiere trabajo adicional de seguridad,
 aislamiento y despliegue; no forma parte de esta demo local.
 
@@ -142,7 +141,7 @@ consulta [scripts](scripts/README.md); no lo ejecutes mientras el worker escribe
   [riesgo](docs/risk_analytics.md): formulas, cobertura y limites.
 - [Pipeline mensual](docs/monthly_pipeline.md), [agentes](src/agents/README.md)
   y [paridad React](docs/react_operations.md): flujo y auditoria.
-- [Arquitectura de dominio/v1](docs/architecture.md), [API](docs/local_api.md)
+- [Arquitectura actual](docs/architecture.md), [API](docs/local_api.md)
   y [roadmap](docs/roadmap.md): presente y siguientes pasos.
 - [CONTRIBUTING](CONTRIBUTING.md): `requirements-dev.txt`, tests, cobertura,
   lint, tipos, secretos, build y auditoria de dependencias.

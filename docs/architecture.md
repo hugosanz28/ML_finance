@@ -20,13 +20,11 @@ El proyecto debe ser útil para uso personal real y, al mismo tiempo, publicable
 
 ### `src/application/`
 
-Contiene casos de uso reutilizables por scripts, Streamlit y una futura API o
-aplicacion de escritorio. Esta capa coordina servicios existentes y devuelve
+Contiene casos de uso reutilizables por scripts y FastAPI local. Esta capa coordina servicios existentes y devuelve
 resultados estructurados; no debe duplicar calculos financieros ni contener
 logica de interfaz.
 
-La v1 de Streamlit consume esta capa tanto para acciones operativas como para
-read models principales del dashboard. Una futura API debe mantener la misma
+FastAPI consume esta capa para lecturas y operaciones opt-in. Mantener la
 regla: endpoints finos que llamen a `src/application/`, no a detalles internos
 de `src/portfolio/`, `src/reports/` o `src/agents/`.
 
@@ -49,7 +47,7 @@ Fronteras ya disponibles:
 Las acciones operativas devuelven `ApplicationResult`. Los read models
 destinados a adaptadores externos, como estado de cartera y requisitos FX,
 usan resultados serializables y no exponen `DataFrame`, `Path` ni objetos
-internos de dominio a una futura API.
+internos de dominio a la API.
 
 ### `src/degiro_exports/`
 
@@ -93,9 +91,9 @@ Estado actual de esta capa:
 - planificacion determinista `contributions_only` en
   `contribution_planner.py`, limitada a posiciones actuales valoradas y
   mapeadas,
-- y una base directa para reporting y Streamlit.
+- y una base directa para reporting y API.
 
-Responsable de reconstrucción histórica de posiciones, métricas agregadas e interfaz de Streamlit.
+Responsable de reconstrucción histórica de posiciones, métricas agregadas, sin interfaz grafica.
 
 ### `src/analytics/`
 
@@ -117,7 +115,7 @@ DEGIRO exports
     -> metricas ancladas a snapshots DEGIRO
     -> simulacion de aportacion / informes
     -> agentes
-    -> Streamlit
+    -> application -> FastAPI local -> React
 ```
 
 ## Modelo de almacenamiento actual
@@ -138,39 +136,20 @@ Entidades mínimas previstas:
 - `fx_rates`
 - `reports_history`
 
-## Streamlit
+## React y FastAPI locales
 
-La primera interfaz se mantendrá simple y local. El objetivo no es hacer una aplicación final desde el primer día, sino una consola visual útil para:
+React + TypeScript + Vite vive en `frontend/`; FastAPI en `src/api/`.
+Lecturas sin escrituras ni proveedores; operaciones opt-in con confirmacion,
+idempotencia y un worker por workspace. React presenta valores del servidor,
+no calcula rentabilidad ni guarda cartera en localStorage.
 
-- ver la asignación actual,
-- revisar evolución histórica,
-- refrescar FX y precios hasta hoy desde la vista general,
-- consultar cambios recientes,
-- y abrir los informes generados.
+Entradas: `scripts/run_api.py` y `npm run dev` desde `frontend/`.
+Ver [UI](../frontend/README.md), [API](local_api.md), [jobs](local_jobs.md)
+y [contratos](api_contracts.md). Streamlit y Altair se retiran en #58;
+[paridad, diferencias y recuperacion](react_migration.md).
 
-Punto de entrada previsto:
-
-```text
-src/portfolio/dashboard.py
-```
-
-`dashboard.py` actua como entrypoint y navegacion. Las pestanas viven en modulos
-especificos (`dashboard_overview.py`, `dashboard_contribution_lab.py`,
-`dashboard_reports.py`, `dashboard_data_update.py`, `dashboard_agents.py`) y los
-helpers compartidos en `dashboard_common.py`. Esta separacion reduce
-acoplamiento antes de una posible interfaz web futura.
-
-## Direccion v2
-
-La direccion tecnica para una futura v2 esta documentada en
-`docs/architecture_v2.md`. La decision actual es no migrar todavia: Streamlit
-sigue siendo la interfaz adecuada para consolidar la v1, mientras
-`src/application/` prepara el camino para una posible API FastAPI y un frontend
-Angular mas adelante.
-
-Antes de implementar FastAPI, los contratos previstos de lectura/escritura viven
-en `docs/api_contracts.md`. Sirven para estabilizar que datos necesita una UI
-futura y que casos de uso deben existir en `src/application/`.
+La exploracion de alternativas en [arquitectura v2](architecture_v2.md) es
+historica: no describe decisiones pendientes ni un despliegue publico.
 
 ## Agentes
 

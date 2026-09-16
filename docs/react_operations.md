@@ -2,7 +2,8 @@
 
 La UI mantiene la analitica de #55 y anade una zona **Operaciones**, con pasos
 manuales. La API ejecuta casos de uso existentes: no hay calculos financieros
-nuevos en el navegador ni ejecucion de ordenes. Streamlit no se retira aqui.
+nuevos en el navegador ni ejecucion de ordenes. React sustituye a Streamlit en #58;
+ver [migracion y diferencias intencionales](react_migration.md).
 
 ## Activacion y entorno
 
@@ -32,10 +33,10 @@ datos privados. Para capturas usar exclusivamente fixtures sinteticas conocidas.
 | Auditoria | Agentes; preflight, metadata, contexto/acciones/fuentes, prompts, providers, raw/output y hashes desplegables | E2E schema v2 + componente legacy |
 | Estado de operaciones | Ejecuciones; progreso por etapas, avisos, errores y resultado | Componentes + jobs/API |
 
-El monitor aislado y utilidades de diagnostico exclusivas de Streamlit no se
-anaden como nuevos endpoints en #56. Antes de #58 se debe decidir su destino;
-esta matriz cubre los flujos operativos acordados en #56, no autoriza aun borrar
-Streamlit. El editor de targets es avanzado; no se inventan categorias ni mappings.
+La paridad de #58 incluye evolucion por activo, aviso de snapshots pendientes,
+refresh separado y controles de ejecucion de agentes. El monitor aislado queda
+como CLI y los diagnosticos permanecen en application; ver la matriz de
+diferencias de la migracion. El editor de targets sigue siendo avanzado.
 
 ## Confirmacion, duplicados y conflictos
 
