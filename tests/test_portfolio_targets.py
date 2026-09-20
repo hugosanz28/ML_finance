@@ -124,7 +124,7 @@ def test_portfolio_targets_normalizes_valid_asset_bucket_mapping() -> None:
         "degiro:cash:eur": "cash",
     }
     assert targets.to_storage_mapping()["asset_bucket_mapping"] == targets.asset_bucket_mapping
-    assert "asset_bucket_mapping" not in targets.to_agent_payload()
+    assert targets.to_agent_payload()["asset_bucket_mapping"] == targets.asset_bucket_mapping
 
 
 @pytest.mark.parametrize(

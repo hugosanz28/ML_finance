@@ -135,20 +135,20 @@ def run_monthly_agent_pipeline(
         constraints=dict(request_constraints or {}),
         metadata=dict(request_metadata or {}),
     )
-    # Snapshot prompts before execution so the audit cannot drift if files change mid-run.
-    prompt_audits = {
-        agent_name: {
-            "prompt_refs": {
-                "schema_version": AUDIT_SCHEMA_VERSION,
-                **_agent_prompt_refs(agent_name),
-            },
-            "prompt_rendered": _agent_prompt_markdown(agent_name),
-        }
-        for agent_name in _agent_prompt_keys()
-    }
-
     monitor_search_provider = _build_search_provider(search_provider)
     monitor_llm_provider = _build_monitor_llm_provider(llm_provider)
+    analista_llm_provider = _build_asset_llm_provider(llm_provider)
+    asistente_llm_provider = _build_contribution_llm_provider(llm_provider)
+    # Audit only prompts actually consumed by the selected provider.
+    prompt_audits = {
+        agent_name: _prompt_audit_snapshot(agent_name, provider.name)
+        for agent_name, provider in (
+            ("monitor_tematico", monitor_llm_provider),
+            ("analista_activos", analista_llm_provider),
+            ("asistente_aportacion_mensual", asistente_llm_provider),
+        )
+    }
+
     monitor_agent = MonitorTematicoAgent(
         search_provider=monitor_search_provider,
         llm_provider=monitor_llm_provider,
@@ -166,7 +166,6 @@ def run_monthly_agent_pipeline(
     monitor_result = monitor_agent.execute(monitor_request, monitor_context)
 
     monitor_ref = _result_input_ref("monitor_tematico_result", "Monitor tematico result", monitor_result)
-    analista_llm_provider = _build_asset_llm_provider(llm_provider)
     analista_agent = AnalistaActivosAgent(llm_provider=analista_llm_provider)
     analista_context = build_agent_context(
         agent_name=analista_agent.name,
@@ -181,7 +180,6 @@ def run_monthly_agent_pipeline(
     analista_result = analista_agent.execute(analista_request, analista_context)
 
     analista_ref = _result_input_ref("analista_activos_result", "Analista activos result", analista_result)
-    asistente_llm_provider = _build_contribution_llm_provider(llm_provider)
     asistente_agent = AsistenteAportacionMensualAgent(llm_provider=asistente_llm_provider)
     asistente_context = build_agent_context(
         agent_name=asistente_agent.name,
@@ -277,12 +275,43 @@ def _analytics_refs(snapshot, agent_name, as_of_date):
 
 
 def _request_for_context(request: AgentRequest, context: AgentContext) -> AgentRequest:
-    """Bind one request to the exact input references available to the agent."""
+    """Bind a request to inputs the implementation actually consumes."""
+    consumed_by_agent = {
+        "monitor_tematico": {
+            "investment_brief",
+            "latest_monthly_report",
+            "watchlist_candidates",
+            "user_satellite_interest",
+        },
+        "analista_activos": {
+            "investment_brief",
+            "latest_monthly_report",
+            "portfolio_metrics_snapshot",
+            ANALYTICS_INPUT_KEY,
+            "watchlist_candidates",
+            "user_satellite_interest",
+            "monitor_tematico_result",
+        },
+        "asistente_aportacion_mensual": {
+            "investment_brief",
+            "latest_monthly_report",
+            "portfolio_metrics_snapshot",
+            ANALYTICS_INPUT_KEY,
+            "target_weights",
+            "user_satellite_interest",
+            "monitor_tematico_result",
+            "analista_activos_result",
+        },
+    }
+    consumed_keys = consumed_by_agent.get(context.agent_name, set(context.available_input_keys))
     return AgentRequest(
         scope=dict(request.scope),
         parameters=dict(request.parameters),
         constraints=dict(request.constraints),
-        input_refs=context.available_input_keys,
+        input_refs=tuple(
+            key for key in context.available_input_keys
+            if key in consumed_keys
+        ),
         metadata=dict(request.metadata),
     )
 
@@ -696,19 +725,16 @@ def _build_agent_audit_payloads(
         request_payload = redact_sensitive_audit_payload(
             _serialize_agent_request(request)
         )
-        prompt_snapshot = result.prompt_audits.get(agent_name) or {}
-        prompt_refs = redact_sensitive_audit_payload(
-            dict(
-                prompt_snapshot.get("prompt_refs")
-                or {
-                    "schema_version": AUDIT_SCHEMA_VERSION,
-                    **_agent_prompt_refs(agent_name),
-                }
-            )
+        provider_name = str(
+            (result.provider_configs.get(agent_name) or {})
+            .get("llm", {})
+            .get("provider", "unknown")
         )
-        prompt_rendered = str(
-            prompt_snapshot.get("prompt_rendered") or _agent_prompt_markdown(agent_name)
-        )
+        prompt_snapshot = result.prompt_audits.get(agent_name)
+        if prompt_snapshot is None:
+            prompt_snapshot = _prompt_audit_snapshot(agent_name, provider_name)
+        prompt_refs = redact_sensitive_audit_payload(dict(prompt_snapshot["prompt_refs"]))
+        prompt_rendered = str(prompt_snapshot["prompt_rendered"])
         provider_payload = redact_sensitive_audit_payload(
             {
                 "schema_version": AUDIT_SCHEMA_VERSION,
@@ -901,6 +927,34 @@ def _agent_prompt_refs(agent_name: str) -> dict[str, Any]:
             }
             for key in prompt_keys
         ],
+    }
+
+
+def _prompt_audit_snapshot(agent_name: str, provider_name: str) -> dict[str, Any]:
+    """Describe prompt use truthfully for real and deterministic providers."""
+    if provider_name == "openai":
+        return {
+            "prompt_refs": {
+                "schema_version": AUDIT_SCHEMA_VERSION,
+                "usage": "used",
+                **_agent_prompt_refs(agent_name),
+            },
+            "prompt_rendered": _agent_prompt_markdown(agent_name),
+        }
+    reason_code = (
+        "deterministic_provider_no_prompt"
+        if provider_name in {"static", "static_llm", "null"}
+        else "provider_prompt_usage_unknown"
+    )
+    return {
+        "prompt_refs": {
+            "schema_version": AUDIT_SCHEMA_VERSION,
+            "agent_name": agent_name,
+            "usage": "not_used" if reason_code == "deterministic_provider_no_prompt" else "unknown",
+            "reason_code": reason_code,
+            "prompts": [],
+        },
+        "prompt_rendered": "",
     }
 
 

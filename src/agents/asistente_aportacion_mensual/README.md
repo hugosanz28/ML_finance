@@ -8,7 +8,8 @@ Entradas:
 
 - mandato de la cuenta,
 - presupuesto mensual,
-- pesos objetivo,
+- contrato completo de objetivos: pesos, limites, modo de rebalanceo y mapping
+  exacto de activos a buckets,
 - asignacion actual,
 - restricciones configurables por el usuario,
 - conclusiones de `monitor_tematico` y `analista_activos`.
@@ -64,6 +65,12 @@ El presupuesto se resuelve desde la ejecucion y, si no se proporciona, desde
 `OpenAIContributionLLMProvider` debe seleccionarse explicitamente. Si falta el
 snapshot o alguno de los dos resultados anteriores, la salida queda marcada
 como `partial`.
+
+Tras cualquier provider se validan de forma determinista el presupuesto, los
+importes no negativos, el limite de gasto y la presencia unica de los tres
+escenarios. Una salida incoherente se descarta como `partial`, sin findings ni
+artefactos accionables. Un presupuesto explicito de cero se conserva y no puede
+producir acciones de compra o rebalanceo.
 
 ## Papel en el flujo mensual
 

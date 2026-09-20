@@ -36,15 +36,13 @@ def collect_input_texts(context: AgentContext) -> dict[str, str]:
 def resolve_monthly_budget(request: AgentRequest, context: AgentContext) -> float:
     """Resolve the monthly contribution budget from request data or settings."""
     for container in (request.parameters, request.scope, request.constraints, context.metadata):
-        value = (
-            container.get("monthly_budget")
-            or container.get("monthly_budget_eur")
-            or container.get("contribution_budget")
-            or container.get("ingreso_mensual")
-        )
-        parsed = _safe_float(value)
-        if parsed is not None:
-            return parsed
+        # Zero is a valid explicit budget and must not fall through to defaults.
+        for key in ("monthly_budget", "monthly_budget_eur", "contribution_budget", "ingreso_mensual"):
+            if key not in container:
+                continue
+            parsed = _safe_float(container[key])
+            if parsed is not None:
+                return parsed
     return float(context.settings.monthly_contribution_eur)
 
 
@@ -54,6 +52,11 @@ def resolve_target_weights(request: AgentRequest, context: AgentContext) -> Mapp
         value = container.get("target_weights") or container.get("pesos_objetivo")
         if isinstance(value, Mapping):
             return value
+        targets = container.get("portfolio_targets")
+        if isinstance(targets, Mapping):
+            value = targets.get("target_weights") or targets.get("target_allocation")
+            if isinstance(value, Mapping):
+                return value
     if context.has_input("target_weights"):
         input_ref = context.get_input("target_weights")
         value = input_ref.metadata.get("weights") or input_ref.metadata.get("target_weights")
@@ -63,6 +66,21 @@ def resolve_target_weights(request: AgentRequest, context: AgentContext) -> Mapp
         if isinstance(loaded, Mapping):
             return loaded
     return {}
+
+
+def resolve_portfolio_targets(request: AgentRequest, context: AgentContext) -> Mapping[str, Any]:
+    """Resolve the complete target contract instead of dropping its constraints."""
+    for container in (request.constraints, request.parameters, request.scope, context.metadata):
+        value = container.get("portfolio_targets")
+        if isinstance(value, Mapping):
+            return value
+    if context.has_input("target_weights"):
+        input_ref = context.get_input("target_weights")
+        value = input_ref.metadata.get("portfolio_targets")
+        if isinstance(value, Mapping):
+            return value
+    weights = resolve_target_weights(request, context)
+    return {"target_weights": dict(weights)} if weights else {}
 
 
 def extract_current_allocation(context: AgentContext) -> tuple[Mapping[str, Any], ...]:

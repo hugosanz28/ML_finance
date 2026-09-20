@@ -21,10 +21,12 @@ Prompts actuales:
 - `analista_activos_analysis_v1.md`: analisis por activo.
 - `asistente_aportacion_mensual_decision_v1.md`: decision mensual.
 
-En los runs persistidos, `prompt_refs.json` registra claves/versiones y
-`prompt_rendered.md` conserva el texto cargado. Ambos forman parte del
-`input_hash` semantico del agente: cambiar una version o el texto renderizado
-debe cambiar la huella aunque el resto de inputs sea igual.
+En los runs con un proveedor LLM real, `prompt_refs.json` registra
+claves/versiones y `prompt_rendered.md` conserva el texto cargado. Ambos forman
+parte del `input_hash` semantico del agente: cambiar una version o el texto
+renderizado debe cambiar la huella aunque el resto de inputs sea igual. Con un
+provider determinista, `prompt_refs.json` usa `usage: not_used`, no atribuye
+versiones y `prompt_rendered.md` queda vacio.
 
 `raw_response.json` es un artefacto distinto del prompt. En el schema de
 auditoria v2 usa `captured`, `partial` o `not_captured` segun lo que exponga el

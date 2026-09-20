@@ -16,7 +16,11 @@ from src.agents.models import (
     AgentResult,
     AgentSource,
 )
-from src.agents.pipeline import MonthlyAgentPipelineResult, _persist_pipeline_result
+from src.agents.pipeline import (
+    MonthlyAgentPipelineResult,
+    _persist_pipeline_result,
+    _prompt_audit_snapshot,
+)
 from src.application.agent_audit import (
     GetAgentRunAuditRequest,
     GetAgentRunAuditUseCase,
@@ -24,6 +28,20 @@ from src.application.agent_audit import (
     persist_agent_preflight_audit,
 )
 from src.config import default_repo_root, load_settings
+
+
+def test_prompt_audit_distinguishes_real_and_deterministic_providers() -> None:
+    static = _prompt_audit_snapshot("analista_activos", "static_llm")
+    real = _prompt_audit_snapshot("analista_activos", "openai")
+
+    assert static["prompt_refs"]["usage"] == "not_used"
+    assert static["prompt_refs"]["prompts"] == []
+    assert static["prompt_rendered"] == ""
+    assert real["prompt_refs"]["usage"] == "used"
+    assert real["prompt_refs"]["prompts"] == [
+        {"key": "analista_activos.analysis", "version": "v2"}
+    ]
+    assert "analista_activos prompts" in real["prompt_rendered"]
 
 
 def test_persist_pipeline_result_writes_audit_trail_files() -> None:
@@ -107,7 +125,7 @@ def test_persist_pipeline_result_writes_audit_trail_files() -> None:
         assert len(run_metadata["input_hash"]) == 71
         assert run_metadata["output_hash"].startswith("sha256:")
         assert len(run_metadata["output_hash"]) == 71
-        assert run_metadata["prompt_versions"]["monitor_tematico"]["monitor_tematico.query"] == "v1"
+        assert run_metadata["prompt_versions"]["monitor_tematico"] == {}
         assert input_payload["schema_version"] == 2
         assert input_payload["input_hash"] == run_metadata["input_hash"]
         assert input_payload["inputs"][0]["metadata"]["content"] == "brief text"
@@ -131,6 +149,7 @@ def test_persist_pipeline_result_writes_audit_trail_files() -> None:
             raw_response = _read_json(agent_dir / "raw_response.json")
             parsed_output = _read_json(agent_dir / "parsed_output.json")
             audit_metadata = _read_json(agent_dir / "audit_metadata.json")
+            prompt_refs = _read_json(agent_dir / "prompt_refs.json")
 
             assert context["agent_name"] == agent_name
             assert request["scope"] == {"universe": "portfolio"}
@@ -155,6 +174,9 @@ def test_persist_pipeline_result_writes_audit_trail_files() -> None:
             assert audit_metadata["hash_projection"] == "semantic-v1"
             assert audit_metadata["input_hash"].startswith("sha256:")
             assert audit_metadata["output_hash"].startswith("sha256:")
+            assert prompt_refs["usage"] in {"not_used", "unknown"}
+            assert prompt_refs["prompts"] == []
+            assert (agent_dir / "prompt_rendered.md").read_text(encoding="utf-8") == ""
     finally:
         shutil.rmtree(workspace, ignore_errors=True)
 

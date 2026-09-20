@@ -47,6 +47,8 @@ class PortfolioTargets:
             "base_currency": self.base_currency,
             "target_allocation": dict(self.target_allocation),
             "target_weights": dict(self.target_allocation),
+            # Agents need the exact mapping; bucket inference from asset names is unsafe.
+            "asset_bucket_mapping": dict(self.asset_bucket_mapping),
         }
         for key, value in (
             ("monthly_contribution", self.monthly_contribution),

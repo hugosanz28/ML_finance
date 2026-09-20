@@ -11,6 +11,7 @@ from src.agents.asistente_aportacion_mensual.context_builder import (
     extract_current_allocation,
     extract_prior_findings,
     resolve_monthly_budget,
+    resolve_portfolio_targets,
     resolve_target_weights,
 )
 from src.agents.asistente_aportacion_mensual.llm import (
@@ -18,6 +19,7 @@ from src.agents.asistente_aportacion_mensual.llm import (
     ContributionLLMProviderError,
     OpenAIContributionLLMProvider,
     StaticContributionLLMProvider,
+    monthly_decision_validation_issues,
 )
 
 __all__ = [
@@ -32,6 +34,8 @@ __all__ = [
     "StaticContributionLLMProvider",
     "extract_current_allocation",
     "extract_prior_findings",
+    "monthly_decision_validation_issues",
     "resolve_monthly_budget",
+    "resolve_portfolio_targets",
     "resolve_target_weights",
 ]

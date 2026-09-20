@@ -2,18 +2,22 @@
 
 from __future__ import annotations
 
+from math import isfinite
+
 from src.agents.asistente_aportacion_mensual._types import MonthlyRecommendation, MonthlyScenario
 from src.agents.asistente_aportacion_mensual.context_builder import (
     collect_input_texts,
     extract_current_allocation,
     extract_prior_findings,
     resolve_monthly_budget,
+    resolve_portfolio_targets,
     resolve_target_weights,
 )
 from src.agents.asistente_aportacion_mensual.llm import (
     ContributionLLMProvider,
     ContributionLLMProviderError,
     StaticContributionLLMProvider,
+    monthly_decision_validation_issues,
 )
 from src.agents.autonomy import autonomy_metadata, skipped_action
 from src.agents.analytics import context_analytics
@@ -48,6 +52,7 @@ class AsistenteAportacionMensualAgent(BaseAgent):
         input_texts = collect_input_texts(context)
         monthly_budget = resolve_monthly_budget(request, context)
         target_weights = resolve_target_weights(request, context)
+        portfolio_targets = resolve_portfolio_targets(request, context)
         current_allocation = extract_current_allocation(context)
         upstream_findings = extract_prior_findings(context)
         sources = _input_sources(context)
@@ -57,8 +62,37 @@ class AsistenteAportacionMensualAgent(BaseAgent):
             "wait",
             "hold_cash",
             "rebalance_with_contribution",
+            "recommend_reduce",
+            "recommend_sell_partial",
             "manual_review_required",
         )
+
+        if not isfinite(monthly_budget) or monthly_budget < 0:
+            return AgentResult(
+                status="failed",
+                summary="No se ejecuto el asistente: el presupuesto mensual no es valido.",
+                sources=tuple(_deduplicate_sources(sources)),
+                errors=("monthly_budget must be a finite non-negative number.",),
+                metadata={
+                    **_contribution_autonomy_metadata(
+                        primary_action="manual_review_required",
+                        selected_actions=("manual_review_required",),
+                        skipped_actions=(
+                            skipped_action("decide_monthly_action", "Monthly budget was invalid."),
+                        ),
+                        allowed_actions=allowed_actions,
+                        max_recommendations=max_recommendations,
+                        has_target_weights=bool(target_weights),
+                        has_expected_context=_has_expected_context(context, upstream_findings),
+                    ),
+                    "llm_provider": self.llm_provider.name,
+                    "monthly_budget": monthly_budget,
+                    "target_weights": dict(target_weights),
+                    "portfolio_targets": dict(portfolio_targets),
+                    "recommendations_count": 0,
+                    "scenarios_count": 0,
+                },
+            )
 
         if monthly_budget <= 0:
             warnings.append("El presupuesto mensual resuelto no es positivo; la propuesta no puede repartir aportacion nueva.")
@@ -83,6 +117,7 @@ class AsistenteAportacionMensualAgent(BaseAgent):
                 upstream_findings=upstream_findings,
                 max_recommendations=max_recommendations,
                 **({"portfolio_analytics_snapshot": context_analytics(context)} if context.has_input("portfolio_analytics_snapshot") else {}),
+                portfolio_targets=portfolio_targets,
             )
         except ContributionLLMProviderError as exc:
             return AgentResult(
@@ -103,6 +138,49 @@ class AsistenteAportacionMensualAgent(BaseAgent):
                     "llm_provider": self.llm_provider.name,
                     "monthly_budget": monthly_budget,
                     "target_weights": dict(target_weights),
+                    "portfolio_targets": dict(portfolio_targets),
+                    "current_allocation_count": len(current_allocation),
+                    "upstream_findings_count": len(upstream_findings),
+                    "recommendations_count": 0,
+                    "scenarios_count": 0,
+                },
+            )
+
+        validation_issues = monthly_decision_validation_issues(
+            decision,
+            requested_budget=monthly_budget,
+        )
+        if validation_issues:
+            warnings.extend(decision.warnings)
+            warnings.extend(
+                f"Invalid monthly decision: {issue}."
+                for issue in validation_issues
+            )
+            return AgentResult(
+                status="partial",
+                summary="Asistente de aportacion mensual sin recomendaciones: la salida no supero las validaciones financieras.",
+                sources=tuple(_deduplicate_sources(sources)),
+                warnings=tuple(warnings),
+                metadata={
+                    **_contribution_autonomy_metadata(
+                        primary_action="manual_review_required",
+                        selected_actions=("manual_review_required",),
+                        skipped_actions=(
+                            skipped_action(
+                                "decide_monthly_action",
+                                "Provider output failed deterministic financial validation.",
+                            ),
+                        ),
+                        allowed_actions=allowed_actions,
+                        max_recommendations=max_recommendations,
+                        has_target_weights=bool(target_weights),
+                        has_expected_context=_has_expected_context(context, upstream_findings),
+                    ),
+                    "llm_provider": self.llm_provider.name,
+                    "monthly_budget": monthly_budget,
+                    "target_weights": dict(target_weights),
+                    "portfolio_targets": dict(portfolio_targets),
+                    "decision_validation_issues": validation_issues,
                     "current_allocation_count": len(current_allocation),
                     "upstream_findings_count": len(upstream_findings),
                     "recommendations_count": 0,
@@ -141,6 +219,7 @@ class AsistenteAportacionMensualAgent(BaseAgent):
                 "primary_action": decision.primary_action,
                 "monthly_budget": decision.monthly_budget,
                 "target_weights": dict(target_weights),
+                "portfolio_targets": dict(portfolio_targets),
                 "assumptions": decision.assumptions,
                 "scenarios": tuple(_scenario_metadata(scenario) for scenario in decision.scenarios),
                 "current_allocation_count": len(current_allocation),
@@ -195,8 +274,12 @@ def _selected_monthly_actions(primary_action: str) -> tuple[str, ...]:
         return ("buy", "rebalance_with_contribution")
     if action in {"hold", "no_buy", "watch"}:
         return ("wait", "hold_cash")
-    if action in {"rebalance", "reduce", "sell_partial"}:
+    if action == "rebalance":
         return ("rebalance_with_contribution", "manual_review_required")
+    if action == "reduce":
+        return ("recommend_reduce", "manual_review_required")
+    if action == "sell_partial":
+        return ("recommend_sell_partial", "manual_review_required")
     return ("manual_review_required",)
 
 
@@ -208,7 +291,15 @@ def _skipped_monthly_actions(
 ) -> tuple[dict[str, str], ...]:
     skipped: list[dict[str, str]] = []
     selected = set(_selected_monthly_actions(primary_action))
-    for action in ("buy", "wait", "hold_cash", "rebalance_with_contribution", "manual_review_required"):
+    for action in (
+        "buy",
+        "wait",
+        "hold_cash",
+        "rebalance_with_contribution",
+        "recommend_reduce",
+        "recommend_sell_partial",
+        "manual_review_required",
+    ):
         if action not in selected:
             skipped.append(skipped_action(action, f"Primary action resolved to {primary_action}."))
     if not has_target_weights:

@@ -162,12 +162,16 @@ def test_provider_payloads_use_structured_snapshot_and_v2_prompts_without_networ
     assistant.decide(investment_brief="demo", latest_monthly_report="demo", portfolio_metrics_snapshot="{}",
                      user_satellite_interest=None, monthly_budget=500, target_weights={}, current_allocation=(),
                      upstream_findings=(), max_recommendations=3,
-                     portfolio_analytics_snapshot=analytics_for_agent(demo[3], "asistente_aportacion_mensual"))
+                     portfolio_analytics_snapshot=analytics_for_agent(demo[3], "asistente_aportacion_mensual"),
+                     portfolio_targets={"rebalance_mode": "contributions_only"})
     for payload in payloads:
         assert isinstance(payload["user_payload"][ANALYTICS_INPUT_KEY], dict)
         assert "Python" in payload["system_prompt"]
         assert "reason_code" in payload["system_prompt"]
         json.dumps(payload["user_payload"], allow_nan=False)
+    assert payloads[1]["user_payload"]["portfolio_targets"] == {
+        "rebalance_mode": "contributions_only"
+    }
 
 
 def test_static_asset_reason_codes_follow_the_provided_metric(demo):

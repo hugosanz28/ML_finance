@@ -40,7 +40,12 @@ def test_monthly_agent_pipeline_passes_portfolio_targets_to_contribution_agent(w
                 "target_allocation:",
                 "  core: 80",
                 "  satellite: 20",
+                "risk_profile: medium",
+                "max_single_asset_weight: 15",
                 "rebalance_mode: contributions_only",
+                "asset_bucket_mapping:",
+                "  CORE: core",
+                "  SAT: satellite",
             ]
         ),
         encoding="utf-8",
@@ -68,15 +73,28 @@ def test_monthly_agent_pipeline_passes_portfolio_targets_to_contribution_agent(w
     target_ref = next(input_ref for input_ref in result.input_refs if input_ref.key == "target_weights")
     assert target_ref.location == str(targets_path)
     assert target_ref.metadata["weights"] == {"core": 0.80, "satellite": 0.20}
+    assert target_ref.metadata["portfolio_targets"]["asset_bucket_mapping"] == {
+        "CORE": "core",
+        "SAT": "satellite",
+    }
     assert result.asistente_aportacion_mensual.metadata["monthly_budget"] == 900
     assert result.asistente_aportacion_mensual.metadata["target_weights"] == {"core": 0.80, "satellite": 0.20}
+    assert result.asistente_aportacion_mensual.metadata["portfolio_targets"]["rebalance_mode"] == "contributions_only"
+    assert result.asistente_aportacion_mensual.metadata["portfolio_targets"]["max_single_asset_weight"] == 0.15
 
-    common_input_keys = tuple(input_ref.key for input_ref in result.input_refs)
     expected_input_refs = {
-        "monitor_tematico": common_input_keys,
-        "analista_activos": (*common_input_keys, "monitor_tematico_result"),
+        "monitor_tematico": ("investment_brief", "latest_monthly_report"),
+        "analista_activos": (
+            "investment_brief",
+            "latest_monthly_report",
+            "portfolio_metrics_snapshot",
+            "monitor_tematico_result",
+        ),
         "asistente_aportacion_mensual": (
-            *common_input_keys,
+            "investment_brief",
+            "latest_monthly_report",
+            "portfolio_metrics_snapshot",
+            "target_weights",
             "monitor_tematico_result",
             "analista_activos_result",
         ),
@@ -87,10 +105,11 @@ def test_monthly_agent_pipeline_passes_portfolio_targets_to_contribution_agent(w
         assert request.constraints == {"network": "offline"}
         assert request.metadata == {"origin": "test"}
         assert request.input_refs == expected_input_refs[agent_name]
-        assert tuple(
+        context_input_refs = tuple(
             input_ref["key"]
             for input_ref in result.agent_contexts[agent_name]["input_refs"]
-        ) == expected_input_refs[agent_name]
+        )
+        assert set(request.input_refs).issubset(context_input_refs)
 
     assert result.raw_responses["monitor_tematico"]["status"] == "not_captured"
     assert set(result.raw_responses["monitor_tematico"]["providers"]) == {"llm", "search"}
@@ -112,6 +131,8 @@ def test_monthly_agent_pipeline_passes_portfolio_targets_to_contribution_agent(w
         assert persisted["request"]["scope"] == {"universe": "current_portfolio"}
         assert persisted["provider"]["providers"]["llm"]["provider"] == "static_llm"
         assert persisted["audit_metadata"]["hash_projection"] == "semantic-v1"
+        assert persisted["prompt_refs"]["usage"] == "not_used"
+        assert persisted["prompt_refs"]["prompts"] == []
     monitor_raw = audit.agents["monitor_tematico"]["raw_response"]
     assert set(monitor_raw["providers"]) == {"llm", "search"}
 

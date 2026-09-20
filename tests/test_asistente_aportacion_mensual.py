@@ -16,7 +16,9 @@ from src.agents.asistente_aportacion_mensual import (
     StaticContributionLLMProvider,
     extract_current_allocation,
     extract_prior_findings,
+    monthly_decision_validation_issues,
     resolve_monthly_budget,
+    resolve_portfolio_targets,
     resolve_target_weights,
 )
 from src.config import default_repo_root, load_settings
@@ -84,7 +86,14 @@ def _context(
             label="Target weights",
             location="manual://target-weights",
             source_type="manual",
-            metadata={"weights": {"core_global_equity": 0.55, "defensive_liquidity": 0.30, "satellites": 0.15}},
+            metadata={
+                "weights": {"core_global_equity": 0.55, "defensive_liquidity": 0.30, "satellites": 0.15},
+                "portfolio_targets": {
+                    "target_weights": {"core_global_equity": 0.55, "defensive_liquidity": 0.30, "satellites": 0.15},
+                    "rebalance_mode": "contributions_only",
+                    "max_single_asset_weight": 0.15,
+                },
+            },
         ),
     ]
     if include_metrics:
@@ -231,10 +240,38 @@ def test_context_builder_resolves_budget_targets_allocation_and_upstream_finding
 
     assert resolve_monthly_budget(request, context) == 1200
     assert resolve_target_weights(request, context)["satellites"] == 0.15
+    assert resolve_portfolio_targets(request, context)["rebalance_mode"] == "contributions_only"
     assert len(extract_current_allocation(context)) == 3
     findings = extract_prior_findings(context)
     assert {finding.source_agent for finding in findings} == {"monitor_tematico", "analista_activos"}
     assert any(finding.asset_id == "NVDA" for finding in findings)
+
+
+def test_context_builder_preserves_explicit_zero_budget(workspace_tmp_path: Path) -> None:
+    context = _context(workspace_tmp_path)
+
+    assert resolve_monthly_budget(AgentRequest(parameters={"monthly_budget": 0}), context) == 0
+
+    result = AsistenteAportacionMensualAgent(
+        llm_provider=StaticContributionLLMProvider()
+    ).execute(AgentRequest(parameters={"monthly_budget": 0}), context)
+
+    assert result.status == "success"
+    assert result.metadata["monthly_budget"] == 0
+    assert result.metadata["primary_action"] == "hold"
+    assert all(finding.metadata["action"] != "buy" for finding in result.findings)
+
+
+def test_asistente_rejects_negative_budget_before_provider_use(workspace_tmp_path: Path) -> None:
+    context = _context(workspace_tmp_path)
+
+    result = AsistenteAportacionMensualAgent(
+        llm_provider=StaticContributionLLMProvider()
+    ).execute(AgentRequest(parameters={"monthly_budget": -1}), context)
+
+    assert result.status == "failed"
+    assert result.findings == ()
+    assert result.errors == ("monthly_budget must be a finite non-negative number.",)
 
 
 def test_asistente_aportacion_returns_actionable_monthly_recommendation(workspace_tmp_path: Path) -> None:
@@ -279,6 +316,7 @@ def test_asistente_aportacion_returns_actionable_monthly_recommendation(workspac
                 tags=("satellite", "watch"),
             ),
         ),
+        scenarios=_holding_scenarios(),
         assumptions=("Presupuesto mensual disponible: 1000 EUR.",),
     )
 
@@ -302,6 +340,93 @@ def test_asistente_aportacion_returns_actionable_monthly_recommendation(workspac
     assert result.findings[2].metadata["recommendation_type"] == "risk_control"
     assert result.artifacts[0].artifact_type == "recommendation"
     assert "iShares Core MSCI World UCITS ETF" in (result.artifacts[0].content or "")
+
+
+def test_asistente_rejects_financially_incoherent_provider_output(workspace_tmp_path: Path) -> None:
+    context = _context(workspace_tmp_path)
+    invalid = MonthlyDecision(
+        summary="Compra fuera de presupuesto.",
+        primary_action="buy",
+        monthly_budget=1000.0,
+        recommendations=(
+            MonthlyRecommendation(
+                target="Core ETF",
+                action="buy",
+                recommendation_type="contribution",
+                suggested_amount=1200.0,
+                priority="high",
+                rationale="Invalid fixture.",
+            ),
+        ),
+        scenarios=_holding_scenarios(),
+    )
+
+    result = AsistenteAportacionMensualAgent(
+        llm_provider=StaticContributionLLMProvider(invalid)
+    ).execute(AgentRequest(parameters={"monthly_budget": 1000}), context)
+
+    assert result.status == "partial"
+    assert result.findings == ()
+    assert "base_recommendations_exceed_budget" in result.metadata["decision_validation_issues"]
+    assert result.metadata["selected_actions"] == ("manual_review_required",)
+
+
+def test_static_provider_returns_financially_coherent_scenarios() -> None:
+    decision = StaticContributionLLMProvider().decide(
+        investment_brief="Synthetic mandate.",
+        latest_monthly_report="Synthetic report.",
+        portfolio_metrics_snapshot="{}",
+        user_satellite_interest=None,
+        monthly_budget=1000.0,
+        target_weights={"core": 0.60, "satellites": 0.10},
+        current_allocation=(),
+        upstream_findings=(),
+        max_recommendations=8,
+    )
+
+    assert monthly_decision_validation_issues(decision, requested_budget=1000.0) == ()
+
+
+@pytest.mark.parametrize(
+    ("primary_action", "selected_action"),
+    [
+        ("reduce", "recommend_reduce"),
+        ("sell_partial", "recommend_sell_partial"),
+    ],
+)
+def test_reduction_and_sale_are_audited_as_manual_recommendations(
+    workspace_tmp_path: Path,
+    primary_action: str,
+    selected_action: str,
+) -> None:
+    context = _context(workspace_tmp_path)
+    decision = MonthlyDecision(
+        summary="Recomendacion defensiva para revision manual.",
+        primary_action=primary_action,
+        monthly_budget=1000.0,
+        recommendations=(
+            MonthlyRecommendation(
+                target="Satellite Stock",
+                action=primary_action,
+                recommendation_type="risk_control",
+                suggested_amount=100.0,
+                priority="high",
+                rationale="Reducir concentracion sin ejecutar ninguna orden.",
+            ),
+        ),
+        scenarios=_holding_scenarios(),
+    )
+
+    result = AsistenteAportacionMensualAgent(
+        llm_provider=StaticContributionLLMProvider(decision)
+    ).execute(AgentRequest(parameters={"monthly_budget": 1000}), context)
+
+    assert result.status == "success"
+    assert selected_action in result.metadata["allowed_actions"]
+    assert result.metadata["selected_actions"] == (
+        selected_action,
+        "manual_review_required",
+    )
 
 
 def test_asistente_aportacion_returns_scenario_based_monthly_recommendation(workspace_tmp_path: Path) -> None:
@@ -391,3 +516,15 @@ def test_asistente_aportacion_returns_scenario_based_monthly_recommendation(work
     assert "### conservador" in (result.artifacts[0].content or "")
     assert "### neutral" in (result.artifacts[0].content or "")
     assert "### oportunista" in (result.artifacts[0].content or "")
+
+
+def _holding_scenarios() -> tuple[MonthlyScenario, ...]:
+    return tuple(
+        MonthlyScenario(
+            name=name,
+            summary="Mantener liquidez y revisar manualmente.",
+            recommended_action="hold",
+            budget_to_invest=0.0,
+        )
+        for name in ("conservador", "neutral", "oportunista")
+    )

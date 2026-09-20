@@ -43,6 +43,7 @@ El contrato incluye:
 - `max_single_asset_weight`
 - `max_sector_weight`
 - `rebalance_mode`
+- `asset_bucket_mapping`
 
 `src.portfolio.targets.load_portfolio_targets()` valida el archivo y normaliza
 pesos escritos como porcentaje (`70`) o decimal (`0.70`). El pipeline mensual
@@ -234,8 +235,10 @@ en `src/data/local/agents/monthly_pipeline/<run_id>/`. Ademas de
 - `agents/<agent_name>/context.json`: contexto efectivo del agente.
 - `agents/<agent_name>/request.json`: request efectiva enviada al agente,
   incluidos alcance, parametros, restricciones y referencias de entrada.
-- `agents/<agent_name>/prompt_refs.json`: claves y versiones de prompts.
-- `agents/<agent_name>/prompt_rendered.md`: prompt versionado usado en esa ejecucion.
+- `agents/<agent_name>/prompt_refs.json`: uso efectivo y, cuando aplica, claves
+  y versiones de prompts.
+- `agents/<agent_name>/prompt_rendered.md`: prompt versionado usado; queda vacio
+  con providers deterministas que no consumen prompts.
 - `agents/<agent_name>/provider.json`: nombre, modelo y opciones operativas
   permitidas por una lista explicita; nunca credenciales.
 - `agents/<agent_name>/raw_response.json`: respuestas que el contrato del
@@ -247,7 +250,9 @@ en `src/data/local/agents/monthly_pipeline/<run_id>/`. Ademas de
 El run y los envelopes de auditoria nuevos usan `schema_version: 2`.
 `request.json` conserva deliberadamente solo los cinco campos de
 `AgentRequest`, para permitir su round-trip directo, y hereda la version del
-run. `raw_response.json` distingue:
+run. Sus `input_refs` enumeran solo las entradas consumidas por la implementacion;
+`context.json` puede contener entradas adicionales disponibles para el agente.
+`raw_response.json` distingue:
 
 - `captured`: se conservaron todas las respuestas raw disponibles;
 - `partial`: solo algunas operaciones o providers ofrecieron respuesta raw;
@@ -338,8 +343,8 @@ Permisos por agente:
 - `analista_activos` puede priorizar activos y omitir los de menor prioridad
   cuando hay limite de cobertura, pero no decide la aportacion mensual.
 - `asistente_aportacion_mensual` puede elegir entre comprar, esperar, mantener
-  liquidez, rebalancear con aportacion o pedir revision manual, pero no ejecuta
-  operaciones.
+  liquidez, rebalancear con aportacion o recomendar una reduccion/venta para
+  revision manual, pero no ejecuta operaciones.
 
 La salida es apoyo analitico para revision manual, no asesoramiento financiero.
 Ningun agente tiene permiso para ejecutar ordenes, modificar datos privados o
