@@ -104,6 +104,9 @@ class AnalistaActivosAgent(BaseAgent):
                         monitor_findings_count=len(monitor_findings),
                     ),
                     "llm_provider": self.llm_provider.name,
+                    "structured_output_invalid": (
+                        getattr(exc, "reason_code", None) == "structured_output_invalid"
+                    ),
                     "assets": _assets_metadata(tuple(assets)),
                     "assets_count": len(assets),
                     "monitor_findings_count": len(monitor_findings),

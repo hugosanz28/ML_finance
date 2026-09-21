@@ -99,12 +99,15 @@ def test_monthly_agent_pipeline_passes_portfolio_targets_to_contribution_agent(w
             "analista_activos_result",
         ),
     }
-    for agent_name, request in result.agent_requests.items():
+    for agent_name, expected_refs in expected_input_refs.items():
+        request = result.agent_requests[agent_name]
         assert request.scope == {"universe": "current_portfolio"}
         assert request.parameters == {"max_findings": 4}
         assert request.constraints == {"network": "offline"}
-        assert request.metadata == {"origin": "test"}
-        assert request.input_refs == expected_input_refs[agent_name]
+        assert request.metadata["origin"] == "test"
+        assert request.metadata["orchestration_attempt"] == 1
+        assert request.metadata["supervisor_instruction"]
+        assert request.input_refs == expected_refs
         context_input_refs = tuple(
             input_ref["key"]
             for input_ref in result.agent_contexts[agent_name]["input_refs"]
@@ -122,7 +125,9 @@ def test_monthly_agent_pipeline_passes_portfolio_targets_to_contribution_agent(w
     audit = GetAgentRunAuditUseCase(settings=settings).execute(
         GetAgentRunAuditRequest(run_id=result.run_id)
     )
-    assert audit.schema_version == 2
+    assert result.agent_requests["supervisor"].scope == {"type": "monthly_orchestration"}
+    assert result.orchestration["terminal_reason"] == "assistant_completed"
+    assert audit.schema_version == 3
     assert audit.is_legacy is False
     assert audit.run_metadata["input_hash"].startswith("sha256:")
     for agent_name, expected_refs in expected_input_refs.items():

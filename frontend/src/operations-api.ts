@@ -42,6 +42,7 @@ export const auditSchema = z.object({
   run_metadata: object,
   input_payload: object,
   preflight: object,
+  orchestration: object.optional().default({}),
   agents: z.record(z.string(), object),
 });
 export type Health = z.infer<typeof healthSchema>;

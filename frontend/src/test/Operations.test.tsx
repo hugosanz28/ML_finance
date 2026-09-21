@@ -235,6 +235,7 @@ describe("operational safety", () => {
           preflight: {},
           input_payload: {},
           run_metadata: {},
+          orchestration: {},
           agents: {
             analista: {
               prompt_rendered: '<img src="https://example.com/track">',

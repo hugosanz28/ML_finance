@@ -30,7 +30,7 @@ datos privados. Para capturas usar exclusivamente fixtures sinteticas conocidas.
 | Investment brief | Configuracion; texto y hash obligatorio | Componentes/conflictos + E2E |
 | Portfolio targets | Configuracion; editor avanzado JSON estructurado, no YAML | Componentes + API + E2E |
 | Pipeline mensual de agentes | Agentes; preflight obligatorio, defaults static/null | E2E offline + API |
-| Auditoria | Agentes; preflight, metadata, contexto/acciones/fuentes, prompts, providers, raw/output y hashes desplegables | E2E schema v2 + componente legacy |
+| Auditoria | Agentes; preflight, ruta del supervisor, contexto/acciones/fuentes, prompts, providers, raw/output y hashes desplegables | E2E schema v3 + lectura v1/v2 |
 | Estado de operaciones | Ejecuciones; progreso por etapas, avisos, errores y resultado | Componentes + jobs/API |
 
 La paridad de #58 incluye evolucion por activo, aviso de snapshots pendientes,

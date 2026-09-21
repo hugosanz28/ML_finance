@@ -58,6 +58,8 @@ class RunMonthlyAgentsUseCase:
 
     def execute(self, request: RunMonthlyAgentsRequest | None = None) -> RunMonthlyAgentsResult:
         resolved_request = request or RunMonthlyAgentsRequest()
+        if resolved_request.search_provider == "openai" and resolved_request.llm_provider != "openai":
+            raise ValueError("search_provider='openai' requires llm_provider='openai'.")
         resolved_metrics = resolved_request.metrics or calculate_portfolio_metrics_from_normalized_degiro(
             settings=self.settings,
             persist=False,
@@ -238,6 +240,8 @@ def _collect_warnings(result: MonthlyAgentPipelineResult) -> tuple[str, ...]:
         ("asistente_aportacion_mensual", result.asistente_aportacion_mensual),
     ):
         warnings.extend(f"{agent_name}: {warning}" for warning in agent_result.warnings)
+    if result.supervisor is not None:
+        warnings.extend(f"supervisor: {warning}" for warning in result.supervisor.warnings)
     return tuple(warnings)
 
 

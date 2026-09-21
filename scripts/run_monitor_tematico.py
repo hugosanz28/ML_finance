@@ -50,9 +50,9 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--search-provider",
-        choices=("null", "static", "duckduckgo", "tavily"),
+        choices=("null", "static", "openai", "duckduckgo", "tavily"),
         default="null",
-        help="Search provider. Defaults to `null`; choose `duckduckgo` or `tavily` explicitly for web search.",
+        help="Search provider. Defaults to `null`; choose `openai`, `duckduckgo` or `tavily` for web search.",
     )
     parser.add_argument(
         "--disable-cache",

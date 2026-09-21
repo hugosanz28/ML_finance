@@ -14,6 +14,9 @@ from urllib.parse import urlsplit, urlunsplit
 
 _RAW_RESPONSES_ATTRIBUTE = "_ml_finance_audit_raw_responses"
 _FAILURES_ATTRIBUTE = "_ml_finance_audit_provider_failures"
+_INTERNAL_REASONING_KEYS = frozenset(
+    {"chain_of_thought", "encrypted_content", "internal_reasoning", "reasoning", "reasoning_content"}
+)
 _SENSITIVE_KEYS = frozenset(
     {
         "api_key",
@@ -41,7 +44,7 @@ def provider_audit_config(provider: Any, *, role: str) -> dict[str, Any]:
     name = str(getattr(provider, "name", type(provider).__name__))
     model = getattr(provider, "model", None)
     options: dict[str, Any] = {}
-    for attribute in ("timeout_seconds", "search_depth", "endpoint"):
+    for attribute in ("timeout_seconds", "search_depth", "endpoint", "max_tool_calls", "store"):
         value = getattr(provider, attribute, None)
         if value is not None:
             options[attribute] = (
@@ -51,6 +54,8 @@ def provider_audit_config(provider: Any, *, role: str) -> dict[str, Any]:
             )
     if name == "openai":
         options["response_format"] = "json_schema"
+    elif name == "openai_web_search":
+        options["tool"] = "web_search"
     elif name in {"static", "static_llm", "null"}:
         options["mode"] = "deterministic_offline"
     return {
@@ -118,7 +123,7 @@ def provider_raw_response_audit(provider: Any, *, role: str) -> dict[str, Any]:
     failures = list(getattr(provider, _FAILURES_ATTRIBUTE, ()) or ())
     if records:
         return {
-            "schema_version": 2,
+            "schema_version": 3,
             "status": "partial" if failures else "captured",
             "reason_code": (
                 "one_or_more_provider_responses_not_captured"
@@ -138,7 +143,7 @@ def provider_raw_response_audit(provider: Any, *, role: str) -> dict[str, Any]:
     else:
         reason_code = "provider_contract_no_raw_response"
     return {
-        "schema_version": 2,
+        "schema_version": 3,
         "status": "not_captured",
         "reason_code": reason_code,
         "provider": config,
@@ -179,7 +184,7 @@ def providers_raw_response_audit(providers: Mapping[str, Any]) -> dict[str, Any]
         for response in audit.get("responses", [])
     ]
     return {
-        "schema_version": 2,
+        "schema_version": 3,
         "status": status,
         "reason_code": reason_code,
         "providers": audits,
@@ -210,6 +215,8 @@ def _json_safe(value: Any) -> Any:
     if is_dataclass(value):
         return _json_safe(asdict(value))
     if isinstance(value, Mapping):
+        if str(value.get("type", "")).lower() in {"reasoning", "reasoning_content"}:
+            return {"type": str(value.get("type")), "redacted": True}
         return {
             str(key): (
                 "[REDACTED]"
@@ -217,6 +224,7 @@ def _json_safe(value: Any) -> Any:
                 else _json_safe(item)
             )
             for key, item in value.items()
+            if _normalized_key(str(key)) not in _INTERNAL_REASONING_KEYS
         }
     if isinstance(value, (tuple, list)):
         return [_json_safe(item) for item in value]
@@ -241,7 +249,7 @@ def redact_sensitive_audit_payload(value: Any) -> Any:
 
 
 def _is_sensitive_key(key: str) -> bool:
-    normalized = re.sub(r"[^a-z0-9]+", "_", key.strip().lower()).strip("_")
+    normalized = _normalized_key(key)
     compact = normalized.replace("_", "")
     return (
         normalized in _SENSITIVE_KEYS
@@ -270,6 +278,10 @@ def _is_sensitive_key(key: str) -> bool:
         or normalized.endswith("_private_key")
         or normalized.endswith("_secret")
     )
+
+
+def _normalized_key(key: str) -> str:
+    return re.sub(r"[^a-z0-9]+", "_", key.strip().lower()).strip("_")
 
 
 def _sanitize_endpoint(value: Any) -> str:

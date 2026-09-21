@@ -401,6 +401,7 @@ export function AgentsForm({
                 <option value="static">Fixtures sintéticas</option>
                 {mode === "real" && (
                   <>
+                    <option value="openai">OpenAI web search · externo</option>
                     <option value="tavily">Tavily · externo</option>
                     <option value="duckduckgo">DuckDuckGo · externo</option>
                   </>

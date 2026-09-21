@@ -71,7 +71,7 @@ class SimulationBody(ReportBody):
 
 class AgentsBody(OperationBody):
     llm_provider: Literal["static", "openai"] = "static"
-    search_provider: Literal["null", "static", "tavily", "duckduckgo"] = "null"
+    search_provider: Literal["null", "static", "openai", "tavily", "duckduckgo"] = "null"
     monthly_budget: float | None = Field(default=None, ge=0, allow_inf_nan=False)
     user_satellite_interest: str | None = Field(default=None, max_length=2000)
     report_id: str | None = Field(default=None, pattern=r"^[A-Za-z0-9][A-Za-z0-9_-]{0,159}$")
@@ -80,6 +80,8 @@ class AgentsBody(OperationBody):
 
     @model_validator(mode="after")
     def weights(self):
+        if self.search_provider == "openai" and self.llm_provider != "openai":
+            raise ValueError("OpenAI web search requires the OpenAI model provider")
         if self.target_weights is not None:
             if not self.target_weights:
                 raise ValueError("Use null for saved targets, or provide explicit weights")

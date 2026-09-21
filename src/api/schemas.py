@@ -130,4 +130,5 @@ class AuditResponse(Schema):
     run_metadata: dict[str, JsonValue]
     input_payload: dict[str, JsonValue]
     preflight: dict[str, JsonValue]
+    orchestration: dict[str, JsonValue]
     agents: dict[str, dict[str, JsonValue]]

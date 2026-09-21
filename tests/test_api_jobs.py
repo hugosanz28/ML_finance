@@ -217,6 +217,17 @@ def test_provider_selection_and_demo_restrictions(client):
     assert client.get("/api/v1/jobs").json() == {"jobs": []}
 
 
+def test_openai_web_search_requires_openai_llm_provider(client):
+    response = client.post(
+        "/api/v1/agents/monthly-runs",
+        json={**CONFIRM, "llm_provider": "static", "search_provider": "openai"},
+        headers=HEADERS,
+    )
+
+    assert response.status_code == 422
+    assert client.get("/api/v1/jobs").json() == {"jobs": []}
+
+
 def test_uploads_canonical_names_limits_and_no_overwrite(client, monkeypatch):
     values = {"uploaded_at": "2026-01-31", "uploads": [{"filename": "cartera.csv", "content_base64": base64.b64encode(b"fixture").decode()}]}
     job = submit(client, "degiro/uploads", values)

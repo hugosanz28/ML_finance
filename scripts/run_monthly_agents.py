@@ -21,7 +21,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--monthly-report", type=Path, help="Path to a monthly Markdown report.")
     parser.add_argument("--user-satellite-interest", help="Optional one-off satellite idea for this run.")
     parser.add_argument("--llm-provider", choices=("static", "openai"), default="static")
-    parser.add_argument("--search-provider", choices=("null", "static", "duckduckgo", "tavily"), default="null")
+    parser.add_argument("--search-provider", choices=("null", "static", "openai", "duckduckgo", "tavily"), default="null")
     parser.add_argument("--no-persist", action="store_true", help="Do not write pipeline or audit artifacts.")
     parser.add_argument("--output-dir", type=Path, help="Output directory for persisted agent results.")
     return parser.parse_args()

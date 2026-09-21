@@ -11,7 +11,8 @@ from src.agents.provider_audit import redact_sensitive_audit_payload
 from src.config import Settings, get_settings
 
 
-AGENT_NAMES = ("monitor_tematico", "analista_activos", "asistente_aportacion_mensual")
+AGENT_NAMES = ("supervisor", "monitor_tematico", "analista_activos", "asistente_aportacion_mensual")
+AUDIT_SCHEMA_VERSION = 3
 
 
 @dataclass(frozen=True)
@@ -41,6 +42,7 @@ class GetAgentRunAuditResult:
     run_metadata: dict[str, Any]
     input_payload: dict[str, Any]
     agents: dict[str, dict[str, Any]]
+    orchestration: dict[str, Any] = field(default_factory=dict)
     preflight: dict[str, Any] = field(default_factory=dict)
     schema_version: int = 1
     is_legacy: bool = True
@@ -93,10 +95,15 @@ class GetAgentRunAuditUseCase:
         preflight = redact_sensitive_audit_payload(
             _read_json_or_empty(output_dir / "preflight.json")
         )
+        orchestration = redact_sensitive_audit_payload(
+            _read_json_or_empty(output_dir / "orchestration.json")
+        )
         schema_version, compatibility_warnings = _audit_schema_compatibility(run_metadata)
+        recorded_agents = set((run_metadata.get("agents") or {}).keys())
         agents = {
             agent_name: _read_agent_audit(output_dir / "agents" / agent_name)
             for agent_name in AGENT_NAMES
+            if agent_name in recorded_agents or (output_dir / "agents" / agent_name).is_dir()
         }
         return GetAgentRunAuditResult(
             run_id=run_id,
@@ -105,6 +112,7 @@ class GetAgentRunAuditUseCase:
             input_payload=input_payload,
             preflight=preflight,
             agents=agents,
+            orchestration=orchestration,
             schema_version=schema_version,
             is_legacy=schema_version < 2,
             compatibility_warnings=compatibility_warnings,
@@ -146,6 +154,7 @@ def persist_agent_preflight_audit(
     metadata = _read_json_or_empty(metadata_path)
     if not metadata:
         metadata = {
+            "schema_version": AUDIT_SCHEMA_VERSION,
             "run_id": run_id,
             "as_of_date": as_of_date,
             "generated_at": generated_at,
@@ -170,6 +179,7 @@ def persist_agent_preflight_audit(
         _write_json(
             input_payload_path,
             {
+                "schema_version": AUDIT_SCHEMA_VERSION,
                 "run_id": run_id,
                 "as_of_date": as_of_date,
                 "inputs": [],
@@ -214,9 +224,9 @@ def _audit_schema_compatibility(
         return schema_version, (
             "Legacy audit: provider metadata and reproducibility hashes may be unavailable.",
         )
-    if schema_version > 2:
+    if schema_version > 3:
         return schema_version, (
-            f"Audit schema v{schema_version} is newer than supported v2; showing raw compatible fields.",
+            f"Audit schema v{schema_version} is newer than supported v3; showing raw compatible fields.",
         )
     return schema_version, ()
 

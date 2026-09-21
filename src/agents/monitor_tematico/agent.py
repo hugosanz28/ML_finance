@@ -113,6 +113,7 @@ class MonitorTematicoAgent(BaseAgent):
         search_bundles: list[SearchResultBundle] = []
         web_sources_by_url: dict[str, AgentSource] = {}
 
+        query_output_invalid = False
         try:
             llm_queries = self.llm_provider.generate_queries(
                 investment_brief=input_texts["investment_brief"],
@@ -126,6 +127,7 @@ class MonitorTematicoAgent(BaseAgent):
             )
         except ThemeLLMProviderError as exc:
             warnings.append(str(exc))
+            query_output_invalid = getattr(exc, "reason_code", None) == "structured_output_invalid"
             llm_queries = ()
 
         if not llm_queries:
@@ -150,6 +152,7 @@ class MonitorTematicoAgent(BaseAgent):
                     "window_end": window_end.isoformat(),
                     "search_provider": self.search_provider.name,
                     "llm_provider": self.llm_provider.name,
+                    "structured_output_invalid": query_output_invalid,
                     "observed_topics": _observed_topics_metadata(observed_topics),
                     "searched_queries": (),
                     "findings_count": 0,
@@ -209,6 +212,7 @@ class MonitorTematicoAgent(BaseAgent):
 
         # Phase 4: ask the LLM to summarize, classify, and prioritize the actual
         # search results. This is the "AI brain" of the agent.
+        synthesis_output_invalid = False
         try:
             synthesis = self.llm_provider.synthesize(
                 investment_brief=input_texts["investment_brief"],
@@ -223,6 +227,7 @@ class MonitorTematicoAgent(BaseAgent):
             )
         except ThemeLLMProviderError as exc:
             warnings.append(str(exc))
+            synthesis_output_invalid = getattr(exc, "reason_code", None) == "structured_output_invalid"
             synthesis = None
 
         if synthesis is None:
@@ -243,6 +248,7 @@ class MonitorTematicoAgent(BaseAgent):
                     "window_end": window_end.isoformat(),
                     "search_provider": self.search_provider.name,
                     "llm_provider": self.llm_provider.name,
+                    "structured_output_invalid": synthesis_output_invalid,
                     "observed_topics": _observed_topics_metadata(observed_topics),
                     "llm_queries": _llm_queries_metadata(llm_queries),
                     "searched_queries": tuple(searched_queries),

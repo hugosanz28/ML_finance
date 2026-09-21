@@ -18,7 +18,9 @@ from src.agents.monitor_tematico.llm import (
 from src.agents.monitor_tematico.providers import (
     CachedSearchProvider,
     DuckDuckGoHtmlSearchProvider,
+    LangChainSearchToolProvider,
     NullSearchProvider,
+    OpenAIWebSearchProvider,
     SearchProvider,
     SearchProviderError,
     StaticSearchProvider,
@@ -29,11 +31,13 @@ from src.agents.monitor_tematico.topic_builder import build_observed_topics
 __all__ = [
     "CachedSearchProvider",
     "DuckDuckGoHtmlSearchProvider",
+    "LangChainSearchToolProvider",
     "LLMSearchQuery",
     "MonitorTematicoAgent",
     "NullSearchProvider",
     "ObservedTopic",
     "OpenAIThemeLLMProvider",
+    "OpenAIWebSearchProvider",
     "SearchProvider",
     "SearchProviderError",
     "SearchResult",

@@ -13,16 +13,15 @@ from __future__ import annotations
 
 from dataclasses import asdict
 from datetime import date
-import json
 import os
 from pathlib import Path
 from typing import Any, Protocol
 
 from dotenv import dotenv_values
 
+from src.agents.langchain_provider import StructuredOutputError, call_openai_structured
 from src.agents.provider_audit import (
     record_provider_failure,
-    record_provider_raw_response,
 )
 from src.agents.prompts import load_prompt
 from src.agents.monitor_tematico._types import (
@@ -73,6 +72,10 @@ class ThemeLLMProvider(Protocol):
 
 class ThemeLLMProviderError(RuntimeError):
     """Raised when the LLM provider cannot complete a request."""
+
+    def __init__(self, message: str, *, reason_code: str = "provider_request_failed") -> None:
+        super().__init__(message)
+        self.reason_code = reason_code
 
 
 class StaticThemeLLMProvider:
@@ -177,7 +180,7 @@ class OpenAIThemeLLMProvider:
         repo_env = _repo_env_values()
         self.model = model or os.environ.get("OPENAI_MODEL") or repo_env.get("OPENAI_MODEL") or "gpt-4.1-mini"
         self.api_key = api_key or os.environ.get("OPENAI_API_KEY") or repo_env.get("OPENAI_API_KEY")
-        self._client: Any | None = None
+        self._langchain_model: Any | None = None
 
     @property
     def name(self) -> str:
@@ -279,18 +282,6 @@ class OpenAIThemeLLMProvider:
             warnings=tuple(str(warning) for warning in data.get("warnings", [])),
         )
 
-    def _client_instance(self) -> Any:
-        if self._client is not None:
-            return self._client
-        try:
-            from openai import OpenAI
-        except ImportError as exc:
-            raise ThemeLLMProviderError(
-                "The OpenAI Python package is not installed. Run `pip install -r requirements.txt`."
-            ) from exc
-        self._client = OpenAI(api_key=self.api_key or None)
-        return self._client
-
     def _call_structured(
         self,
         *,
@@ -300,42 +291,24 @@ class OpenAIThemeLLMProvider:
         schema: dict[str, Any],
     ) -> dict[str, Any]:
         try:
-            response = self._client_instance().responses.create(
-                model=self.model,
-                input=[
-                    {"role": "system", "content": system_prompt},
-                    {
-                        "role": "user",
-                        "content": (
-                            "Return JSON that matches the provided schema. "
-                            f"Input payload:\n{json.dumps(user_payload, ensure_ascii=False)}"
-                        ),
-                    },
-                ],
-                text={
-                    "format": {
-                        "type": "json_schema",
-                        "name": schema_name,
-                        "strict": True,
-                        "schema": schema,
-                    }
-                },
+            return call_openai_structured(
+                self,
+                system_prompt=system_prompt,
+                user_payload=user_payload,
+                schema_name=schema_name,
+                schema=schema,
             )
         except Exception as exc:
             record_provider_failure(self, operation=schema_name)
-            raise ThemeLLMProviderError(f"OpenAI request failed: {exc}") from exc
-
-        record_provider_raw_response(self, response, operation=schema_name)
-        text = getattr(response, "output_text", None)
-        if not text:
-            raise ThemeLLMProviderError("OpenAI response did not include output_text.")
-        try:
-            parsed = json.loads(text)
-        except json.JSONDecodeError as exc:
-            raise ThemeLLMProviderError("OpenAI response was not valid JSON.") from exc
-        if not isinstance(parsed, dict):
-            raise ThemeLLMProviderError("OpenAI response JSON root was not an object.")
-        return parsed
+            error = ThemeLLMProviderError(
+                f"OpenAI request failed: {exc}",
+                reason_code=(
+                    "structured_output_invalid"
+                    if isinstance(exc, StructuredOutputError)
+                    else "provider_request_failed"
+                ),
+            )
+            raise error from exc
 
 
 _QUERY_SYSTEM_PROMPT = load_prompt("monitor_tematico.query")

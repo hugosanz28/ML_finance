@@ -172,8 +172,8 @@ Reglas:
 2. La trazabilidad de fuentes y fechas es parte del contrato, no una nota opcional.
 3. Los agentes pueden devolver `partial` cuando falta cobertura pero hay salida util.
 4. El mandato de la cuenta pesa mas que una noticia aislada o una moda puntual.
-5. La logica especifica queda encapsulada en el modulo de cada agente y la
-   orquestacion mantiene un orden fijo.
+5. La logica especifica queda encapsulada en cada especialista; un supervisor
+   LangGraph decide el orden y las repeticiones dentro de limites deterministas.
 
 ## Validacion de fechas
 
@@ -229,6 +229,8 @@ en `src/data/local/agents/monthly_pipeline/<run_id>/`. Ademas de
 
 - `run_metadata.json`: version de esquema, fecha, moneda base, estados,
   providers, hashes agregados y versiones de prompts.
+- `orchestration.json`: ruta del supervisor, instrucciones, intentos,
+  reparaciones, resultados por intento y motivo de parada.
 - `preflight.json`: resultado, codigos, severidades y conteos de calidad.
 - `input_payload.json`: referencias de entrada completas y hash agregado del
   run.
@@ -247,7 +249,7 @@ en `src/data/local/agents/monthly_pipeline/<run_id>/`. Ademas de
 - `agents/<agent_name>/audit_metadata.json`: version de esquema y hashes
   semanticos de entrada y salida.
 
-El run y los envelopes de auditoria nuevos usan `schema_version: 2`.
+El run y los envelopes de auditoria nuevos usan `schema_version: 3`.
 `request.json` conserva deliberadamente solo los cinco campos de
 `AgentRequest`, para permitir su round-trip directo, y hereda la version del
 run. Sus `input_refs` enumeran solo las entradas consumidas por la implementacion;
@@ -270,10 +272,8 @@ excluye identificadores y timestamps volatiles. El `output_hash` representa la
 salida parseada. Son huellas para comparar integridad y cambios semanticos, no
 una prueba de equivalencia financiera ni un mecanismo de anonimato.
 
-Los runs anteriores sin `schema_version`, `provider.json`,
-`audit_metadata.json` o hashes se leen como auditorias legacy v1. No se
-reescriben ni migran al abrirlos; React muestra lo disponible y marca como
-ausente la metadata que la version antigua nunca persistio.
+Los runs v1 y v2 se siguen leyendo sin reescribirlos. React muestra lo
+disponible y marca como ausente la metadata que su version no persistio.
 
 Estos artefactos viven bajo `src/data/local/`, por tanto son privados y estan
 ignorados por Git. Para demos publicas deben usarse datos sinteticos.
@@ -302,6 +302,8 @@ el cambio debe quedar en el diff del prompt versionado o en una nueva version.
   devuelven fixtures sinteticos y deterministas.
 - `openai/tavily`: ejecucion externa con OpenAI y Tavily configurados.
 - `openai/duckduckgo`: alternativa web best-effort sin clave de busqueda.
+- `openai/openai`: Responses API con la tool alojada `web_search`, fuentes
+  incluidas, `store=True` y un maximo de 7 tool calls por ejecucion.
 
 Los dos primeros modos no usan red. Los resultados `static/static` son
 sinteticos y no deben presentarse como hechos de mercado ni recomendaciones
@@ -321,11 +323,21 @@ mantienen `static/null` como default.
 - `analista_activos`
 - `asistente_aportacion_mensual`
 
+El `supervisor` es un participante de coordinacion auditado, no un cuarto
+especialista financiero.
+
 ## Autonomia acotada
 
-El pipeline mantiene un orden fijo: `monitor_tematico`, `analista_activos` y
-`asistente_aportacion_mensual`. La autonomia vive dentro de cada agente, no en
-la orquestacion global.
+El supervisor recibe disponibilidad de inputs, intentos y resúmenes, y elige
+el siguiente especialista. Con provider `static` mantiene la ruta reproducible
+monitor → analista → asistente. Con OpenAI puede cambiar el orden u omitir
+monitor/analista, pero no puede emitir recomendaciones financieras.
+
+El runtime impone como codigo un maximo de 5 delegaciones, 2 ejecuciones por
+especialista y una reparacion de output invalido. Un resultado valido del
+asistente finaliza el grafo. Un `finish` previo se rechaza salvo bloqueo real o
+agotamiento de limites. Los especialistas omitidos se representan como
+`AgentResult` con `metadata.execution_status="skipped"`.
 
 Cada agente debe dejar en `AgentResult.metadata` una traza comun:
 

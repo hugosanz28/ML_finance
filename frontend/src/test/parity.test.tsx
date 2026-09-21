@@ -61,6 +61,18 @@ it("rejects malformed target JSON before preparing a run", async () => {
   expect(screen.getByRole("alert")).toHaveTextContent("JSON");
 });
 
+it("offers OpenAI hosted web search only in real mode", () => {
+  const { rerender } = render(
+    <AgentsForm mode="demo" disabled={false} prepare={vi.fn()} />,
+  );
+  expect(screen.queryByRole("option", { name: /OpenAI web search/ })).toBeNull();
+
+  rerender(<AgentsForm mode="real" disabled={false} prepare={vi.fn()} />);
+  expect(
+    screen.getByRole("option", { name: /OpenAI web search/ }),
+  ).toBeVisible();
+});
+
 it("keeps isolated FX controls in the confirmation payload", async () => {
   const prepare = vi.fn();
   render(<DataForms mode="demo" disabled={false} prepare={prepare} />);

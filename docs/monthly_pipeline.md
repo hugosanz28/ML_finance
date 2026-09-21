@@ -28,6 +28,12 @@ Las interfaces comparten los mismos casos de uso:
 de valoracion, precios, FX o fechas bloquean antes de llamar a LLM/busqueda. Los
 warnings quedan auditados y permiten continuar con estado `partial`.
 
+Tras el preflight, un `StateGraph` coordina supervisor y especialistas. El
+supervisor puede escoger orden y repeticiones; el modo `static` usa la ruta
+monitor → analista → asistente. El runtime limita la ejecucion a 5 delegaciones,
+2 intentos por especialista y una reparacion de salida invalida. El asistente
+valido termina el grafo.
+
 Para una actualizacion rapida sin importar nuevos CSVs ni generar informe, usa
 `Vista general` -> `Actualizar a hoy`. Ese boton refresca FX y precios hasta la
 fecha actual, limpia la cache y mantiene el ultimo snapshot DEGIRO como ancla.
@@ -49,7 +55,8 @@ necesariamente la fecha del snapshot.
 - Resultados de agentes: `src/data/local/agents/monthly_pipeline/<run_id>/pipeline_result.json`
 - Preflight de calidad: `src/data/local/agents/monthly_pipeline/<run_id>/preflight.json`
 - Audit trail de agentes: `src/data/local/agents/monthly_pipeline/<run_id>/run_metadata.json`,
-  `input_payload.json` y `agents/<agent_name>/...`
+  `input_payload.json`, `orchestration.json` y `agents/<agent_name>/...`
+- Checkpoints LangGraph: `src/data/local/agents/langgraph_checkpoints.sqlite`
 - Overrides temporales de informes para agentes: `src/data/local/agents/input_overrides/latest_monthly_report_override_YYYY-MM-DD.md`
 
 ### Auditoria reproducible
@@ -61,10 +68,12 @@ targets. El monitor mantiene sus inputs de contexto externo. Ver
 [analitica para agentes](agent_analytics.md) para schema, limites y politica
 ante datos parciales.
 
-El schema v2 persiste la peticion y el contexto efectivos de cada agente. El
+El schema v3 persiste la peticion y el contexto efectivos de cada agente. El
 `request.json` conserva `scope`, `parameters`, `constraints`, `metadata` e
 `input_refs`; estas referencias se resuelven contra el contexto real, por lo que
-analista y asistente incluyen tambien resultados de agentes anteriores.
+cada especialista incluye solo resultados anteriores que ya existan en la ruta.
+`orchestration.json` conserva decisiones, intentos, reparaciones y causa de
+parada; no contiene razonamiento interno.
 
 Cada directorio de agente añade `provider.json` y `audit_metadata.json`.
 `provider.json` contiene solo provider, modelo y opciones allowlisted; no
@@ -77,9 +86,7 @@ hashes de entrada excluyen ids de run y timestamps volatiles; los de salida
 representan la salida parseada. Sirven para detectar cambios reproducibles, no
 para anonimizar datos ni validar una recomendacion.
 
-Los runs sin `schema_version` o sin los artefactos nuevos son legacy v1.
-`GetAgentRunAuditUseCase` y React los leen sin reescribirlos y muestran como
-no disponible la metadata que no existia entonces.
+`GetAgentRunAuditUseCase` y React mantienen lectura de v1 y v2 sin reescribirlos.
 
 ## Notas operativas
 
@@ -133,10 +140,11 @@ Combinaciones recomendadas:
 - `static/static`: demo publica offline con contexto sintetico.
 - `openai/tavily`: ejecucion externa con busqueda API.
 - `openai/duckduckgo`: ejecucion externa con busqueda best-effort.
+- `openai/openai`: Responses API y `web_search` alojado por OpenAI.
 
 ## Busqueda externa para agentes
 
-El monitor tematico soporta cuatro modos:
+El monitor tematico soporta cinco modos:
 
 - `null`: no busca en la web; util como baseline o para pruebas sin red.
 - `static`: genera fixtures sinteticos locales; util solo para demo y tests.
@@ -144,6 +152,8 @@ El monitor tematico soporta cuatro modos:
   cero resultados si cambia el HTML, hay bloqueo o la query no encaja.
 - `tavily`: proveedor API mas estable para agentes. Requiere `TAVILY_API_KEY`
   en `.env` o en variables de entorno.
+- `openai`: tool alojada `web_search` de Responses, con fuentes incluidas y
+  maximo de 7 llamadas. Requiere `llm_provider=openai`.
 
 Ejemplo con Tavily:
 

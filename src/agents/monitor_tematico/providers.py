@@ -18,14 +18,18 @@ import hashlib
 import json
 import os
 from pathlib import Path
-from typing import Protocol
+from typing import Any, Protocol
 from urllib.parse import quote_plus, urlparse, parse_qs, unquote
 from urllib.request import Request, urlopen
 
 from dotenv import dotenv_values
+from langchain_core.messages import HumanMessage, SystemMessage
+from langchain_core.tools import StructuredTool
+from langchain_openai import ChatOpenAI
+from langsmith import tracing_context
 
 from src.agents.monitor_tematico._types import SearchResult
-from src.agents.provider_audit import record_provider_failure
+from src.agents.provider_audit import record_provider_failure, record_provider_raw_response
 
 
 class SearchProvider(Protocol):
@@ -52,6 +56,57 @@ class SearchProvider(Protocol):
 
 class SearchProviderError(RuntimeError):
     """Raised when a search provider cannot complete a request."""
+
+
+class LangChainSearchToolProvider:
+    """Expose a legacy normalized provider through a LangChain tool contract."""
+
+    def __init__(self, provider: SearchProvider) -> None:
+        self.provider = provider
+
+        def search_tool(
+            query: str,
+            start_date: str,
+            end_date: str,
+            max_results: int,
+        ) -> tuple[SearchResult, ...]:
+            return provider.search(
+                query,
+                start_date=date.fromisoformat(start_date),
+                end_date=date.fromisoformat(end_date),
+                max_results=max_results,
+            )
+
+        self.tool = StructuredTool.from_function(
+            search_tool,
+            name=f"{provider.name}_search",
+            description="Search external context and return normalized, source-attributed results.",
+        )
+
+    @property
+    def name(self) -> str:
+        return self.provider.name
+
+    def __getattr__(self, attribute: str) -> Any:
+        return getattr(self.provider, attribute)
+
+    def search(
+        self,
+        query: str,
+        *,
+        start_date: date,
+        end_date: date,
+        max_results: int,
+    ) -> tuple[SearchResult, ...]:
+        result = self.tool.invoke(
+            {
+                "query": query,
+                "start_date": start_date.isoformat(),
+                "end_date": end_date.isoformat(),
+                "max_results": max_results,
+            }
+        )
+        return tuple(result)
 
 
 class NullSearchProvider:
@@ -123,6 +178,69 @@ class StaticSearchProvider:
             if key.lower() in normalized_query or normalized_query in key.lower():
                 matching.extend(results)
         return tuple(matching[:max_results])
+
+
+class OpenAIWebSearchProvider:
+    """Hosted Responses web search exposed through LangChain."""
+
+    max_tool_calls = 7
+
+    def __init__(self, *, model: str | None = None, api_key: str | None = None) -> None:
+        self.model = model or _resolve_env_value("OPENAI_MODEL") or "gpt-4.1-mini"
+        self.api_key = api_key or _resolve_env_value("OPENAI_API_KEY")
+        self.store = True
+        self._langchain_model: Any | None = None
+
+    @property
+    def name(self) -> str:
+        return "openai_web_search"
+
+    def search(
+        self,
+        query: str,
+        *,
+        start_date: date,
+        end_date: date,
+        max_results: int,
+    ) -> tuple[SearchResult, ...]:
+        try:
+            model = self._model_instance().bind_tools([{"type": "web_search"}])
+            with tracing_context(enabled=False):
+                response = model.invoke(
+                    [
+                        SystemMessage(
+                            content=(
+                                "Search the web for factual context. Return a concise synthesis with citations. "
+                                "Do not make portfolio recommendations."
+                            )
+                        ),
+                        HumanMessage(
+                            content=(
+                                f"Query: {query}\nRelevant date window: "
+                                f"{start_date.isoformat()} to {end_date.isoformat()}."
+                            )
+                        ),
+                    ]
+                )
+        except Exception as exc:
+            record_provider_failure(self, operation="web_search")
+            raise SearchProviderError(f"OpenAI web search failed for query {query!r}.") from exc
+        record_provider_raw_response(self, response, operation="web_search")
+        payload = response.model_dump(mode="json") if hasattr(response, "model_dump") else response
+        return _search_results_from_openai_payload(payload, query=query, max_results=max_results)
+
+    def _model_instance(self) -> ChatOpenAI:
+        if self._langchain_model is None:
+            self._langchain_model = ChatOpenAI(
+                model=self.model,
+                api_key=self.api_key or None,
+                use_responses_api=True,
+                store=True,
+                max_retries=0,
+                include=["web_search_call.action.sources"],
+                model_kwargs={"max_tool_calls": self.max_tool_calls},
+            )
+        return self._langchain_model
 
 
 class DuckDuckGoHtmlSearchProvider:
@@ -406,6 +524,50 @@ class _DuckDuckGoHtmlParser(HTMLParser):
             self._in_snippet = False
             self._pending_result_index = None
             self._snippet_parts = []
+
+
+def _search_results_from_openai_payload(
+    payload: Any,
+    *,
+    query: str,
+    max_results: int,
+) -> tuple[SearchResult, ...]:
+    candidates: list[dict[str, Any]] = []
+
+    def visit(value: Any) -> None:
+        if isinstance(value, dict):
+            url = value.get("url")
+            if isinstance(url, str) and url.startswith(("https://", "http://")):
+                candidates.append(value)
+            for item in value.values():
+                visit(item)
+        elif isinstance(value, list):
+            for item in value:
+                visit(item)
+
+    visit(payload)
+    results: list[SearchResult] = []
+    seen: set[str] = set()
+    for item in candidates:
+        url = str(item["url"])
+        if url in seen:
+            continue
+        seen.add(url)
+        parsed = urlparse(url)
+        title = str(item.get("title") or item.get("name") or parsed.netloc or url)
+        snippet = str(item.get("snippet") or item.get("description") or "")
+        results.append(
+            SearchResult(
+                title=title,
+                url=url,
+                snippet=snippet,
+                query=query,
+                metadata={"provider": "openai_web_search"},
+            )
+        )
+        if len(results) >= max_results:
+            break
+    return tuple(results)
 
 
 def _clean_text(value: str) -> str:

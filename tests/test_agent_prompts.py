@@ -18,7 +18,11 @@ def test_registered_agent_prompts_exist_and_are_non_empty() -> None:
     for key, spec in PROMPT_REGISTRY.items():
         text = load_prompt(key)
         assert spec.path.exists()
-        expected_version = "v1" if key.startswith("monitor_tematico.") else "v2"
+        expected_version = (
+            "v1"
+            if key.startswith("monitor_tematico.") or key == "monthly_supervisor.routing"
+            else "v2"
+        )
         assert spec.version == expected_version
         assert prompt_version(key) == expected_version
         assert len(text) > 80

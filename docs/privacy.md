@@ -52,7 +52,7 @@ particular, `request.json`, `context.json`, `prompt_rendered.md`,
 presupuesto, objetivos, respuestas del provider y decisiones derivadas. Deben
 tratarse siempre como datos financieros privados.
 
-El schema v2 añade `provider.json` y hashes SHA-256. La configuracion del
+El schema v3 añade la ruta de orquestacion y conserva `provider.json` y hashes SHA-256. La configuracion del
 provider se construye mediante una lista permitida de campos no secretos:
 nombre, modelo y opciones operativas necesarias para interpretar el run. No
 debe persistir API keys, tokens, passwords, cookies, cabeceras de autorizacion,

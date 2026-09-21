@@ -40,6 +40,10 @@ export function AuditView({ audit }: { audit: Audit }) {
         value={audit.run_metadata}
       />
       <JsonDetails label="Inputs de la ejecución" value={audit.input_payload} />
+      <JsonDetails
+        label="Ruta y decisiones del supervisor"
+        value={audit.orchestration}
+      />
       {Object.entries(audit.agents).map(([name, data]) => (
         <details key={name}>
           <summary>{name}</summary>

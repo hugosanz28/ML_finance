@@ -123,7 +123,10 @@ class ReadAgentAuditUseCase:
         root = self.settings.data_dir / "agents" / "monthly_pipeline"
         run_dir = _contained(root / run_id, root)
         # Validate every file the legacy reader may open, including symlinked subfolders.
-        paths = [run_dir / name for name in ("run_metadata.json", "input_payload.json", "preflight.json")]
+        paths = [
+            run_dir / name
+            for name in ("run_metadata.json", "input_payload.json", "preflight.json", "orchestration.json")
+        ]
         for agent in AGENT_NAMES:
             paths.extend(run_dir / "agents" / agent / name for name in (
                 "context.json", "request.json", "prompt_refs.json", "prompt_rendered.md", "provider.json",

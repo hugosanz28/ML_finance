@@ -5,7 +5,6 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import date, datetime, timezone
 import json
-from types import SimpleNamespace
 
 import pytest
 
@@ -216,16 +215,30 @@ def test_openai_provider_records_sdk_response_after_successful_call(
     class OpenAIResponse(_FakeResponse):
         output_text = '{"ok": true}'
 
-    class Responses:
-        def create(self, **kwargs):
-            assert kwargs["model"] == "audit-model"
-            return OpenAIResponse()
+    class Runnable:
+        def invoke(self, messages):
+            assert len(messages) == 2
+            return {
+                "raw": OpenAIResponse(),
+                "parsed": {"ok": True},
+                "parsing_error": None,
+            }
+
+    class Model:
+        def with_structured_output(self, schema, **kwargs):
+            assert schema["title"] == "audit_schema"
+            assert kwargs == {
+                "method": "json_schema",
+                "include_raw": True,
+                "strict": True,
+            }
+            return Runnable()
 
     provider = provider_type(
         model="audit-model",
         api_key="sentinel-secret-api-key",  # pragma: allowlist secret
     )
-    provider._client = SimpleNamespace(responses=Responses())
+    provider._langchain_model = Model()
 
     parsed = provider._call_structured(
         system_prompt="system",
@@ -242,15 +255,19 @@ def test_openai_provider_records_sdk_response_after_successful_call(
 
 
 def test_openai_provider_records_failure_before_response() -> None:
-    class FailingResponses:
-        def create(self, **kwargs):
+    class FailingRunnable:
+        def invoke(self, messages):
             raise RuntimeError("provider unavailable")
+
+    class Model:
+        def with_structured_output(self, schema, **kwargs):
+            return FailingRunnable()
 
     provider = OpenAIThemeLLMProvider(
         model="audit-model",
         api_key="sentinel-secret-api-key",  # pragma: allowlist secret
     )
-    provider._client = SimpleNamespace(responses=FailingResponses())
+    provider._langchain_model = Model()
 
     with pytest.raises(ThemeLLMProviderError, match="OpenAI request failed"):
         provider._call_structured(
@@ -263,6 +280,32 @@ def test_openai_provider_records_failure_before_response() -> None:
     audit = provider_audit.provider_raw_response_audit(provider, role="llm")
     assert audit["status"] == "not_captured"
     assert audit["reason_code"] == "provider_request_failed_before_response"
+
+
+def test_openai_provider_classifies_invalid_structured_output_for_graph_repair() -> None:
+    class Runnable:
+        def invoke(self, messages):
+            return {"raw": _FakeResponse(), "parsed": None, "parsing_error": ValueError("invalid")}
+
+    class Model:
+        def with_structured_output(self, schema, **kwargs):
+            return Runnable()
+
+    provider = OpenAIThemeLLMProvider(
+        model="audit-model",
+        api_key="test-key",  # pragma: allowlist secret
+    )
+    provider._langchain_model = Model()
+
+    with pytest.raises(ThemeLLMProviderError) as error:
+        provider._call_structured(
+            system_prompt="system",
+            user_payload={"input": "value"},
+            schema_name="audit_schema",
+            schema={"type": "object"},
+        )
+
+    assert error.value.reason_code == "structured_output_invalid"
 
 
 @dataclass(frozen=True)
@@ -290,3 +333,22 @@ def test_json_safe_normalizes_basic_nested_values() -> None:
         },
     }
     json.dumps(payload, allow_nan=False)
+
+
+def test_json_safe_removes_internal_reasoning_content() -> None:
+    payload = provider_audit._json_safe(
+        {
+            "output": [
+                {"type": "reasoning", "summary": "private chain", "encrypted_content": "ciphertext"},
+                {"type": "message", "content": "visible answer"},
+            ],
+            "reasoning_content": "private chain",
+        }
+    )
+
+    assert payload == {
+        "output": [
+            {"type": "reasoning", "redacted": True},
+            {"type": "message", "content": "visible answer"},
+        ]
+    }

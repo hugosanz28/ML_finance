@@ -22,6 +22,11 @@ class PromptSpec:
 
 
 PROMPT_REGISTRY: dict[str, PromptSpec] = {
+    "monthly_supervisor.routing": PromptSpec(
+        key="monthly_supervisor.routing",
+        version="v1",
+        filename="monthly_supervisor_routing_v1.md",
+    ),
     "monitor_tematico.query": PromptSpec(
         key="monitor_tematico.query",
         version="v1",

@@ -20,6 +20,14 @@ from src.agents.asistente_aportacion_mensual import (
     StaticContributionLLMProvider,
 )
 from src.agents.models import AgentContext, AgentInputRef, AgentRequest, AgentResult, build_agent_context
+from src.agents.orchestration import (
+    GRAPH_VERSION,
+    OpenAISupervisorProvider,
+    SpecialistName,
+    StaticSupervisorProvider,
+    agent_result_from_payload,
+    run_monthly_graph,
+)
 from src.agents.analytics import ANALYTICS_INPUT_KEY, analytics_for_agent, analytics_quality_issues
 from src.agents.provider_audit import (
     provider_audit_config,
@@ -29,8 +37,10 @@ from src.agents.provider_audit import (
 from src.agents.prompts import load_prompt, prompt_version
 from src.agents.monitor_tematico import (
     DuckDuckGoHtmlSearchProvider,
+    LangChainSearchToolProvider,
     MonitorTematicoAgent,
     NullSearchProvider,
+    OpenAIWebSearchProvider,
     OpenAIThemeLLMProvider,
     StaticSearchProvider,
     StaticThemeLLMProvider,
@@ -43,7 +53,7 @@ from src.portfolio.targets import PortfolioTargets, load_portfolio_targets
 from src.reports import generate_monthly_report, get_latest_monthly_report
 
 
-AUDIT_SCHEMA_VERSION = 2
+AUDIT_SCHEMA_VERSION = 3
 
 
 @dataclass(frozen=True)
@@ -62,6 +72,8 @@ class MonthlyAgentPipelineResult:
     prompt_audits: Mapping[str, Mapping[str, Any]] = field(default_factory=dict)
     provider_configs: Mapping[str, Mapping[str, Any]] = field(default_factory=dict)
     raw_responses: Mapping[str, Mapping[str, Any]] = field(default_factory=dict)
+    supervisor: AgentResult | None = None
+    orchestration: Mapping[str, Any] = field(default_factory=dict)
 
 
 def run_monthly_agent_pipeline(
@@ -135,14 +147,18 @@ def run_monthly_agent_pipeline(
         constraints=dict(request_constraints or {}),
         metadata=dict(request_metadata or {}),
     )
+    if search_provider == "openai" and llm_provider != "openai":
+        raise ValueError("search_provider='openai' requires llm_provider='openai'.")
     monitor_search_provider = _build_search_provider(search_provider)
     monitor_llm_provider = _build_monitor_llm_provider(llm_provider)
     analista_llm_provider = _build_asset_llm_provider(llm_provider)
     asistente_llm_provider = _build_contribution_llm_provider(llm_provider)
+    supervisor_provider = _build_supervisor_provider(llm_provider)
     # Audit only prompts actually consumed by the selected provider.
     prompt_audits = {
         agent_name: _prompt_audit_snapshot(agent_name, provider.name)
         for agent_name, provider in (
+            ("supervisor", supervisor_provider),
             ("monitor_tematico", monitor_llm_provider),
             ("analista_activos", analista_llm_provider),
             ("asistente_aportacion_mensual", asistente_llm_provider),
@@ -153,68 +169,198 @@ def run_monthly_agent_pipeline(
         search_provider=monitor_search_provider,
         llm_provider=monitor_llm_provider,
     )
-    monitor_context = build_agent_context(
-        agent_name=monitor_agent.name,
-        as_of_date=as_of_date,
-        generated_at=generated_at,
-        base_currency=resolved_settings.default_currency,
-        settings=resolved_settings,
-        input_refs=common_refs,
-        run_id=run_id,
-    )
-    monitor_request = _request_for_context(base_request, monitor_context)
-    monitor_result = monitor_agent.execute(monitor_request, monitor_context)
-
-    monitor_ref = _result_input_ref("monitor_tematico_result", "Monitor tematico result", monitor_result)
     analista_agent = AnalistaActivosAgent(llm_provider=analista_llm_provider)
-    analista_context = build_agent_context(
-        agent_name=analista_agent.name,
-        as_of_date=as_of_date,
-        generated_at=generated_at,
-        base_currency=resolved_settings.default_currency,
-        settings=resolved_settings,
-        input_refs=(*common_refs, *_analytics_refs(portfolio_analytics_snapshot, "analista_activos", as_of_date), monitor_ref),
-        run_id=run_id,
-    )
-    analista_request = _request_for_context(base_request, analista_context)
-    analista_result = analista_agent.execute(analista_request, analista_context)
-
-    analista_ref = _result_input_ref("analista_activos_result", "Analista activos result", analista_result)
     asistente_agent = AsistenteAportacionMensualAgent(llm_provider=asistente_llm_provider)
-    asistente_context = build_agent_context(
-        agent_name=asistente_agent.name,
-        as_of_date=as_of_date,
-        generated_at=generated_at,
-        base_currency=resolved_settings.default_currency,
-        settings=resolved_settings,
-        input_refs=(*common_refs, *_analytics_refs(portfolio_analytics_snapshot, "asistente_aportacion_mensual", as_of_date), monitor_ref, analista_ref),
-        metadata={
-            "monthly_budget": (
-                float(monthly_budget)
-                if monthly_budget is not None
-                else (
-                    portfolio_targets.monthly_contribution
-                    if portfolio_targets is not None and portfolio_targets.monthly_contribution is not None
-                    else resolved_settings.monthly_contribution_eur
+    agents = {
+        "monitor_tematico": monitor_agent,
+        "analista_activos": analista_agent,
+        "asistente_aportacion_mensual": asistente_agent,
+    }
+    specialist_llm_providers = {
+        "monitor_tematico": monitor_llm_provider,
+        "analista_activos": analista_llm_provider,
+        "asistente_aportacion_mensual": asistente_llm_provider,
+    }
+    resolved_monthly_budget = (
+        float(monthly_budget)
+        if monthly_budget is not None
+        else (
+            portfolio_targets.monthly_contribution
+            if portfolio_targets is not None and portfolio_targets.monthly_contribution is not None
+            else resolved_settings.monthly_contribution_eur
+        )
+    )
+    agent_requests: dict[str, AgentRequest] = {}
+    agent_contexts: dict[str, Mapping[str, Any]] = {}
+
+    def execute_specialist(
+        agent_name: SpecialistName,
+        instruction: str,
+        attempt: int,
+        prior_payloads: Mapping[str, dict[str, Any]],
+    ) -> AgentResult:
+        prior_results = {
+            name: agent_result_from_payload(dict(payload))
+            for name, payload in prior_payloads.items()
+        }
+        refs: list[AgentInputRef] = list(common_refs)
+        refs.extend(_analytics_refs(portfolio_analytics_snapshot, agent_name, as_of_date))
+        if "monitor_tematico" in prior_results and agent_name != "monitor_tematico":
+            refs.append(
+                _result_input_ref(
+                    "monitor_tematico_result",
+                    "Monitor tematico result",
+                    prior_results["monitor_tematico"],
                 )
             )
-        },
-        run_id=run_id,
-    )
-    asistente_request = _request_for_context(base_request, asistente_context)
-    asistente_result = asistente_agent.execute(asistente_request, asistente_context)
+        if "analista_activos" in prior_results and agent_name == "asistente_aportacion_mensual":
+            refs.append(
+                _result_input_ref(
+                    "analista_activos_result",
+                    "Analista activos result",
+                    prior_results["analista_activos"],
+                )
+            )
+        metadata = {
+            "supervisor_instruction": instruction,
+            "orchestration_attempt": attempt,
+        }
+        if agent_name == "asistente_aportacion_mensual":
+            metadata["monthly_budget"] = resolved_monthly_budget
+        context = build_agent_context(
+            agent_name=agent_name,
+            as_of_date=as_of_date,
+            generated_at=generated_at,
+            base_currency=resolved_settings.default_currency,
+            settings=resolved_settings,
+            input_refs=tuple(refs),
+            metadata=metadata,
+            run_id=run_id,
+        )
+        delegated_request = AgentRequest(
+            scope=dict(base_request.scope),
+            parameters=dict(base_request.parameters),
+            constraints=dict(base_request.constraints),
+            metadata={**dict(base_request.metadata), **metadata},
+        )
+        request = _request_for_context(delegated_request, context)
+        agent_requests[agent_name] = request
+        agent_contexts[agent_name] = _serialize_agent_context(context)
+        provider = specialist_llm_providers[agent_name]
+        provider._ml_finance_delegation_instruction = instruction
+        provider._ml_finance_orchestration_attempt = attempt
+        try:
+            return agents[agent_name].execute(request, context)
+        finally:
+            del provider._ml_finance_delegation_instruction
+            del provider._ml_finance_orchestration_attempt
 
-    agent_requests = {
-        "monitor_tematico": monitor_request,
-        "analista_activos": analista_request,
-        "asistente_aportacion_mensual": asistente_request,
+    full_refs = (*common_refs, *_analytics_refs(portfolio_analytics_snapshot, "full", as_of_date))
+    initial_state = {
+        "run_id": run_id,
+        "as_of_date": as_of_date.isoformat(),
+        "base_currency": resolved_settings.default_currency,
+        "graph_version": GRAPH_VERSION,
+        "inputs": {
+            "input_refs": [_serialize_input_ref_full(ref) for ref in full_refs],
+            "monthly_budget": resolved_monthly_budget,
+        },
+        "input_summary": {
+            "input_keys": [ref.key for ref in full_refs],
+            "position_count": len(metrics_snapshot.get("positions", [])),
+            "analytics_available": portfolio_analytics_snapshot is not None,
+            "user_interest_available": bool(user_satellite_interest),
+            "monthly_budget": resolved_monthly_budget,
+        },
+        "decisions": [],
+        "attempts": {},
+        "repair_counts": {},
+        "attempt_log": [],
+        "results": {},
+        "result_history": {},
+        "next_agent": "supervisor",
+        "delegation_instruction": "",
+        "total_delegations": 0,
+        "warnings": [],
+        "errors": [],
+        "terminal_status": "failed",
+        "terminal_reason": "not_started",
     }
-    agent_contexts = {
-        "monitor_tematico": _serialize_agent_context(monitor_context),
-        "analista_activos": _serialize_agent_context(analista_context),
-        "asistente_aportacion_mensual": _serialize_agent_context(asistente_context),
+    graph_result = run_monthly_graph(
+        initial_state,
+        supervisor=supervisor_provider,
+        execute_specialist=execute_specialist,
+        persist=persist,
+        checkpoint_path=resolved_settings.data_dir / "agents" / "langgraph_checkpoints.sqlite",
+    )
+    final_state = graph_result.state
+    final_results = {
+        name: agent_result_from_payload(dict(payload))
+        for name, payload in final_state.get("results", {}).items()
     }
+    monitor_result = final_results.get("monitor_tematico") or _skipped_agent_result("monitor_tematico")
+    analista_result = final_results.get("analista_activos") or _skipped_agent_result("analista_activos")
+    asistente_result = final_results.get("asistente_aportacion_mensual") or _skipped_agent_result(
+        "asistente_aportacion_mensual", required=True
+    )
+    orchestration = {
+        "schema_version": AUDIT_SCHEMA_VERSION,
+        "graph_version": GRAPH_VERSION,
+        "runtime": "langgraph",
+        "thread_id": run_id,
+        "checkpoint_backend": "sqlite" if persist else "memory",
+        "decisions": final_state.get("decisions", []),
+        "attempts": final_state.get("attempts", {}),
+        "repair_counts": final_state.get("repair_counts", {}),
+        "attempt_log": final_state.get("attempt_log", []),
+        "result_history": final_state.get("result_history", {}),
+        "total_delegations": final_state.get("total_delegations", 0),
+        "terminal_status": final_state.get("terminal_status", "failed"),
+        "terminal_reason": final_state.get("terminal_reason", "unknown"),
+        "warnings": final_state.get("warnings", []),
+        "errors": final_state.get("errors", []),
+    }
+    supervisor_result = AgentResult(
+        status=str(orchestration["terminal_status"]),
+        summary=f"Orquestacion finalizada: {orchestration['terminal_reason']}.",
+        warnings=tuple(str(item) for item in orchestration["warnings"]),
+        errors=tuple(str(item) for item in orchestration["errors"]),
+        metadata={
+            "agent_plan": tuple(item.get("next_agent") for item in orchestration["decisions"]),
+            "allowed_actions": (
+                "delegate_monitor",
+                "delegate_analyst",
+                "delegate_assistant",
+                "finish",
+            ),
+            "selected_actions": tuple(item.get("next_agent") for item in orchestration["decisions"]),
+            "applied_constraints": {
+                "max_delegations": 5,
+                "max_specialist_attempts": 2,
+                "assistant_required": True,
+            },
+            "decision_basis": "validated_state_and_specialist_summaries",
+        },
+    )
+    agent_contexts["supervisor"] = {
+        "schema_version": AUDIT_SCHEMA_VERSION,
+        "agent_name": "supervisor",
+        "run_id": run_id,
+        "as_of_date": as_of_date.isoformat(),
+        "generated_at": generated_at.isoformat(),
+        "base_currency": resolved_settings.default_currency,
+        "input_refs": [_serialize_input_ref_full(ref) for ref in full_refs],
+        "metadata": {"input_summary": initial_state["input_summary"]},
+    }
+    agent_requests["supervisor"] = AgentRequest(
+        scope={"type": "monthly_orchestration"},
+        constraints={"max_delegations": 5, "max_specialist_attempts": 2},
+        input_refs=tuple(ref.key for ref in full_refs),
+    )
     provider_configs = {
+        "supervisor": {
+            "llm": provider_audit_config(supervisor_provider, role="llm"),
+        },
         "monitor_tematico": {
             "llm": provider_audit_config(monitor_llm_provider, role="llm"),
             "search": provider_audit_config(monitor_search_provider, role="search"),
@@ -227,6 +373,7 @@ def run_monthly_agent_pipeline(
         },
     }
     raw_responses = {
+        "supervisor": providers_raw_response_audit({"llm": supervisor_provider}),
         "monitor_tematico": providers_raw_response_audit(
             {
                 "llm": monitor_llm_provider,
@@ -243,7 +390,7 @@ def run_monthly_agent_pipeline(
     result = MonthlyAgentPipelineResult(
         run_id=run_id,
         as_of_date=as_of_date,
-        input_refs=(*common_refs, *_analytics_refs(portfolio_analytics_snapshot, "full", as_of_date)),
+        input_refs=full_refs,
         monitor_tematico=monitor_result,
         analista_activos=analista_result,
         asistente_aportacion_mensual=asistente_result,
@@ -253,6 +400,8 @@ def run_monthly_agent_pipeline(
         prompt_audits=prompt_audits,
         provider_configs=provider_configs,
         raw_responses=raw_responses,
+        supervisor=supervisor_result,
+        orchestration=orchestration,
     )
     if persist:
         resolved_output_dir = _persist_pipeline_result(
@@ -575,16 +724,36 @@ def _build_contribution_llm_provider(provider_name: str):
     raise ValueError(f"Unsupported agent LLM provider: {provider_name}")
 
 
+def _build_supervisor_provider(provider_name: str):
+    if provider_name == "static":
+        return StaticSupervisorProvider()
+    if provider_name == "openai":
+        return OpenAISupervisorProvider()
+    raise ValueError(f"Unsupported supervisor LLM provider: {provider_name}")
+
+
 def _build_search_provider(provider_name: str):
     if provider_name == "null":
         return NullSearchProvider()
     if provider_name == "static":
         return StaticSearchProvider()
+    if provider_name == "openai":
+        return OpenAIWebSearchProvider()
     if provider_name == "duckduckgo":
-        return DuckDuckGoHtmlSearchProvider()
+        return LangChainSearchToolProvider(DuckDuckGoHtmlSearchProvider())
     if provider_name == "tavily":
-        return TavilySearchProvider()
+        return LangChainSearchToolProvider(TavilySearchProvider())
     raise ValueError(f"Unsupported search provider: {provider_name}")
+
+
+def _skipped_agent_result(agent_name: str, *, required: bool = False) -> AgentResult:
+    return AgentResult(
+        status="failed" if required else "partial",
+        summary=f"{agent_name} no fue ejecutado por el supervisor.",
+        warnings=() if required else ("specialist_skipped_by_supervisor",),
+        errors=("required_specialist_not_executed",) if required else (),
+        metadata={"execution_status": "skipped"},
+    )
 
 
 def _persist_pipeline_result(
@@ -653,6 +822,11 @@ def _persist_pipeline_audit_trail(
         "hash_algorithm": "sha256",
         "input_hash": input_hash,
         "output_hash": output_hash,
+        "runtime": "langgraph",
+        "graph_version": result.orchestration.get("graph_version"),
+        "thread_id": result.orchestration.get("thread_id"),
+        "terminal_status": result.orchestration.get("terminal_status"),
+        "terminal_reason": result.orchestration.get("terminal_reason"),
         "agents": {
             agent_name: {
                 "status": payload["parsed_output"]["status"],
@@ -671,6 +845,13 @@ def _persist_pipeline_audit_trail(
         },
     }
     _write_json(base_dir / "run_metadata.json", run_metadata)
+    _write_json(
+        base_dir / "orchestration.json",
+        {
+            "schema_version": AUDIT_SCHEMA_VERSION,
+            **_json_ready(dict(result.orchestration)),
+        },
+    )
     _write_json(
         base_dir / "input_payload.json",
         {
@@ -797,7 +978,10 @@ def _build_agent_audit_payloads(
 def _agent_audit_specs(
     result: MonthlyAgentPipelineResult,
 ) -> tuple[tuple[str, AgentResult, tuple[AgentInputRef, ...], Mapping[str, Any]], ...]:
-    return (
+    specs: list[tuple[str, AgentResult, tuple[AgentInputRef, ...], Mapping[str, Any]]] = []
+    if result.supervisor is not None:
+        specs.append(("supervisor", result.supervisor, result.input_refs, dict(result.orchestration)))
+    specs.extend((
         (
             "monitor_tematico",
             result.monitor_tematico,
@@ -835,7 +1019,8 @@ def _agent_audit_specs(
             ),
             {},
         ),
-    )
+    ))
+    return tuple(specs)
 
 
 def _audit_input_refs(result, agent_name):
@@ -967,6 +1152,7 @@ def _agent_prompt_markdown(agent_name: str) -> str:
 
 def _agent_prompt_keys() -> dict[str, tuple[str, ...]]:
     return {
+        "supervisor": ("monthly_supervisor.routing",),
         "monitor_tematico": ("monitor_tematico.query", "monitor_tematico.synthesis"),
         "analista_activos": ("analista_activos.analysis",),
         "asistente_aportacion_mensual": ("asistente_aportacion_mensual.decision",),
@@ -1033,15 +1219,19 @@ def _canonical_json_text(payload: Any) -> str:
 
 
 def _serialize_pipeline_result(result: MonthlyAgentPipelineResult) -> dict[str, Any]:
+    results = {
+        "monitor_tematico": _serialize_agent_result(result.monitor_tematico),
+        "analista_activos": _serialize_agent_result(result.analista_activos),
+        "asistente_aportacion_mensual": _serialize_agent_result(result.asistente_aportacion_mensual),
+    }
+    if result.supervisor is not None:
+        results["supervisor"] = _serialize_agent_result(result.supervisor)
     return {
         "run_id": result.run_id,
         "as_of_date": result.as_of_date.isoformat(),
         "inputs": [_serialize_input_ref(input_ref) for input_ref in result.input_refs],
-        "results": {
-            "monitor_tematico": _serialize_agent_result(result.monitor_tematico),
-            "analista_activos": _serialize_agent_result(result.analista_activos),
-            "asistente_aportacion_mensual": _serialize_agent_result(result.asistente_aportacion_mensual),
-        },
+        "results": results,
+        "orchestration": _json_ready(dict(result.orchestration)),
     }
 
 

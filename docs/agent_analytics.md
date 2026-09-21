@@ -81,8 +81,8 @@ semanticos existentes incorporan estos inputs. El preflight añade
 serializable no recibe hash. No se persiste el bruto invalido en un bloqueo.
 
 Las fuentes resumidas omiten el snapshot voluminoso: el contenido completo
-queda en los inputs de auditoria. Se mantiene schema v2 de auditoria, lectura
-legacy sin reescrituras y redaccion de campos sensibles. Los snapshots y hashes
+queda en los inputs de auditoria. El schema v3 mantiene lectura de v1/v2 sin
+reescrituras y redaccion de campos sensibles. Los snapshots y hashes
 de carteras reales son privados; ver [privacidad](privacy.md).
 
 ## Validacion offline

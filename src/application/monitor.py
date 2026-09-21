@@ -11,9 +11,11 @@ from src.agents import AgentInputRef, AgentRequest, AgentResult, build_agent_con
 from src.agents.monitor_tematico import (
     CachedSearchProvider,
     DuckDuckGoHtmlSearchProvider,
+    LangChainSearchToolProvider,
     MonitorTematicoAgent,
     NullSearchProvider,
     OpenAIThemeLLMProvider,
+    OpenAIWebSearchProvider,
     SearchProvider,
     StaticSearchProvider,
     StaticThemeLLMProvider,
@@ -119,6 +121,8 @@ class RunMonitorTematicoUseCase:
                 payload=payload,
             )
 
+        if resolved_request.search_provider == "openai" and resolved_request.llm_provider != "openai":
+            raise ValueError("search_provider='openai' requires llm_provider='openai'.")
         agent = MonitorTematicoAgent(
             search_provider=_build_search_provider(resolved_request, self.settings),
             llm_provider=_build_llm_provider(resolved_request.llm_provider),
@@ -213,10 +217,12 @@ def _build_search_provider(
         return NullSearchProvider()
     if request.search_provider == "static":
         return StaticSearchProvider()
+    if request.search_provider == "openai":
+        return OpenAIWebSearchProvider()
     if request.search_provider == "tavily":
-        provider: SearchProvider = TavilySearchProvider()
+        provider: SearchProvider = LangChainSearchToolProvider(TavilySearchProvider())
     elif request.search_provider == "duckduckgo":
-        provider = DuckDuckGoHtmlSearchProvider()
+        provider = LangChainSearchToolProvider(DuckDuckGoHtmlSearchProvider())
     else:
         raise ValueError(f"Unsupported search provider: {request.search_provider}")
 

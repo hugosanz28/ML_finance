@@ -119,14 +119,14 @@ def test_persist_pipeline_result_writes_audit_trail_files() -> None:
         assert run_metadata["run_id"] == "run-audit-001"
         assert run_metadata["execution_status"] == "succeeded"
         assert run_metadata["preflight"]["status"] == "passed"
-        assert run_metadata["schema_version"] == 2
+        assert run_metadata["schema_version"] == 3
         assert run_metadata["hash_algorithm"] == "sha256"
         assert run_metadata["input_hash"].startswith("sha256:")
         assert len(run_metadata["input_hash"]) == 71
         assert run_metadata["output_hash"].startswith("sha256:")
         assert len(run_metadata["output_hash"]) == 71
         assert run_metadata["prompt_versions"]["monitor_tematico"] == {}
-        assert input_payload["schema_version"] == 2
+        assert input_payload["schema_version"] == 3
         assert input_payload["input_hash"] == run_metadata["input_hash"]
         assert input_payload["inputs"][0]["metadata"]["content"] == "brief text"
         assert pipeline_result["input_hash"] == run_metadata["input_hash"]
@@ -165,7 +165,7 @@ def test_persist_pipeline_result_writes_audit_trail_files() -> None:
                 metadata=request["metadata"],
             )
             assert restored_request == result.agent_requests[agent_name]
-            assert provider["schema_version"] == 2
+            assert provider["schema_version"] == 3
             assert raw_response["status"] == "not_captured"
             assert raw_response["reason_code"] == "provider_contract_no_raw_response"
             assert parsed_output["status"] == "success"

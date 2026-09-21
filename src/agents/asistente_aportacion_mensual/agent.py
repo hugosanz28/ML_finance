@@ -136,6 +136,9 @@ class AsistenteAportacionMensualAgent(BaseAgent):
                         has_expected_context=_has_expected_context(context, upstream_findings),
                     ),
                     "llm_provider": self.llm_provider.name,
+                    "structured_output_invalid": (
+                        getattr(exc, "reason_code", None) == "structured_output_invalid"
+                    ),
                     "monthly_budget": monthly_budget,
                     "target_weights": dict(target_weights),
                     "portfolio_targets": dict(portfolio_targets),
