@@ -28,6 +28,7 @@ from langchain_core.tools import StructuredTool
 from langchain_openai import ChatOpenAI
 from langsmith import tracing_context
 
+from src.agents.langchain_provider import parse_openai_reasoning_effort
 from src.agents.monitor_tematico._types import SearchResult
 from src.agents.provider_audit import record_provider_failure, record_provider_raw_response
 
@@ -188,6 +189,9 @@ class OpenAIWebSearchProvider:
     def __init__(self, *, model: str | None = None, api_key: str | None = None) -> None:
         self.model = model or _resolve_env_value("OPENAI_MODEL") or "gpt-4.1-mini"
         self.api_key = api_key or _resolve_env_value("OPENAI_API_KEY")
+        self.reasoning_effort = parse_openai_reasoning_effort(
+            _resolve_env_value("OPENAI_REASONING_EFFORT")
+        )
         self.store = True
         self._langchain_model: Any | None = None
 
@@ -239,6 +243,11 @@ class OpenAIWebSearchProvider:
                 max_retries=0,
                 include=["web_search_call.action.sources"],
                 model_kwargs={"max_tool_calls": self.max_tool_calls},
+                **(
+                    {"reasoning": {"effort": self.reasoning_effort}}
+                    if self.reasoning_effort
+                    else {}
+                ),
             )
         return self._langchain_model
 

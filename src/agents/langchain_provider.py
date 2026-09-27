@@ -16,6 +16,16 @@ class StructuredOutputError(ValueError):
     """The provider responded, but the structured payload could not be validated."""
 
 
+def parse_openai_reasoning_effort(value: str | None) -> str | None:
+    """Validate an optional Responses reasoning effort without changing unset defaults."""
+    effort = value.strip().lower() if value else ""
+    if not effort:
+        return None
+    if effort not in {"none", "minimal", "low", "medium", "high", "xhigh", "max"}:
+        raise ValueError(f"Invalid OPENAI_REASONING_EFFORT: {effort!r}.")
+    return effort
+
+
 def call_openai_structured(
     provider: Any,
     *,
@@ -33,6 +43,11 @@ def call_openai_structured(
             use_responses_api=True,
             store=True,
             max_retries=0,
+            **(
+                {"reasoning": {"effort": provider.reasoning_effort}}
+                if getattr(provider, "reasoning_effort", None)
+                else {}
+            ),
         )
         provider._langchain_model = model
     resolved_schema = dict(schema)
@@ -84,4 +99,4 @@ def call_openai_structured(
     return dict(parsed)
 
 
-__all__ = ["StructuredOutputError", "call_openai_structured"]
+__all__ = ["StructuredOutputError", "call_openai_structured", "parse_openai_reasoning_effort"]

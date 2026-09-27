@@ -8,6 +8,7 @@ import json
 
 import pytest
 
+from src.agents import langchain_provider
 from src.agents import provider_audit
 from src.agents.analista_activos.llm import OpenAIAssetLLMProvider
 from src.agents.asistente_aportacion_mensual.llm import (
@@ -18,6 +19,7 @@ from src.agents.monitor_tematico.llm import (
     StaticThemeLLMProvider,
     ThemeLLMProviderError,
 )
+from src.agents.orchestration.supervisor import OpenAISupervisorProvider
 
 
 class _ConfiguredProvider:
@@ -38,6 +40,84 @@ class _FakeResponse:
             "output": [{"type": "message", "text": "resultado"}],
             "usage": {"input_tokens": 10, "output_tokens": 4},
         }
+
+
+@pytest.mark.parametrize(
+    "provider_type",
+    [
+        OpenAISupervisorProvider,
+        OpenAIThemeLLMProvider,
+        OpenAIAssetLLMProvider,
+        OpenAIContributionLLMProvider,
+    ],
+)
+def test_openai_providers_read_reasoning_effort_from_environment(monkeypatch, provider_type) -> None:
+    monkeypatch.setenv("OPENAI_REASONING_EFFORT", " HIGH ")
+    provider = provider_type(model="gpt-6-sol", api_key="test-key")  # pragma: allowlist secret
+
+    assert provider.reasoning_effort == "high"
+    assert provider_audit.provider_audit_config(provider, role="llm")["options"]["reasoning_effort"] == "high"
+
+
+def test_reasoning_effort_is_optional_and_invalid_values_fail_fast() -> None:
+    assert langchain_provider.parse_openai_reasoning_effort(None) is None
+    assert langchain_provider.parse_openai_reasoning_effort(" ") is None
+    with pytest.raises(ValueError, match="Invalid OPENAI_REASONING_EFFORT"):
+        langchain_provider.parse_openai_reasoning_effort("turbo")
+
+
+def test_openai_provider_uses_repo_env_when_process_variable_is_absent(monkeypatch) -> None:
+    monkeypatch.delenv("OPENAI_REASONING_EFFORT", raising=False)
+    monkeypatch.setattr(
+        "src.agents.monitor_tematico.llm._repo_env_values",
+        lambda: {"OPENAI_REASONING_EFFORT": "high"},
+    )
+
+    provider = OpenAIThemeLLMProvider(model="gpt-6-sol", api_key="test-key")  # pragma: allowlist secret
+
+    assert provider.reasoning_effort == "high"
+
+
+def test_structured_responses_pass_configured_reasoning_effort(monkeypatch) -> None:
+    captured: dict = {}
+
+    class Runnable:
+        def invoke(self, messages):
+            return {"raw": None, "parsed": {"ok": True}, "parsing_error": None}
+
+    class Model:
+        def __init__(self, **kwargs):
+            captured.update(kwargs)
+
+        def with_structured_output(self, schema, **kwargs):
+            return Runnable()
+
+    monkeypatch.setenv("OPENAI_REASONING_EFFORT", "high")
+    monkeypatch.setattr(langchain_provider, "ChatOpenAI", Model)
+    provider = OpenAIThemeLLMProvider(model="gpt-6-sol", api_key="test-key")  # pragma: allowlist secret
+
+    assert langchain_provider.call_openai_structured(
+        provider,
+        system_prompt="system",
+        user_payload={"input": "value"},
+        schema_name="test_schema",
+        schema={"type": "object"},
+    ) == {"ok": True}
+    assert captured["use_responses_api"] is True
+    assert captured["reasoning"] == {"effort": "high"}
+
+    # Leaving the variable unset must preserve the model's native default.
+    provider.reasoning_effort = None
+    provider._langchain_model = None
+    captured.clear()
+    langchain_provider.call_openai_structured(
+        provider,
+        system_prompt="system",
+        user_payload={"input": "value"},
+        schema_name="test_schema",
+        schema={"type": "object"},
+    )
+    assert "reasoning" not in captured
 
 
 def test_provider_audit_config_only_includes_allowlisted_fields() -> None:

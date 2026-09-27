@@ -312,6 +312,7 @@ def test_sqlite_checkpoint_roundtrips_json_safe_state(tmp_path: Path) -> None:
 
 def test_openai_web_search_uses_hosted_tool_and_extracts_sources(monkeypatch) -> None:
     captured: dict = {}
+    monkeypatch.setenv("OPENAI_REASONING_EFFORT", "high")
 
     class Response:
         def model_dump(self, *, mode):
@@ -361,6 +362,7 @@ def test_openai_web_search_uses_hosted_tool_and_extracts_sources(monkeypatch) ->
     assert captured["tools"] == [{"type": "web_search"}]
     assert captured["kwargs"]["use_responses_api"] is True
     assert captured["kwargs"]["store"] is True
+    assert captured["kwargs"]["reasoning"] == {"effort": "high"}
     assert captured["kwargs"]["include"] == ["web_search_call.action.sources"]
     assert captured["kwargs"]["model_kwargs"] == {"max_tool_calls": 7}
     assert [(item.title, item.url) for item in results] == [

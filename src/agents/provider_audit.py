@@ -44,7 +44,9 @@ def provider_audit_config(provider: Any, *, role: str) -> dict[str, Any]:
     name = str(getattr(provider, "name", type(provider).__name__))
     model = getattr(provider, "model", None)
     options: dict[str, Any] = {}
-    for attribute in ("timeout_seconds", "search_depth", "endpoint", "max_tool_calls", "store"):
+    for attribute in (
+        "timeout_seconds", "search_depth", "endpoint", "max_tool_calls", "store", "reasoning_effort"
+    ):
         value = getattr(provider, attribute, None)
         if value is not None:
             options[attribute] = (

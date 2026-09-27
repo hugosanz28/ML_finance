@@ -377,6 +377,8 @@ Configuracion OpenAI:
 
 - `OPENAI_API_KEY`: clave de API, leida desde variables de entorno o `.env`.
 - `OPENAI_MODEL`: modelo a usar; por defecto `gpt-4.1-mini`, configurable en `.env`.
+- `OPENAI_REASONING_EFFORT`: opcional; nivel de razonamiento para llamadas
+  OpenAI por Responses (por ejemplo, `high` con `gpt-6-sol`).
 
 Configuracion de busqueda:
 

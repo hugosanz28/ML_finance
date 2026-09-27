@@ -9,7 +9,11 @@ from typing import Any, Protocol
 from dotenv import dotenv_values
 from pydantic import ValidationError
 
-from src.agents.langchain_provider import StructuredOutputError, call_openai_structured
+from src.agents.langchain_provider import (
+    StructuredOutputError,
+    call_openai_structured,
+    parse_openai_reasoning_effort,
+)
 from src.agents.orchestration.schemas import SupervisorDecision
 from src.agents.orchestration.state import MonthlyAgentState
 from src.agents.prompts import load_prompt
@@ -61,6 +65,9 @@ class OpenAISupervisorProvider:
         repo_env = _repo_env_values()
         self.model = model or os.environ.get("OPENAI_MODEL") or repo_env.get("OPENAI_MODEL") or "gpt-4.1-mini"
         self.api_key = api_key or os.environ.get("OPENAI_API_KEY") or repo_env.get("OPENAI_API_KEY")
+        self.reasoning_effort = parse_openai_reasoning_effort(
+            os.environ.get("OPENAI_REASONING_EFFORT") or repo_env.get("OPENAI_REASONING_EFFORT")
+        )
         self._langchain_model: Any | None = None
 
     @property

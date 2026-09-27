@@ -305,6 +305,12 @@ el cambio debe quedar en el diff del prompt versionado o en una nueva version.
 - `openai/openai`: Responses API con la tool alojada `web_search`, fuentes
   incluidas, `store=True` y un maximo de 7 tool calls por ejecucion.
 
+Para OpenAI, `OPENAI_MODEL` selecciona el modelo y
+`OPENAI_REASONING_EFFORT` configura opcionalmente `reasoning.effort` en
+Responses para supervisor, especialistas y busqueda OpenAI. Por ejemplo,
+`OPENAI_MODEL=gpt-6-sol` y `OPENAI_REASONING_EFFORT=high` en `.env`.
+Si la variable de razonamiento queda vacia, se conserva el default del modelo.
+
 Los dos primeros modos no usan red. Los resultados `static/static` son
 sinteticos y no deben presentarse como hechos de mercado ni recomendaciones
 reales.
