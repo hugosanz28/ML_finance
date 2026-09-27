@@ -285,6 +285,16 @@ describe("read-only workspace", () => {
     expect(screen.getByRole("alert")).toHaveTextContent("operación en curso");
     expect(screen.getByText(/102,65/)).toBeVisible();
   });
+  it("retries a transient busy analytics read on opening", async () => {
+    mockApi();
+    const analytics = vi.spyOn(api, "analytics")
+      .mockRejectedValueOnce(new ApiError("workspace_busy"))
+      .mockResolvedValue(analyticsSchema.parse(fixture.analytics));
+    render(<App />);
+    await ready();
+    await waitFor(() => expect(analytics).toHaveBeenCalledTimes(2));
+    expect(screen.queryByText(/Hay una operación en curso/)).not.toBeInTheDocument();
+  });
   it("handles empty data and reconnects only when requested", async () => {
     vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new TypeError("offline")));
     const user = userEvent.setup();

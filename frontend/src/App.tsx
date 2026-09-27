@@ -23,6 +23,18 @@ const benchmarks = [
 const errorCode = (error: unknown) =>
   error instanceof ApiError ? error.code : "request_failed";
 
+async function readAnalyticsWhenReady(period: Period, benchmark: string, signal: AbortSignal) {
+  // An aborted local read can briefly keep the server lock while it finishes.
+  for (let attempt = 0; attempt < 30; attempt++) {
+    try { return await api.analytics(period, benchmark, signal); }
+    catch (error) {
+      if (errorCode(error) !== "workspace_busy" || signal.aborted || attempt === 29) throw error;
+      await new Promise((resolve) => setTimeout(resolve, 500));
+    }
+  }
+  throw new ApiError("workspace_busy");
+}
+
 export function App() {
   const [view, setView] = useState<View>("Resumen");
   const [period, setPeriod] = useState<Period>("since_inception");
@@ -60,7 +72,7 @@ export function App() {
     async function load() {
       // The local API admits one data read at a time; avoid a spurious workspace_busy.
       const [analytics] = await Promise.allSettled([
-        api.analytics(period, benchmark, controller.signal),
+        readAnalyticsWhenReady(period, benchmark, controller.signal),
       ]);
       const [definitions] = await Promise.allSettled([
         api.definitions(controller.signal),
@@ -100,9 +112,11 @@ export function App() {
       });
       setLoading(false);
     }
-    void load();
+    // Defer the request so StrictMode's first setup can cancel before starting it.
+    const start = setTimeout(() => void load(), 0);
     // Abort also discards obsolete filter responses; no automatic retries or persistent cache.
     return () => {
+      clearTimeout(start);
       clearTimeout(timeout);
       controller.abort();
     };
