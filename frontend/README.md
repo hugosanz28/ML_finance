@@ -54,6 +54,12 @@ La API fija el entorno; la UI no puede cambiarlo. Ver [jobs locales](../docs/loc
   posiciones, correlaciones y detalle opcional de riesgo por activo.
 - **Operaciones**: datos, aportaciones, informes, agentes, configuracion y
   ejecuciones. Ver [matriz de paridad y seguridad](../docs/react_operations.md).
+- **Planificacion**: sueldo, saldo bancario introducido manualmente, reservas,
+  presupuesto, metas configurables y calendario. Admite varias metas bancarias
+  y una meta vinculada a toda la cartera DEGIRO. Funciona sin importar DEGIRO;
+  en ese caso falta la valoracion de la meta vinculada. Inversiones funciona sin crear un
+  plan. Los cambios se guardan en DuckDB privada con el modo operativo activo.
+  No se leen PDF ni movimientos bancarios. Ver [reglas](../docs/personal_finance_plan.md).
 
 Las explicaciones vienen del catalogo de la API. Los avisos permanecen visibles
 y los datos ausentes nunca se convierten en cero. Los graficos SVG solo escalan

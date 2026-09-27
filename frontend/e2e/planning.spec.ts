@@ -1,0 +1,35 @@
+import { expect, test } from "@playwright/test";
+
+test("planning persists independently of investment screens", async ({ page }) => {
+  await page.goto("/");
+  await expect(page.getByRole("heading", { name: "Tu cartera, de un vistazo" })).toBeVisible();
+  await page.getByRole("button", { name: "Planificación", exact: true }).click();
+  await expect(page.getByRole("heading", { name: /Calendario/ })).toBeVisible();
+  await page.getByLabel("Sueldo neto mensual previsto").fill("2500");
+  await page.getByLabel("Nombre del banco o cuenta").fill("BBVA");
+  await page.getByLabel("Saldo bancario observado (€)").fill("5000");
+  await page.getByRole("button", { name: "Añadir meta bancaria" }).click();
+  const car = page.locator(".planning-goal").first();
+  await car.getByLabel("Nombre de la meta").fill("Coche");
+  await car.getByLabel("Importe objetivo (€)").fill("10000");
+  await car.getByLabel("Reserva inicial en la cuenta (€)").fill("4000");
+  await page.getByRole("button", { name: "Añadir meta bancaria" }).click();
+  const holiday = page.locator(".planning-goal").nth(1);
+  await holiday.getByLabel("Nombre de la meta").fill("Vacaciones");
+  await holiday.getByLabel("Importe objetivo (€)").fill("1000");
+  await holiday.getByLabel("Reserva inicial en la cuenta (€)").fill("500");
+  await page.getByRole("button", { name: "Añadir meta con DEGIRO" }).click();
+  await expect(page.getByRole("button", { name: "Añadir meta con DEGIRO" })).toBeDisabled();
+  await expect(page.getByText("Libre en BBVA tras reservas").locator("..")).toContainText(/500,00/);
+  await page.getByRole("button", { name: "Revisar y guardar plan" }).click();
+  await page.getByRole("button", { name: "Confirmar guardado" }).click();
+  await expect(page.getByText("Plan guardado en la base local.")).toBeVisible();
+  await page.reload();
+  await page.getByRole("button", { name: "Planificación", exact: true }).click();
+  await expect(page.getByLabel("Sueldo neto mensual previsto")).toHaveValue("2500");
+  await expect(page.locator(".planning-goal")).toHaveCount(3);
+  await page.setViewportSize({ width: 390, height: 844 });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true);
+  await page.getByRole("button", { name: "Resumen", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "Tu cartera, de un vistazo" })).toBeVisible();
+});

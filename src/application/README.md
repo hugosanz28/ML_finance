@@ -38,6 +38,8 @@ que la interfaz no dependa de detalles internos de `src/portfolio/`,
 - guardar uploads DEGIRO con nombres normalizados antes de importarlos.
 - consultar resumen analitico, TWR/MWR, riesgo, concentracion, correlaciones,
   benchmarks y definiciones de metricas mediante read models JSON.
+- leer, previsualizar y guardar el plan personal en una base privada separada,
+  sin exigir datos DEGIRO ni cambiar los casos de uso de cartera.
 
 ## Analitica avanzada
 

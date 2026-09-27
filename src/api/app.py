@@ -22,6 +22,11 @@ from src.application.artifact_reads import (
 from src.application.portfolio_state import (
     GetPortfolioStateRequest, GetPortfolioStateUseCase, PortfolioStateUnavailableError,
 )
+from src.application.personal_plan import (
+    PreviewPersonalPlanRequest, PreviewPersonalPlanUseCase,
+    ReadPersonalPlanRequest, ReadPersonalPlanUseCase,
+)
+from src.personal_finance.model import PersonalPlan
 from src.config import Settings, get_settings
 from src.application.local_jobs import LocalJobManager
 from src.application.operational_workspace import OperationalWorkspace, OperationError
@@ -31,7 +36,7 @@ from src.application.workspace_status import GetWorkspaceStatusUseCase, Workspac
 from src.api.schemas import (
     AnalyticsQuery, AnalyticsResponse, AuditResponse, ErrorResponse, HealthResponse,
     ListQuery, MetricDefinition, MetricDefinitionsResponse, PortfolioQuery, PortfolioResponse,
-    ReportResponse, ReportsResponse, RunsResponse,
+    ReportResponse, ReportsResponse, RunsResponse, PersonalPlanResponse, PersonalPlanSummaryResponse,
 )
 
 
@@ -63,7 +68,7 @@ def create_app(*, settings: Settings | None = None, workspace_mode: str | None =
     app = FastAPI(title="ML_finance local API", version="1.0.0", docs_url=None, redoc_url=None, lifespan=lifespan)
     app.state.jobs = manager
     app.add_middleware(CORSMiddleware, allow_origins=list(LOCAL_ORIGINS),
-                       allow_methods=["GET", "POST", "PUT"] if manager else ["GET"],
+                       allow_methods=["GET", "POST", "PUT"] if manager else ["GET", "POST"],
                        allow_headers=["Content-Type", "Idempotency-Key", "X-ML-Finance-Confirm"], allow_credentials=False)
     app.add_middleware(BodyLimitMiddleware)
 
@@ -77,7 +82,7 @@ def create_app(*, settings: Settings | None = None, workspace_mode: str | None =
             response = _error(400, "invalid_host", "Only localhost is supported.")
         elif request.headers.get("origin") not in {None, *LOCAL_ORIGINS, f"http://{host}"}:
             response = _error(403, "origin_not_allowed", "This browser origin is not allowed.")
-        elif manager and request.method in {"POST", "PUT", "PATCH", "DELETE"} and request.headers.get("x-ml-finance-confirm") != "local-write":
+        elif manager and request.method in {"POST", "PUT", "PATCH", "DELETE"} and request.url.path != "/api/v1/planning/preview" and request.headers.get("x-ml-finance-confirm") != "local-write":
             response = _error(403, "confirmation_required", "Explicit local write confirmation is required.")
         elif manager and request.method in {"POST", "PUT", "PATCH"} and request.headers.get("content-type", "").split(";")[0] != "application/json":
             response = _error(415, "json_required", "Use application/json.")
@@ -125,6 +130,16 @@ def create_app(*, settings: Settings | None = None, workspace_mode: str | None =
     @router.get("/health", response_model=HealthResponse)
     def health():
         return HealthResponse(**GetWorkspaceStatusUseCase(settings=resolved).execute(WorkspaceStatusRequest(workspace_mode)))
+
+    @router.get("/planning/plan", response_model=PersonalPlanResponse)
+    def personal_plan():
+        with reading():
+            return ReadPersonalPlanUseCase(settings=resolved).execute(ReadPersonalPlanRequest())
+
+    @router.post("/planning/preview", response_model=PersonalPlanSummaryResponse)
+    def preview_personal_plan(plan: PersonalPlan):
+        with reading():
+            return PreviewPersonalPlanUseCase(settings=resolved).execute(PreviewPersonalPlanRequest(plan))
 
     @router.get("/portfolio/state", response_model=PortfolioResponse)
     def portfolio(query: Annotated[PortfolioQuery, Query()]):

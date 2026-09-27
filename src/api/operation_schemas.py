@@ -6,6 +6,7 @@ from typing import Literal
 from pydantic import Field, JsonValue, model_validator
 
 from src.api.schemas import DateQuery, Schema
+from src.personal_finance.model import PersonalPlan
 
 
 class OperationBody(Schema):
@@ -102,6 +103,11 @@ class BriefBody(OperationBody):
 
 class TargetsBody(OperationBody):
     portfolio_targets: dict[str, JsonValue]
+    expected_previous_hash: str = Field(pattern=r"^sha256:[a-f0-9]{64}$")
+
+
+class PersonalPlanBody(OperationBody):
+    plan: PersonalPlan
     expected_previous_hash: str = Field(pattern=r"^sha256:[a-f0-9]{64}$")
 
 

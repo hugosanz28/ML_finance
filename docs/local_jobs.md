@@ -97,6 +97,7 @@ financiero final. Consultar `/jobs/{job_id}` hasta un estado terminal.
 | POST `/agents/monthly-runs` | `llm_provider=static`, `search_provider=null`, presupuesto `monthly_budget`, interes `user_satellite_interest`, `report_id`, `investment_brief_text` y `target_weights` opcionales |
 | PUT `/settings/investment-brief` | `content` y `expected_previous_hash` obligatorios |
 | PUT `/settings/portfolio-targets` | `portfolio_targets` como objeto y `expected_previous_hash` obligatorios |
+| PUT `/planning/plan` | Plan personal estructurado y `expected_previous_hash` obligatorios |
 | GET `/settings/investment-brief` | Texto, existencia y hash; sin path |
 | GET `/settings/portfolio-targets` | Contrato, existencia y hash; sin path |
 | GET `/jobs` | Query `limit`, default 20, entre 1 y 100 |

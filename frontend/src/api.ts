@@ -53,6 +53,8 @@ export const api = {
       portfolioSchema,
       signal,
     ),
+  portfolioSummary: (signal: AbortSignal) =>
+    get("/portfolio/state?include_history=false", portfolioSchema, signal),
   analytics: (period: Period, benchmark: string, signal: AbortSignal) =>
     get(
       `/analytics/summary?${new URLSearchParams({ period, benchmark_id: benchmark })}`,

@@ -2,9 +2,11 @@
 
 **Entiende tu cartera. Prepara tu revision mensual.**
 
-Una aplicacion local nacida para simplificar la revision de fin de mes de una
-cartera DEGIRO: importar exportaciones, entender resultados y riesgos, simular
-una aportacion y consultar agentes con trazabilidad para la revision manual.
+Una aplicacion local para revisar una cartera DEGIRO y planificar el dinero del
+mes. Inversiones permite importar exportaciones, entender resultados y riesgos,
+simular una aportacion y consultar agentes con trazabilidad. Planificacion
+permite guardar sueldo, gastos, reservas y metas en una base local, con un
+calendario mensual. Las dos zonas se pueden usar por separado.
 
 **Hoy:** v2 local con **React + TypeScript + Vite / FastAPI / Python / DuckDB**.
 La release etiquetada `v0.1.0` corresponde a la v1 historica; Streamlit se ha
@@ -14,6 +16,7 @@ el repositorio es publico, los datos del usuario no.
 > [!IMPORTANT]
 > No ejecuta ordenes, no es un bot de trading ni un modelo de ML predictivo.
 > Es apoyo analitico, no asesoramiento financiero. La IA no sustituye tu criterio.
+> Los informes y planes requieren revision manual antes de tomar decisiones.
 
 ![UI React real sobre una cartera completamente sintetica](docs/assets/showcase/overview.png)
 
@@ -33,10 +36,15 @@ de abril de 2026; los porcentajes no representan resultados de inversion.*
 | ¿Con que lo comparo? | Seleccionar MSCI World, S&P 500, 60/40 o efectivo €STR, con fuentes, cobertura y limites visibles. |
 | ¿Donde se concentra el riesgo? | Consultar drawdown, volatilidad, pesos y correlaciones, sin convertir datos ausentes en ceros. |
 | ¿Como simulo mi proxima aportacion? | Proponer compras sobre posiciones actuales y objetivos explicitos; sin ventas ni ordenes, con caja residual separada. |
+| ¿Como reparto mi sueldo? | Introducir ingresos, presupuestos y saldo bancario manual; crear varias metas bancarias y una vinculada a DEGIRO, y revisar un calendario mensual. No hay conexion bancaria ni importacion de extractos. |
 | ¿Puedo revisar de donde sale una conclusion? | Leer informes Markdown, comprobaciones de calidad y auditoria de agentes: inputs, prompts, fuentes, outputs y hashes. |
 
 La UI explica las metricas y ofrece detalle avanzado opcional. Su facilidad de
 comprension en dos minutos es un objetivo de producto, **todavia no validado con usuarios**.
+Planificacion no necesita DEGIRO; si no hay cartera, el valor de la meta vinculada
+se muestra como no disponible. Inversiones no necesita datos de
+Planificacion. Para guardar cambios se arranca la API con `--operations demo`
+o `--operations real`.
 
 ## Pruebalo con datos sinteticos
 
@@ -136,6 +144,7 @@ Tras instalar `requirements-dev.txt`, ejecuta `.\scripts\test.ps1` (o
 consulta [scripts](scripts/README.md); no lo ejecutes mientras el worker escribe.
 
 - [Demo sintetica](demo/README.md) y [frontend](frontend/README.md): arranque y uso.
+- [Planificacion personal](docs/personal_finance_plan.md): datos, reglas y calendario.
 - [Caso de estudio](docs/case_study.md): decisiones de arquitectura y evidencias.
 - [TWR/MWR](docs/performance.md), [benchmarks](docs/benchmarks.md) y
   [riesgo](docs/risk_analytics.md): formulas, cobertura y limites.

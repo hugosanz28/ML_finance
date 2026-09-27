@@ -135,8 +135,12 @@ def test_local_host_origin_and_cache_protection(client):
 
 def test_openapi_documents_models_and_read_routes(client):
     spec = client.get("/openapi.json").json()
-    assert len(spec["paths"]) == 12
-    for path in spec["paths"].values():
+    assert len(spec["paths"]) == 14
+    assert "/api/v1/planning/plan" in spec["paths"]
+    assert set(spec["paths"]["/api/v1/planning/preview"]) == {"post"}
+    for route, path in spec["paths"].items():
+        if route == "/api/v1/planning/preview":
+            continue
         assert set(path) == {"get"}
         assert "$ref" in path["get"]["responses"]["200"]["content"]["application/json"]["schema"]
         assert "$ref" in path["get"]["responses"]["422"]["content"]["application/json"]["schema"]

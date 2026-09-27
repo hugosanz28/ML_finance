@@ -1,6 +1,7 @@
 """Adapt validated operations to existing use cases; no financial rules here."""
 
 import base64
+import re
 from dataclasses import asdict, dataclass
 from datetime import date
 from typing import Any
@@ -13,14 +14,18 @@ from src.application.degiro import ImportDegiroRequest, ImportDegiroUseCase
 from src.application.market_data import RefreshFxRequest, RefreshFxUseCase, RefreshMarketDataRequest, RefreshMarketDataUseCase
 from src.application.operational_workspace import OperationalWorkspace, OperationError
 from src.application.portfolio_targets import ReadPortfolioTargetsUseCase, UpdatePortfolioTargetsRequest, UpdatePortfolioTargetsUseCase
+from src.application.personal_plan import UpdatePersonalPlanRequest, UpdatePersonalPlanUseCase
 from src.application.reports import GenerateMonthlyReportRequest, GenerateMonthlyReportUseCase
 from src.application.settings import ReadInvestmentBriefUseCase, UpdateInvestmentBriefRequest, UpdateInvestmentBriefUseCase
 from src.application.uploads import DegiroUpload, SaveDegiroUploadsRequest, SaveDegiroUploadsUseCase, canonical_degiro_upload_name
+from src.personal_finance.model import PersonalPlan
+from src.personal_finance.store import PlanConflictError
+from pydantic import ValidationError
 
 
 MAX_UPLOAD_BYTES = 5 * 1024 * 1024
 MAX_TOTAL_UPLOAD_BYTES = 10 * 1024 * 1024
-OPERATIONS = {"uploads", "import", "refresh", "benchmarks", "report", "simulation", "agents", "brief", "targets"}
+OPERATIONS = {"uploads", "import", "refresh", "benchmarks", "report", "simulation", "agents", "brief", "targets", "personal_plan"}
 
 
 @dataclass(frozen=True)
@@ -56,6 +61,13 @@ def validate_operation(request: ExecuteOperationRequest, workspace: OperationalW
             raise OperationError("external_provider_forbidden_in_demo", 422)
     if request.operation == "uploads":
         decode_uploads(values)
+    if request.operation == "personal_plan":
+        try:
+            PersonalPlan.model_validate(values["plan"])
+            if not re.fullmatch(r"sha256:[a-f0-9]{64}", values["expected_previous_hash"]):
+                raise ValueError("Invalid revision")
+        except (KeyError, ValueError, ValidationError) as exc:
+            raise OperationError("invalid_personal_plan", 422) from exc
 
 
 def decode_uploads(values):
@@ -159,6 +171,14 @@ class ExecuteOperationUseCase:
                 raise OperationError("content_conflict")
             output = UpdateInvestmentBriefUseCase(settings=self.settings).execute(UpdateInvestmentBriefRequest(**values))
             extra["content_hash"] = output.content_hash
+        elif operation == "personal_plan":
+            try:
+                return UpdatePersonalPlanUseCase(settings=self.settings).execute(UpdatePersonalPlanRequest(
+                    plan=PersonalPlan.model_validate(values["plan"]),
+                    expected_previous_hash=values["expected_previous_hash"],
+                ))
+            except PlanConflictError as exc:
+                raise OperationError("content_conflict") from exc
         else:
             current = ReadPortfolioTargetsUseCase(settings=self.settings).execute()
             if current.content_hash != values["expected_previous_hash"]:

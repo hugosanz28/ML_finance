@@ -56,6 +56,7 @@ Todas las rutas siguientes llevan el prefijo `/api/v1` y usan GET:
 | Ruta | Respuesta |
 | --- | --- |
 | `/health` | Salud, version API, modo `read_only`/`operations` y entorno `demo`/`real` |
+| `/planning/plan` | Planificacion personal guardada, revision y calculo actual; sin crear base al leer |
 | `/portfolio/state` | Resumen, posiciones, historico opcional y avisos |
 | `/analytics/summary` | Resumen analitico completo |
 | `/analytics/performance` | Rendimiento, TWR/MWR y flujos |
@@ -67,6 +68,13 @@ Todas las rutas siguientes llevan el prefijo `/api/v1` y usan GET:
 | `/reports/{report_id}` | ID y contenido Markdown como texto JSON |
 | `/agents/runs` | Runs persistidos, `limit` entre 1 y 100 |
 | `/agents/runs/{run_id}` | Auditoria compatible con legacy, sin metadata de rutas |
+
+`POST /planning/preview` calcula un plan proporcionado por el usuario sin
+persistirlo. Si hay una meta vinculada a DEGIRO, consulta su valoración local
+en modo lectura. Esta disponible tambien con la API en modo
+solo lectura. `PUT /planning/plan` requiere modo operativo, confirmacion,
+Idempotency-Key y revision previa; ver [jobs](local_jobs.md). No hay rutas para
+conectar bancos o importar extractos.
 
 Los IDs de informe son los nombres sin `.md` de archivos legacy `monthly_*.md`
 o actuales `YYYY-MM-DD-monthly-YYYYMMDDTHHMMSSffffff.md` en

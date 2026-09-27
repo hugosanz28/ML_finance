@@ -22,6 +22,8 @@ Trata como privados, aunque no contengan contrasenas:
 - informes mensuales, historicos, outputs de agentes y audit trails;
 - `investment_brief.md`, presupuestos, objetivos, pesos objetivo y notas
   personales de inversion;
+- `personal_finance.duckdb`: sueldo, saldo bancario introducido a mano, reservas,
+  metas y movimientos registrados en Planificacion;
 - capturas del dashboard o logs de ejecucion generados con datos reales;
 - `.env`, claves de OpenAI, Tavily u otros proveedores, y secretos de
   Streamlit.
@@ -33,7 +35,8 @@ decisiones personales.
 ## Auditoria de agentes
 
 La API operativa guarda parametros/resultados en `jobs.duckdb` dentro del
-directorio privado de datos: puede incluir CSVs subidos, brief y targets.
+directorio privado de datos: puede incluir CSVs subidos, brief, targets y el
+plan personal enviado al guardar.
 Nunca versionar ni compartir esa base. La API no expone parametros en su polling
 y sanea resultados, pero estos siguen siendo datos financieros privados.
 No tiene autenticacion para multiples usuarios ni debe publicarse mediante un

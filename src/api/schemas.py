@@ -5,6 +5,8 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, JsonValue, field_validator
 
+from src.personal_finance.model import PersonalPlan
+
 
 class Schema(BaseModel):
     model_config = ConfigDict(extra="forbid", allow_inf_nan=False)
@@ -50,6 +52,37 @@ class HealthResponse(Schema):
     api_version: Literal["v1"] = "v1"
     mode: Literal["read_only", "operations"] = "read_only"
     workspace_mode: Literal["demo", "real"]
+
+
+class PersonalGoalSummaryResponse(Schema):
+    id: str
+    current_cents: int | None
+    remaining_cents: int | None
+    paydays_remaining: int | None
+    required_monthly_cents: int | None
+    planned_monthly_cents: int | None
+    status: str
+
+
+class PersonalPlanSummaryResponse(Schema):
+    unallocated_bank_cents: int | None
+    bank_reserve_shortfall_cents: int | None
+    monthly_expenses_cents: int
+    monthly_margin_cents: int
+    goals_planned_monthly_cents: int | None
+    after_goals_cents: int | None
+    status: str
+    goals: list[PersonalGoalSummaryResponse]
+    portfolio_value_cents: int | None
+    portfolio_as_of_date: date | None
+    portfolio_warnings: list[str]
+
+
+class PersonalPlanResponse(Schema):
+    configured: bool
+    plan: PersonalPlan | None
+    content_hash: str
+    summary: PersonalPlanSummaryResponse | None
 
 
 class PortfolioResponse(Schema):
