@@ -121,10 +121,11 @@ class AsistenteAportacionMensualAgent(BaseAgent):
             )
         except ContributionLLMProviderError as exc:
             return AgentResult(
-                status="partial",
-                summary="Asistente de aportacion mensual ejecutado con cobertura parcial: fallo la decision LLM.",
+                status="failed",
+                summary="Asistente de aportacion mensual sin decision: fallo el proveedor LLM.",
                 sources=tuple(sources),
-                warnings=tuple([*warnings, str(exc)]),
+                warnings=tuple(warnings),
+                errors=("assistant_llm_provider_failed",),
                 metadata={
                     **_contribution_autonomy_metadata(
                         primary_action="manual_review_required",
@@ -139,6 +140,7 @@ class AsistenteAportacionMensualAgent(BaseAgent):
                     "structured_output_invalid": (
                         getattr(exc, "reason_code", None) == "structured_output_invalid"
                     ),
+                    "provider_error_reason_code": getattr(exc, "reason_code", "provider_request_failed"),
                     "monthly_budget": monthly_budget,
                     "target_weights": dict(target_weights),
                     "portfolio_targets": dict(portfolio_targets),

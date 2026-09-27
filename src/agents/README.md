@@ -339,6 +339,11 @@ asistente finaliza el grafo. Un `finish` previo se rechaza salvo bloqueo real o
 agotamiento de limites. Los especialistas omitidos se representan como
 `AgentResult` con `metadata.execution_status="skipped"`.
 
+Un fallo del proveedor del asistente queda como `failed` con un codigo de error
+estable. Si una validacion detecta que faltan entradas obligatorias compartidas,
+el grafo registra `blocking_issue_codes` y finaliza con
+`verified_runtime_blocker`, sin pedir mas delegaciones.
+
 Cada agente debe dejar en `AgentResult.metadata` una traza comun:
 
 - `agent_plan`: pasos internos que siguio para resolver su tarea.

@@ -8,6 +8,7 @@ from pathlib import Path
 from langgraph.checkpoint.serde.jsonplus import JsonPlusSerializer
 from langgraph.checkpoint.sqlite import SqliteSaver
 
+from src.agents.base import AgentValidationError
 from src.agents.models import AgentResult
 from src.agents.monitor_tematico import LangChainSearchToolProvider, OpenAIWebSearchProvider, SearchResult
 import src.agents.monitor_tematico.providers as search_providers
@@ -33,6 +34,7 @@ def _state(run_id: str = "orchestration-test") -> dict:
         "total_delegations": 0,
         "warnings": [],
         "errors": [],
+        "blocking_issue_codes": [],
         "terminal_status": "failed",
         "terminal_reason": "not_started",
     }
@@ -159,6 +161,82 @@ def test_monitor_and_analyst_failures_do_not_block_the_assistant(tmp_path: Path)
         "asistente_aportacion_mensual": 1,
     }
     assert result["terminal_status"] == "success"
+
+
+def test_missing_required_inputs_end_the_graph_as_a_verified_blocker(tmp_path: Path) -> None:
+    calls: list[str] = []
+
+    def execute(agent_name, instruction, attempt, prior_results):
+        calls.append(agent_name)
+        raise AgentValidationError(
+            "Missing required agent inputs in context: investment_brief",
+            reason_code="required_agent_inputs_missing",
+        )
+
+    result = run_monthly_graph(
+        _state(),
+        supervisor=_ScriptedSupervisor([_decision("monitor_tematico", "check_inputs")]),
+        execute_specialist=execute,
+        persist=False,
+        checkpoint_path=tmp_path / "unused.sqlite",
+    ).state
+
+    assert calls == ["monitor_tematico"]
+    assert result["blocking_issue_codes"] == ["required_agent_inputs_missing"]
+    assert result["errors"] == ["required_agent_inputs_missing"]
+    assert result["terminal_status"] == "failed"
+    assert result["terminal_reason"] == "verified_runtime_blocker"
+    assert result["decisions"][-1]["next_agent"] == "finish"
+    assert "asistente_aportacion_mensual" not in result["results"]
+
+
+def test_other_validation_error_does_not_claim_a_verified_blocker(tmp_path: Path) -> None:
+    def execute(agent_name, instruction, attempt, prior_results):
+        if agent_name == "monitor_tematico":
+            raise AgentValidationError("Unsupported request")
+        return _success(agent_name)
+
+    result = run_monthly_graph(
+        _state(),
+        supervisor=StaticSupervisorProvider(),
+        execute_specialist=execute,
+        persist=False,
+        checkpoint_path=tmp_path / "unused.sqlite",
+    ).state
+
+    assert result["blocking_issue_codes"] == []
+    assert result["terminal_status"] == "success"
+    assert result["attempts"] == {
+        "monitor_tematico": 1,
+        "analista_activos": 1,
+        "asistente_aportacion_mensual": 1,
+    }
+
+
+def test_assistant_provider_failure_is_terminal_failure(tmp_path: Path) -> None:
+    def execute(agent_name, instruction, attempt, prior_results):
+        if agent_name == "monitor_tematico":
+            return _success(agent_name)
+        return AgentResult(
+            status="failed",
+            summary="Provider unavailable",
+            errors=("assistant_llm_provider_failed",),
+            metadata={"structured_output_invalid": False},
+        )
+
+    result = run_monthly_graph(
+        _state(),
+        supervisor=_ScriptedSupervisor(
+            [_decision("monitor_tematico", "research"), _decision("asistente_aportacion_mensual", "decide")]
+        ),
+        execute_specialist=execute,
+        persist=False,
+        checkpoint_path=tmp_path / "unused.sqlite",
+    ).state
+
+    assert result["attempts"] == {"monitor_tematico": 1, "asistente_aportacion_mensual": 1}
+    assert result["terminal_status"] == "failed"
+    assert result["terminal_reason"] == "assistant_provider_failed"
 
 
 def test_invalid_assistant_output_gets_one_repair_then_stops(tmp_path: Path) -> None:

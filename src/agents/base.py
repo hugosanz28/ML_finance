@@ -10,6 +10,10 @@ from src.agents.models import AgentContext, AgentRequest, AgentResult
 class AgentValidationError(ValueError):
     """Raised when an agent request cannot run with the provided context."""
 
+    def __init__(self, message: str, *, reason_code: str = "agent_request_invalid") -> None:
+        super().__init__(message)
+        self.reason_code = reason_code
+
 
 class BaseAgent(ABC):
     """Minimal interface implemented by all portfolio agents."""
@@ -42,7 +46,10 @@ class BaseAgent(ABC):
         missing_required_inputs = [key for key in self.required_inputs() if not context.has_input(key)]
         if missing_required_inputs:
             missing_display = ", ".join(sorted(missing_required_inputs))
-            raise AgentValidationError(f"Missing required agent inputs in context: {missing_display}")
+            raise AgentValidationError(
+                f"Missing required agent inputs in context: {missing_display}",
+                reason_code="required_agent_inputs_missing",
+            )
 
         missing_requested_inputs = [key for key in request.input_refs if not context.has_input(key)]
         if missing_requested_inputs:

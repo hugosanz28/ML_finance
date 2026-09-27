@@ -10,6 +10,7 @@ import pytest
 from src.agents import AgentFinding, AgentInputRef, AgentRequest, AgentValidationError, build_agent_context
 from src.agents.asistente_aportacion_mensual import (
     AsistenteAportacionMensualAgent,
+    ContributionLLMProviderError,
     MonthlyDecision,
     MonthlyRecommendation,
     MonthlyScenario,
@@ -272,6 +273,23 @@ def test_asistente_rejects_negative_budget_before_provider_use(workspace_tmp_pat
     assert result.status == "failed"
     assert result.findings == ()
     assert result.errors == ("monthly_budget must be a finite non-negative number.",)
+
+
+def test_asistente_marks_provider_failure_as_failed(workspace_tmp_path: Path) -> None:
+    class FailingProvider:
+        name = "failing_llm"
+
+        def decide(self, **kwargs):
+            raise ContributionLLMProviderError("Provider unavailable")
+
+    result = AsistenteAportacionMensualAgent(
+        llm_provider=FailingProvider()
+    ).execute(AgentRequest(), _context(workspace_tmp_path))
+
+    assert result.status == "failed"
+    assert result.errors == ("assistant_llm_provider_failed",)
+    assert result.findings == ()
+    assert result.metadata["provider_error_reason_code"] == "provider_request_failed"
 
 
 def test_asistente_aportacion_returns_actionable_monthly_recommendation(workspace_tmp_path: Path) -> None:

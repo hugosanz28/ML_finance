@@ -30,6 +30,7 @@ class MonthlyAgentState(TypedDict, total=False):
     total_delegations: int
     warnings: list[str]
     errors: list[str]
+    blocking_issue_codes: list[str]
     terminal_status: str
     terminal_reason: str
 

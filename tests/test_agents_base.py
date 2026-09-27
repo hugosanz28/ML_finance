@@ -147,8 +147,9 @@ def test_base_agent_validate_request_rejects_missing_context_input(workspace_tmp
         settings=settings,
     )
 
-    with pytest.raises(AgentValidationError, match="Missing required agent inputs"):
+    with pytest.raises(AgentValidationError, match="Missing required agent inputs") as exc_info:
         StubAgent().execute(AgentRequest(), context)
+    assert exc_info.value.reason_code == "required_agent_inputs_missing"
 
 
 def test_base_agent_validate_request_rejects_unknown_requested_input(workspace_tmp_path: Path) -> None:

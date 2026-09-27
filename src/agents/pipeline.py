@@ -283,6 +283,7 @@ def run_monthly_agent_pipeline(
         "total_delegations": 0,
         "warnings": [],
         "errors": [],
+        "blocking_issue_codes": [],
         "terminal_status": "failed",
         "terminal_reason": "not_started",
     }
@@ -319,6 +320,7 @@ def run_monthly_agent_pipeline(
         "terminal_reason": final_state.get("terminal_reason", "unknown"),
         "warnings": final_state.get("warnings", []),
         "errors": final_state.get("errors", []),
+        "blocking_issue_codes": final_state.get("blocking_issue_codes", []),
     }
     supervisor_result = AgentResult(
         status=str(orchestration["terminal_status"]),

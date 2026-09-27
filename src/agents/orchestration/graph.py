@@ -14,6 +14,7 @@ from langgraph.checkpoint.serde.jsonplus import JsonPlusSerializer
 from langgraph.checkpoint.sqlite import SqliteSaver
 from langgraph.graph import END, START, StateGraph
 
+from src.agents.base import AgentValidationError
 from src.agents.models import AgentResult
 from src.agents.orchestration.schemas import SpecialistName, SupervisorDecision
 from src.agents.orchestration.state import MonthlyAgentState, agent_result_to_payload
@@ -60,6 +61,21 @@ def _build_graph(*, supervisor: SupervisorProvider, execute_specialist: Speciali
     fallback = StaticSupervisorProvider()
 
     def supervise(state: MonthlyAgentState) -> dict[str, Any]:
+        if state.get("blocking_issue_codes"):
+            # A validated missing input is a runtime blocker, independent of LLM routing.
+            decision = SupervisorDecision(
+                next_agent="finish",
+                instruction="Deten la ejecucion por entradas obligatorias ausentes.",
+                expected_output="Resultado fallido con el bloqueo registrado.",
+                reason_code="verified_runtime_blocker",
+            )
+            return {
+                **_terminal_update(state, reason=decision.reason_code),
+                "decisions": [*state.get("decisions", []), decision.model_dump(mode="json")],
+                "errors": list(
+                    dict.fromkeys([*state.get("errors", []), *state["blocking_issue_codes"]])
+                ),
+            }
         if state.get("total_delegations", 0) >= MAX_DELEGATIONS:
             return _terminal_update(state, reason="delegation_limit_reached")
         warnings = list(state.get("warnings", []))
@@ -87,8 +103,18 @@ def _build_graph(*, supervisor: SupervisorProvider, execute_specialist: Speciali
             attempt = attempts.get(agent_name, 0) + 1
             attempts[agent_name] = attempt
             instruction = state.get("delegation_instruction", "Ejecuta tu responsabilidad especializada.")
+            blocking_issue_codes = list(state.get("blocking_issue_codes", []))
             try:
                 result = execute_specialist(agent_name, instruction, attempt, state.get("results", {}))
+            except AgentValidationError as exc:
+                result = AgentResult(
+                    status="failed",
+                    summary=f"{agent_name} no pudo validar sus entradas.",
+                    errors=(exc.reason_code,),
+                    metadata={"execution_status": "failed"},
+                )
+                if exc.reason_code == "required_agent_inputs_missing":
+                    blocking_issue_codes.append(exc.reason_code)
             except Exception:
                 result = AgentResult(
                     status="failed",
@@ -123,7 +149,11 @@ def _build_graph(*, supervisor: SupervisorProvider, execute_specialist: Speciali
                 "results": results,
                 "result_history": result_history,
                 "total_delegations": total,
+                "blocking_issue_codes": blocking_issue_codes,
             }
+            if blocking_issue_codes:
+                update["next_agent"] = "supervisor"
+                return update
             if agent_name == "asistente_aportacion_mensual" and _accepted(result):
                 update.update(
                     next_agent="finish",
@@ -145,8 +175,14 @@ def _build_graph(*, supervisor: SupervisorProvider, execute_specialist: Speciali
             if agent_name == "asistente_aportacion_mensual":
                 update.update(
                     next_agent="finish",
-                    terminal_status="failed" if not _usable_results(results) else "partial",
-                    terminal_reason="assistant_validation_failed",
+                    terminal_status=(
+                        "failed" if result.status == "failed" or not _usable_results(results) else "partial"
+                    ),
+                    terminal_reason=(
+                        "assistant_provider_failed"
+                        if "assistant_llm_provider_failed" in result.errors
+                        else "assistant_validation_failed"
+                    ),
                 )
                 return update
             if total >= MAX_DELEGATIONS:
@@ -191,7 +227,11 @@ def _guard_decision(state: MonthlyAgentState, decision: SupervisorDecision) -> S
     if decision.next_agent == "finish":
         if _accepted_payload(state.get("results", {}).get("asistente_aportacion_mensual")):
             return decision
-        if state.get("total_delegations", 0) >= MAX_DELEGATIONS or _all_specialists_exhausted(attempts):
+        if (
+            state.get("blocking_issue_codes")
+            or state.get("total_delegations", 0) >= MAX_DELEGATIONS
+            or _all_specialists_exhausted(attempts)
+        ):
             return decision
         return _fallback_decision(state, reason_code="premature_finish_rejected")
     if attempts.get(decision.next_agent, 0) >= MAX_SPECIALIST_ATTEMPTS:
@@ -224,7 +264,9 @@ def _fallback_decision(state: MonthlyAgentState, *, reason_code: str) -> Supervi
 def _terminal_update(state: MonthlyAgentState, *, reason: str) -> dict[str, Any]:
     results = state.get("results", {})
     assistant = results.get("asistente_aportacion_mensual")
-    if _accepted_payload(assistant):
+    if state.get("blocking_issue_codes"):
+        status = "failed"
+    elif _accepted_payload(assistant):
         status = str(assistant["status"])
     else:
         status = "partial" if _usable_results(results) else "failed"
