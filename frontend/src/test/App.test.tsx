@@ -157,7 +157,7 @@ describe("read-only workspace", () => {
     expect(screen.getByRole("status")).toBeInTheDocument();
     await ready();
     const card = screen
-      .getByRole("heading", { name: "Valor de las posiciones" })
+      .getByRole("heading", { name: "Valor total de la cuenta" })
       .closest("article")!;
     expect(within(card).getByText("9172,70 €")).toBeVisible();
     expect(screen.getByText(/BENCHMARK SINTÉTICO/)).toBeVisible();

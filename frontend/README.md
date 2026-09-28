@@ -44,7 +44,7 @@ La API fija el entorno; la UI no puede cambiarlo. Ver [jobs locales](../docs/loc
 
 ## Pantallas y limites
 
-- **Resumen**: valor de posiciones (incluye caja si figura como posicion),
+- **Resumen**: valor total de posiciones y caja registrada en DEGIRO,
   aportaciones netas acumuladas, PnL no realizado, TWR y evolucion del valor.
   No confundir PnL de posiciones abiertas con resultado total, ni aportaciones
   con ganancias. El valor historico no es una curva de rentabilidad.

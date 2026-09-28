@@ -385,7 +385,7 @@ function Overview({
       </div>
       <div className="summary-grid">
         <article className="summary-card featured">
-          <h3>Valor de las posiciones</h3>
+          <h3>Valor total de la cuenta</h3>
           <strong>
             {format(
               portfolio?.summary.total_market_value_base,
@@ -393,7 +393,7 @@ function Overview({
               currency,
             )}
           </strong>
-          <p>Valoración de activos; no equivale a saldo de efectivo.</p>
+          <p>Incluye las posiciones valoradas y el efectivo registrado en DEGIRO.</p>
           <span className="coverage">
             Cobertura {format(portfolio?.summary.valuation_coverage_ratio)}
           </span>
