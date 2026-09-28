@@ -71,6 +71,7 @@ def reconstruct_positions_by_date(
     """Build a daily position history per asset from normalized broker events."""
     transactions_frame = _prepare_transactions_frame(transactions)
     snapshots_frame = _prepare_snapshots_frame(snapshots)
+    transactions_frame = align_unidentified_transaction_assets(transactions_frame, snapshots_frame)
     resolved_start_date, resolved_end_date = _resolve_date_window(
         transactions_frame,
         snapshots_frame,
@@ -113,6 +114,41 @@ def reconstruct_positions_by_date(
         positions=positions,
         snapshot_reconciliation=snapshot_reconciliation,
     )
+
+
+def align_unidentified_transaction_assets(transactions: pd.DataFrame, snapshots: pd.DataFrame) -> pd.DataFrame:
+    """Match unique no-ISIN product IDs when transactions include an exchange but snapshots do not."""
+    if transactions.empty or snapshots.empty:
+        return transactions
+    required = {"asset_id", "asset_name", "asset_type", "isin"}
+    if not required.issubset(transactions.columns) or not required.issubset(snapshots.columns):
+        return transactions
+
+    aligned = transactions.copy()
+    snapshot_products = snapshots.loc[
+        snapshots["isin"].isna() & snapshots["asset_name"].notna() & snapshots["asset_type"].notna()
+        & snapshots["asset_id"].astype(str).str.startswith("degiro:product:")
+    ]
+    transaction_products = aligned.loc[
+        aligned["isin"].isna() & aligned["asset_name"].notna() & aligned["asset_type"].notna()
+        & aligned["asset_id"].astype(str).str.startswith("degiro:product:")
+    ]
+    for (name, asset_type), group in snapshot_products.groupby(["asset_name", "asset_type"], dropna=False):
+        snapshot_ids = set(group["asset_id"].astype(str))
+        if len(snapshot_ids) != 1:
+            continue
+        snapshot_id = next(iter(snapshot_ids))
+        slug = snapshot_id.removeprefix("degiro:product:")
+        candidates = transaction_products.loc[
+            (transaction_products["asset_name"] == name)
+            & (transaction_products["asset_type"] == asset_type)
+            & transaction_products["asset_id"].astype(str).str.endswith(f":{slug}")
+        ]
+        transaction_ids = set(candidates["asset_id"].astype(str))
+        if len(transaction_ids) == 1:
+            # Keep the original broker exchange metadata; only reconcile the derived identity.
+            aligned.loc[aligned["asset_id"] == next(iter(transaction_ids)), "asset_id"] = snapshot_id
+    return aligned
 
 
 def reconstruct_positions_from_normalized_degiro(

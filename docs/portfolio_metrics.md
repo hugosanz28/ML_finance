@@ -61,6 +61,8 @@ Campos principales:
 - por defecto usa `broker_snapshot_anchored`: DEGIRO fija el precio local de
   referencia por activo en cada snapshot y `yfinance` solo aporta la variacion
   relativa entre fechas,
+- si falta la cotizacion externa, el valor oficial del snapshot sigue siendo
+  utilizable en esa fecha exacta; los dias posteriores continuan sin valorar,
 - la formula de precio local es:
   `precio_DEGIRO_ancla * precio_proveedor_fecha / precio_proveedor_ancla`,
 - el valor local se ancla preferentemente al `market_value` del snapshot, no a
@@ -78,6 +80,8 @@ Campos principales:
   precios absolutos del proveedor,
 - usa precio disponible mas reciente en o antes de cada fecha de valoracion,
 - recalibra cantidades cuando aparece un snapshot posterior del broker,
+- concilia IDs de producto sin ISIN entre transacciones y snapshots solo cuando
+  la coincidencia de nombre, tipo e identificador es unica,
 - soporta coste base con media ponderada movil para `BUY` y `SELL`,
 - marca `missing_price`, `missing_anchor`, `missing_provider_anchor_price` o
   `missing_fx` cuando no puede valorar una posicion,
@@ -104,6 +108,7 @@ Columnas de auditoria relevantes:
 Estados habituales de `valuation_status`:
 
 - `valued_anchored`: posicion valorada con precio DEGIRO anclado y variacion del proveedor.
+- `valued_snapshot`: valor oficial de DEGIRO en la fecha exacta del snapshot, sin cotizacion externa.
 - `valued_cash`: efectivo valorado directamente.
 - `missing_anchor`: no hay snapshot DEGIRO util para anclar.
 - `missing_provider_anchor_price`: falta el precio del proveedor en la fecha de ancla.

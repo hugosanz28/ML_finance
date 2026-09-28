@@ -51,10 +51,16 @@ const reasons: Record<string, string> = {
     "La API ha devuelto un formato inesperado. No se mostrarán datos sin validar.",
   benchmark_provider_unavailable:
     "Falta descargar el histórico real de benchmarks. Usa la actualización explícita; no se sustituye por datos ficticios.",
+  benchmark_not_selected:
+    "No hay una referencia seleccionada para comparar la cartera.",
   cash_flow_data_missing:
     "Faltan movimientos de efectivo: no podemos separar aportaciones y rentabilidad.",
   valuation_price_proxy:
     "El riesgo por activo usa precios de valoración aproximados, no rentabilidad total con dividendos.",
+  partial_valuation_coverage:
+    "En parte del histórico faltan valoraciones; algunas métricas usan datos incompletos.",
+  incomplete_position_valuation:
+    "Falta valorar alguna posición para calcular la diversificación completa.",
   risk_free_rate_required:
     "Esta métrica necesita una tasa libre de riesgo explícita.",
   risk_free_rate_missing:
@@ -79,10 +85,17 @@ const reasons: Record<string, string> = {
     "La lectura ha fallado. Comprueba el servidor local y vuelve a intentar.",
   insufficient_observations:
     "No hay suficientes observaciones para calcular esta métrica.",
+  zero_return_variance:
+    "No se puede calcular esta correlación porque al menos una serie no varía.",
   incomplete_coverage:
     "La cobertura es incompleta; interpreta este resultado con cautela.",
 };
 export function reason(code: string): string {
+  const missingPrices = /^missing_price_positions:(\d+)$/.exec(code);
+  if (missingPrices) {
+    const count = Number(missingPrices[1]);
+    return `${count} ${count === 1 ? "posición" : "posiciones"} sin precio o ancla de valoración.`;
+  }
   return (
     reasons[code] ??
     "El servidor informa de una limitación adicional. Revisa el código de diagnóstico."

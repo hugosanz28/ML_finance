@@ -246,6 +246,35 @@ def test_calculate_portfolio_metrics_uses_broker_market_value_anchor_when_quanti
     assert positions_metrics["market_value_base"].tolist() == [290.0, 319.0]
 
 
+def test_broker_snapshot_values_exact_date_without_provider_price() -> None:
+    positions = pd.DataFrame([
+        {"position_date": day, "asset_id": "degiro:product:token", "asset_name": "TOKEN",
+         "asset_type": "crypto", "quantity": 2}
+        for day in ("2026-01-01", "2026-01-02")
+    ])
+    transactions = pd.DataFrame([{
+        "asset_id": "degiro:product:trd:token", "asset_name": "TOKEN", "asset_type": "crypto",
+        "isin": None, "trade_date": "2026-01-01", "transaction_type": "BUY", "quantity": 2,
+        "gross_amount_base": 80, "fees_amount_base": 0, "taxes_amount_base": 0,
+    }])
+    snapshots = pd.DataFrame([{
+        "asset_id": "degiro:product:token", "asset_name": "TOKEN", "asset_type": "crypto",
+        "isin": None, "snapshot_date": "2026-01-01", "quantity": 2,
+        "market_price": 50, "market_value": 100, "position_currency": "EUR",
+    }])
+
+    metrics = calculate_portfolio_metrics(
+        positions, pd.DataFrame(), transactions=transactions, snapshots=snapshots,
+        base_currency="EUR", pricing_policy="broker_snapshot_anchored",
+    )
+
+    rows = metrics.position_metrics
+    assert rows["valuation_status"].tolist() == ["valued_snapshot", "missing_provider_anchor_price"]
+    assert rows["market_value_base"].iloc[0] == 100
+    assert rows["cost_basis_base"].iloc[0] == 80
+    assert pd.isna(rows["market_value_base"].iloc[1])
+
+
 def test_calculate_portfolio_metrics_scales_broker_value_anchor_by_current_quantity() -> None:
     positions = pd.DataFrame(
         [

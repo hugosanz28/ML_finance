@@ -126,6 +126,42 @@ def test_reconstruct_positions_by_date_uses_snapshot_anchor_for_initial_state() 
     assert positions["anchor_snapshot_quantity"].tolist() == [4.0, 4.0, 4.0, 4.0]
 
 
+def test_reconstruct_positions_aligns_unique_no_isin_product_across_exports() -> None:
+    transactions = pd.DataFrame([{
+        "asset_id": "degiro:product:trd:token", "asset_name": "TOKEN", "asset_type": "crypto",
+        "isin": None, "trade_date": "2026-01-01", "transaction_type": "BUY", "quantity": 2,
+    }])
+    snapshots = pd.DataFrame([{
+        "asset_id": "degiro:product:token", "asset_name": "TOKEN", "asset_type": "crypto",
+        "isin": None, "snapshot_date": "2026-01-03", "quantity": 3,
+    }])
+
+    reconstructed = reconstruct_positions_by_date(transactions, snapshots=snapshots)
+
+    current = reconstructed.positions.loc[reconstructed.positions["position_date"] == "2026-01-03"]
+    assert current["asset_id"].tolist() == ["degiro:product:token"]
+    assert current["quantity"].tolist() == [3.0]
+    assert reconstructed.snapshot_reconciliation["comparison_status"].tolist() == ["matched"]
+
+
+def test_reconstruct_positions_does_not_guess_ambiguous_no_isin_products() -> None:
+    transactions = pd.DataFrame([
+        {"asset_id": f"degiro:product:{exchange}:token", "asset_name": "TOKEN", "asset_type": "crypto",
+         "isin": None, "trade_date": "2026-01-01", "transaction_type": "BUY", "quantity": 1}
+        for exchange in ("trd", "xet")
+    ])
+    snapshots = pd.DataFrame([{
+        "asset_id": "degiro:product:token", "asset_name": "TOKEN", "asset_type": "crypto",
+        "isin": None, "snapshot_date": "2026-01-02", "quantity": 1,
+    }])
+
+    reconstructed = reconstruct_positions_by_date(transactions, snapshots=snapshots)
+
+    assert set(reconstructed.positions["asset_id"]) == {
+        "degiro:product:trd:token", "degiro:product:xet:token", "degiro:product:token",
+    }
+
+
 def test_reconcile_positions_with_snapshots_marks_matches_and_mismatches() -> None:
     transactions = pd.DataFrame(
         [
