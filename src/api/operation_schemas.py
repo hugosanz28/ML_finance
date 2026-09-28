@@ -33,6 +33,7 @@ class UploadsBody(OperationBody):
 class RefreshBody(OperationBody):
     scope: Literal["both", "fx", "prices"] = "both"
     only_missing_base: bool = False
+    include_classifications: bool = False
     fx_provider: Literal["synthetic", "yfinance"]
     price_provider: Literal["synthetic", "yfinance"]
     start_date: str | None = Field(default=None, pattern=r"^\d{4}-\d{2}-\d{2}$")

@@ -18,14 +18,16 @@ from src.portfolio.metrics_models import (
     PortfolioMetricsResult,
 )
 from src.portfolio.positions import (
+    load_local_asset_aliases,
     align_unidentified_transaction_assets,
     load_normalized_degiro_snapshots,
     load_normalized_degiro_transactions,
     reconstruct_positions_by_date,
 )
+from src.portfolio.cash_history import load_cash_movements, reconcile_cash_history
 
 _POSITION_REQUIRED_COLUMNS = ("position_date", "asset_id", "quantity")
-_POSITION_OPTIONAL_COLUMNS = ("asset_name", "asset_type", "isin", "anchor_snapshot_date")
+_POSITION_OPTIONAL_COLUMNS = ("asset_name", "asset_type", "isin", "anchor_snapshot_date", "cash_reconciled")
 _PRICE_REQUIRED_COLUMNS = ("asset_id", "price_date", "price_currency", "close_price")
 _PRICE_OPTIONAL_COLUMNS = ("adjusted_close_price", "price_provider")
 _TRANSACTION_REQUIRED_COLUMNS = (
@@ -46,6 +48,7 @@ _SNAPSHOT_OPTIONAL_COLUMNS = (
     "market_value_base",
     "base_currency",
     "fx_rate_to_base",
+    "anchor_kind",
 )
 
 
@@ -66,7 +69,7 @@ def calculate_portfolio_metrics(
     aligned_transactions = align_unidentified_transaction_assets(transactions, snapshots) if transactions is not None and snapshots is not None else transactions
     transactions_frame = _prepare_transactions_frame(aligned_transactions)
     fx_rates_frame = _prepare_fx_rates_frame(fx_rates)
-    snapshots_frame = _prepare_snapshots_frame(snapshots)
+    snapshots_frame = _prepare_snapshots_frame(_with_trade_anchors(snapshots, aligned_transactions, base_currency))
 
     if positions_frame.empty:
         raise ValueError("positions cannot be empty when calculating portfolio metrics.")
@@ -157,13 +160,15 @@ def calculate_portfolio_metrics_from_normalized_degiro(
         end_date=valuation_end_date,
         provider_name=resolved_price_provider,
     )
+    cash = load_cash_movements(resolved_settings, normalized_degiro_dir)
+    positions = reconcile_cash_history(reconstructed.positions, cash, snapshots)
     fx_rates = load_fx_rates_from_duckdb(
         repository=resolved_repository,
         end_date=valuation_end_date,
         provider_name=fx_provider,
     )
     metrics = calculate_portfolio_metrics(
-        reconstructed.positions,
+        positions,
         prices,
         transactions=transactions,
         fx_rates=fx_rates,
@@ -224,6 +229,8 @@ def load_prices_daily_from_duckdb(
     if not asset_ids:
         return pd.DataFrame(columns=[*_PRICE_REQUIRED_COLUMNS, *_PRICE_OPTIONAL_COLUMNS])
 
+    aliases = load_local_asset_aliases(repository.settings)
+    asset_ids = list(dict.fromkeys([*asset_ids, *(source for source, target in aliases.items() if target in asset_ids)]))
     placeholders = ", ".join("?" for _ in asset_ids)
     where_clauses = [f"asset_id IN ({placeholders})", "price_date <= ?"]
     parameters: list[object] = [*asset_ids, end_date]
@@ -248,7 +255,10 @@ def load_prices_daily_from_duckdb(
             """,
             parameters,
         ).fetchdf()
-    return frame
+    # Keep the canonical quote when both broker identifiers have a quote for the same day.
+    frame["_alias"] = frame.asset_id.isin(aliases)
+    frame["asset_id"] = frame.asset_id.map(lambda key: aliases.get(key, key))
+    return frame.sort_values("_alias", kind="stable").drop_duplicates(["asset_id", "price_date", "price_provider"]).drop(columns="_alias")
 
 
 def _latest_price_date_from_duckdb(
@@ -261,6 +271,8 @@ def _latest_price_date_from_duckdb(
     if not asset_ids:
         return None
 
+    aliases = load_local_asset_aliases(repository.settings)
+    asset_ids = list(dict.fromkeys([*asset_ids, *(source for source, target in aliases.items() if target in asset_ids)]))
     placeholders = ", ".join("?" for _ in asset_ids)
     where_clauses = [f"asset_id IN ({placeholders})", "price_date <= ?"]
     parameters: list[object] = [*asset_ids, max_date]
@@ -314,6 +326,24 @@ def load_fx_rates_from_duckdb(
             parameters,
         ).fetchdf()
     return frame
+
+
+def _with_trade_anchors(snapshots, transactions, base_currency):
+    """An executed broker trade can anchor a sold asset absent from every portfolio export."""
+    frame = snapshots.copy() if snapshots is not None else pd.DataFrame()
+    required = {"unit_price", "transaction_currency", "gross_amount_base", "quantity", "trade_date", "asset_id", "transaction_type"}
+    if transactions is None or not required.issubset(transactions.columns):
+        return frame
+    known = set(frame.asset_id) if "asset_id" in frame else set()
+    buys = transactions.loc[(transactions.transaction_type == "BUY") & (transactions.unit_price > 0)
+                            & (transactions.quantity > 0) & ~transactions.asset_id.isin(known)]
+    anchors = []
+    for row in buys.sort_values("trade_date").drop_duplicates("asset_id").itertuples():
+        anchors.append(dict(asset_id=row.asset_id, snapshot_date=row.trade_date, quantity=row.quantity,
+                            market_price=row.unit_price, market_value=row.quantity * row.unit_price,
+                            position_currency=row.transaction_currency, market_value_base=row.gross_amount_base,
+                            base_currency=base_currency, anchor_kind="trade"))
+    return pd.concat([frame, pd.DataFrame(anchors)], ignore_index=True) if anchors else frame
 
 
 def _prepare_positions_frame(positions: pd.DataFrame) -> pd.DataFrame:
@@ -570,6 +600,7 @@ def _build_snapshot_lookup(snapshots: pd.DataFrame) -> dict[str, pd.DataFrame]:
                 "market_value_base",
                 "base_currency",
                 "fx_rate_to_base",
+                "anchor_kind",
             ],
         ]
     return lookups
@@ -646,6 +677,16 @@ def _value_position_row(
     asset_id = str(row["asset_id"])
     quantity = float(row["quantity"])
     asset_type = _normalize_optional_text(row.get("asset_type"))
+
+    # An unknown cash balance is not a proven zero position.
+    if (asset_type == "cash" or asset_id.startswith("degiro:cash:")) and pd.notna(row.get("cash_reconciled")) and not row["cash_reconciled"]:
+        return _build_unvalued_row(row, valuation_status="cash_balance_mismatch", pricing_policy=pricing_policy)
+
+    if quantity == 0:
+        # A closed position has zero value even when its historical quote is unavailable.
+        return {**_build_unvalued_row(row, valuation_status="valued_closed", pricing_policy=pricing_policy),
+                "market_value_local": 0.0, "market_value_base": 0.0, "cost_basis_base": 0.0,
+                "unrealized_pnl_base": 0.0}
 
     if asset_type == "cash" or asset_id.startswith("degiro:cash:"):
         cash_currency = asset_id.split(":")[-1].upper()
@@ -816,6 +857,11 @@ def _value_position_row_with_broker_anchor(
             provider_anchor_row=provider_anchor_row,
         )
 
+    if (_days_between(valuation_date, provider_price_row["price_date"].date()) > 7
+            or _days_between(anchor_row["snapshot_date"].date(), provider_anchor_row["price_date"].date()) > 7):
+        return _build_unvalued_row(row, valuation_status="stale_price", pricing_policy="broker_snapshot_anchored",
+                                  anchor_row=anchor_row, provider_anchor_row=provider_anchor_row)
+
     provider_anchor_price = float(provider_anchor_row["effective_close_price"])
     if provider_anchor_price == 0:
         return _build_unvalued_row(
@@ -898,7 +944,7 @@ def _value_position_row_with_broker_anchor(
         "unrealized_pnl_base": unrealized_pnl_base,
         "unrealized_return_pct": unrealized_return_pct,
         "weight": 0.0,
-        "valuation_status": "valued_anchored",
+        "valuation_status": "valued_trade_anchor" if anchor_row.get("anchor_kind") == "trade" else "valued_anchored",
         "pricing_policy": "broker_snapshot_anchored",
         "anchor_snapshot_date": anchor_row["snapshot_date"].date(),
         "anchor_market_price": anchor_market_price,
@@ -946,7 +992,7 @@ def _value_exact_snapshot_row(
     unrealized_pnl_base = None if cost_basis_base is None else round(market_value_base - cost_basis_base, 8)
     unrealized_return_pct = None if cost_basis_base is None or cost_basis_base == 0 else round(market_value_base / cost_basis_base - 1, 8)
     return {
-        **_build_unvalued_row(row, valuation_status="valued_snapshot", pricing_policy="broker_snapshot_anchored", anchor_row=anchor_row),
+        **_build_unvalued_row(row, valuation_status="valued_trade_anchor" if anchor_row.get("anchor_kind") == "trade" else "valued_snapshot", pricing_policy="broker_snapshot_anchored", anchor_row=anchor_row),
         "price_date": valuation_date,
         "price_currency": price_currency,
         "close_price": round(anchor_unit_value, 8),
@@ -1036,7 +1082,7 @@ def _resolve_fx_rate(
         date_column="rate_date",
         as_of_date=valuation_date,
     )
-    if direct is not None:
+    if direct is not None and _days_between(valuation_date, direct["rate_date"].date()) <= 7:
         return round(float(direct["rate"]), 10)
 
     inverse = _resolve_latest_row(
@@ -1044,7 +1090,7 @@ def _resolve_fx_rate(
         date_column="rate_date",
         as_of_date=valuation_date,
     )
-    if inverse is None:
+    if inverse is None or _days_between(valuation_date, inverse["rate_date"].date()) > 7:
         return None
     rate = float(inverse["rate"])
     if rate == 0:

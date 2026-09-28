@@ -7,6 +7,7 @@ from datetime import date
 from typing import Any
 
 from src.application.agents import RunMonthlyAgentsRequest, RunMonthlyAgentsUseCase
+from src.application.asset_classifications import RefreshAssetClassificationsUseCase
 from src.application.benchmarks import RefreshBenchmarksRequest, RefreshBenchmarksUseCase
 from src.application.artifact_reads import _safe_payload, resolve_report_path
 from src.application.contribution_lab import SimulateContributionRequest, SimulateContributionUseCase
@@ -48,6 +49,10 @@ def validate_operation(request: ExecuteOperationRequest, workspace: OperationalW
         if values.get("provider") != "yfinance_ecb":
             raise OperationError("provider_required", 422)
     if request.operation == "refresh":
+        if values.get("include_classifications") and workspace.mode != "real":
+            raise OperationError("external_provider_forbidden_in_demo", 422)
+        if values.get("include_classifications") and values.get("scope", "both") != "both":
+            raise OperationError("classifications_require_full_refresh", 422)
         for field in ("fx_provider", "price_provider"):
             if values[field] not in {"synthetic", "yfinance"}:
                 raise OperationError("provider_required", 422)
@@ -139,9 +144,16 @@ class ExecuteOperationUseCase:
             ))
             payload = self._result(prices.result)
             payload["steps"] = {"fx": self._result(fx.result), "prices": self._result(prices.result)}
-            if any(item.result.status in {"partial", "skipped"} for item in (fx, prices)):
+            if any(item.result.status != "succeeded" for item in (fx, prices)):
                 payload["status"] = "partial"
             payload["warnings"] = list(dict.fromkeys([*payload["warnings"], *fx.result.warnings]))
+            if values.get("include_classifications"):
+                progress(80, "refresh_classifications")
+                classifications = RefreshAssetClassificationsUseCase(settings=self.settings).execute()
+                payload["steps"]["classifications"] = self._result(classifications)
+                payload["warnings"].extend(classifications.warnings)
+                if classifications.status != "succeeded":
+                    payload["status"] = "partial"
             return payload
         elif operation == "benchmarks":
             output = RefreshBenchmarksUseCase(settings=self.settings).execute(RefreshBenchmarksRequest(

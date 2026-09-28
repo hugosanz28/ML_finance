@@ -128,7 +128,11 @@ Para carteras USD, GBP, CHF o JPY se descarga ademas el FX diario oficial BCE
 `EXR.D.<MONEDA>.EUR.SP00.A`. EUR no necesita conversion. No se rellenan extremos
 FX ausentes ni observaciones nulas. Otras monedas se rechazan antes de descargar.
 
-### Actualizacion explicita
+### Actualización manual y al arrancar
+
+El servidor operativo real también puede programar esta descarga al arrancar;
+ver [actualización al arrancar](local_jobs.md#actualización-al-arrancar).
+GET sigue siendo offline y la demo no utiliza proveedores externos.
 
 Con la configuracion real habitual y sin el worker operativo ni otro escritor
 CLI activo, ejecuta (ajusta las fechas a todo el historial necesario):

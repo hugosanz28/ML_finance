@@ -26,6 +26,18 @@ export function dateLabel(date: string | null | undefined): string {
     : "Sin fecha";
 }
 const reasons: Record<string, string> = {
+  non_positive_opening_valuation:
+    "La valoración inicial es cero o no es válida. Completa efectivo, precios y divisas, o elige un periodo posterior con datos completos.",
+  cash_balance_mismatch:
+    "El efectivo reconstruido no cuadra con el saldo de DEGIRO. Revisa el Estado de cuenta y su cobertura antes de calcular rentabilidad.",
+  stale_price:
+    "La última cotización tiene más de siete días. Actualiza precios en Operaciones → Datos; ese intervalo queda sin valorar.",
+  constant_cash_not_applicable:
+    "No aplicable: el precio del efectivo en su propia moneda es constante y su correlación no está definida.",
+  transaction_price_anchor:
+    "Un activo sin snapshot se valora usando su precio de compra DEGIRO y la variación del proveedor. Es una aproximación histórica identificada.",
+  asset_classifications_partial:
+    "No se han podido obtener todas las clasificaciones de activos. Los sectores ausentes se mantienen sin clasificar.",
   pending_portfolio_import: "Hay snapshots de cartera más recientes pendientes de importar. Revisa Operaciones → Datos.",
   benchmark_etf_proxy:
     "La referencia usa un ETF de acumulación como aproximación, no el índice oficial. Incluye costes del fondo, tracking difference y precios de mercado.",
@@ -41,8 +53,16 @@ const reasons: Record<string, string> = {
     "El proveedor ha devuelto cotizaciones ausentes. Se conservan como huecos, no como retornos cero.",
   benchmark_common_window_truncated:
     "La comparación empieza después del último hueco: solo usa el tramo común continuo indicado, no todo el periodo solicitado.",
+  partial_benchmark_coverage:
+    "La referencia no cubre todas las fechas solicitadas. La comparación muestra su cobertura y usa únicamente observaciones disponibles.",
+  incomplete_calendar_alignment:
+    "La cartera y la referencia no tienen datos coincidentes en todos los días. Las métricas comparativas usan las fechas comunes indicadas.",
+  partial_portfolio_coverage:
+    "La comparación dispone de valoraciones de cartera incompletas en parte del periodo.",
+  partial_portfolio_returns:
+    "Algunos retornos de cartera de la comparación son parciales. Consulta la cobertura de cada métrica.",
   portfolio_data_unavailable:
-    "Todavía no hay una cartera importada. Prepara la demo o importa tus datos desde Streamlit.",
+    "Todavía no hay una cartera importada. Prepara la demo o importa tus datos desde Operaciones → Datos.",
   connection_failed:
     "No se puede conectar con la API local. Arráncala en el puerto 8000 y vuelve a intentar.",
   workspace_busy:
@@ -58,7 +78,7 @@ const reasons: Record<string, string> = {
   valuation_price_proxy:
     "El riesgo por activo usa precios de valoración aproximados, no rentabilidad total con dividendos.",
   partial_valuation_coverage:
-    "En parte del histórico faltan valoraciones; algunas métricas usan datos incompletos.",
+    "Faltan valoraciones completas en parte del histórico. Esos intervalos se excluyen de la rentabilidad; actualiza precios y divisas en Operaciones → Datos.",
   incomplete_position_valuation:
     "Falta valorar alguna posición para calcular la diversificación completa.",
   risk_free_rate_required:
@@ -70,9 +90,9 @@ const reasons: Record<string, string> = {
   partial_exposure_coverage:
     "Parte de las posiciones no tiene valoración o clasificación completa.",
   classification_missing:
-    "Faltan clasificaciones: la concentración de esas categorías no está disponible.",
+    "Faltan categorías o sectores. Las categorías se definen en Operaciones → Configuración; los fondos no tienen desglose automático por sector.",
   incomplete_return_path:
-    "Hay huecos en la serie; no se unen para calcular caídas desde máximos.",
+    "Hay intervalos sin valoración completa. El drawdown necesita una trayectoria continua; completa los datos o selecciona un periodo más corto.",
   partial_return_coverage:
     "Algunas estadísticas usan solo una parte del histórico.",
   request_timeout:

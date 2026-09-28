@@ -64,16 +64,22 @@ export function MetricCard({
 }
 export function Notices({ codes }: { codes: string[] }) {
   if (!codes.length) return null;
+  const informational = new Set(["valuation_price_proxy", "transaction_price_anchor", "benchmark_etf_proxy", "constant_cash_not_applicable"]);
+  const unique = [...new Set(codes)];
   return (
     <aside className="notices" aria-label="Calidad y límites de los datos">
       <strong>Antes de interpretar los resultados</strong>
-      <ul>
-        {[...new Set(codes)].map((code) => (
+      <p>Los avisos pueden afectar a una métrica, activo o comparación concretos. Consulta la cobertura de cada resultado.</p>
+      {[["Datos por completar", unique.filter((code) => !informational.has(code))],
+        ["Cómo se calculan", unique.filter((code) => informational.has(code))]].map(([title, group]) =>
+        Array.isArray(group) && group.length > 0 && <div key={String(title)}>
+      <p>{title}</p><ul>
+        {group.map((code) => (
           <li key={code}>
             {reason(code)} <small>({code})</small>
           </li>
         ))}
-      </ul>
+      </ul></div>)}
     </aside>
   );
 }

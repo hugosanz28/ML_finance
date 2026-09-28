@@ -46,6 +46,50 @@ se muestra como no disponible. Inversiones no necesita datos de
 Planificacion. Para guardar cambios se arranca la API con `--operations demo`
 o `--operations real`.
 
+## Arrancar con tus datos personales
+
+Al iniciar con `--operations real`, se encolan precios, divisas, benchmarks y
+clasificaciones disponibles en segundo plano, como máximo un intento diario
+para el mismo histórico. El avance aparece en **Operaciones → Ejecuciones**.
+Para usar únicamente la caché local, añade `--no-refresh-on-start`. La demo
+y el servidor de solo lectura no descargan datos al arrancar.
+
+Requiere Python 3.11 o posterior, Node.js 22.12 o posterior y las dependencias
+instaladas. Ejecuta los comandos desde la raiz del repositorio. Si ya tienes
+datos importados y configuracion local, se reutilizan al arrancar.
+
+En una primera instalacion, crea `.venv` e instala `requirements.txt` como en
+la seccion de demo de abajo. Crea `.env` a partir de `.env.example` solo si no
+existe y revisa su configuracion local; conserva tu `.env` si ya esta preparado.
+
+**Terminal 1 — API con datos reales y guardado habilitado:**
+
+```powershell
+.\.venv\Scripts\python.exe scripts/run_api.py --env-file .env --operations real
+```
+
+**Terminal 2 — interfaz web:**
+
+```powershell
+cd frontend
+npm ci # Solo la primera vez o cuando cambien las dependencias
+npm run dev
+```
+
+Comprueba `node --version` si falla el arranque: necesita al menos 22.12.
+Abre [ML Finance local](http://127.0.0.1:5173/); debe mostrar **DATOS REALES**.
+En **Operaciones → Datos** puedes subir e importar CSV de DEGIRO. En
+**Planificacion** introduces sueldo, gastos, saldo bancario y metas.
+
+Las exportaciones se guardan en `src/degiro_exports/local/` y el estado privado
+en `src/data/local/`, con la configuracion local predeterminada. Ambas carpetas
+y `.env` estan ignoradas por Git. No hace falta volver a importar al reiniciar.
+
+Mantén las dos terminales abiertas; pulsa **Ctrl+C** en cada una para detener
+la aplicacion. Si ya esta funcionando, usa esa instancia: los puertos 8000 y
+5173 deben estar libres para arrancar otra. Mas detalle en la
+[guia de la interfaz](frontend/README.md) y la [API local](docs/local_api.md).
+
 ## Pruebalo con datos sinteticos
 
 Requiere **Python 3.11 o posterior**, **Node.js 22.12 o posterior** y puertos
@@ -117,11 +161,11 @@ agentes. Las escrituras usan confirmacion, idempotencia y un unico worker local.
   convencion de flujo al cierre; no es un TWR intradia exacto.
 - **MWR/XIRR**: rentabilidad anualizada ponderada por fechas e importes de
   flujos; no es directamente comparable con un TWR acumulado.
-- **Benchmarks**: en modo real necesitan descarga explicita de proxies ETF y
+- **Benchmarks**: en modo real usan la descarga al arranque o manual de proxies ETF y
   BCE a cache. Un proxy no es el indice oficial. Nunca se usa la serie
   sintetica como respaldo de datos reales.
 - **Riesgo**: muestra y cobertura condicionan los resultados. Sharpe/Sortino
-  requieren tasa explicita; esta UI no la configura. Faltantes y avisos se muestran.
+  requieren tasa explicita, configurable en el filtro de tasa anual de la UI. Faltantes y avisos se muestran.
 - **Agentes**: `static/null` es el baseline offline; `static/static` añade
   busqueda sintetica. OpenAI/Tavily/DuckDuckGo son opciones externas explicitas
   que pueden transmitir contexto privado. Una auditoria no garantiza acierto.

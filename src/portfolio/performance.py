@@ -116,6 +116,10 @@ def calculate_daily_returns(
         if previous.market_value_base <= 0 or not isfinite(previous.market_value_base):
             status = "unavailable"
             reason_code = "non_positive_opening_valuation"
+        elif coverage_ratio < 1.0:
+            # Changes in the valued subset are not returns of the whole account.
+            status = "unavailable"
+            reason_code = "partial_valuation_coverage"
         else:
             adjusted_closing_value = current.market_value_base - net_flow
             if not isfinite(adjusted_closing_value) or adjusted_closing_value < 0:

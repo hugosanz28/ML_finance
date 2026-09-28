@@ -85,9 +85,9 @@ def test_daily_returns_expose_flow_adjustment_and_coverage() -> None:
 
     assert len(result) == 1
     assert result[0].net_external_flow_base == 100
-    assert result[0].return_decimal == pytest.approx(0.05)
+    assert result[0].return_decimal is None
     assert result[0].coverage_ratio == 0.8
-    assert result[0].status == "partial"
+    assert result[0].status == "unavailable"
     assert result[0].reason_code == "partial_valuation_coverage"
 
 
@@ -220,8 +220,8 @@ def test_partial_coverage_and_ambiguous_cash_flow_are_explicit() -> None:
     )
     period = result.periods[0]
 
-    assert period.twr.value == pytest.approx(0.05)
-    assert period.twr.status == "partial"
+    assert period.twr.value is None
+    assert period.twr.status == "unavailable"
     assert period.twr.reason_code == "partial_valuation_coverage"
     assert period.reason_codes == (
         "partial_valuation_coverage",

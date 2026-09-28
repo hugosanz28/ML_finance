@@ -473,3 +473,38 @@ def test_calculate_portfolio_metrics_from_normalized_degiro_loads_duckdb_prices(
     assert metrics.end_date == date(2026, 1, 6)
     assert daily["total_market_value_base"].tolist() == [100.0, 100.0, 180.0, 210.0]
     assert daily["total_cost_basis_base"].tolist() == [100.0, 100.0, 160.0, 160.0]
+
+
+def test_trade_anchor_values_sold_asset_and_rejects_stale_quote():
+    positions = pd.DataFrame([{"position_date": day, "asset_id": "sold", "quantity": 2}
+                              for day in ["2026-01-01", "2026-01-02", "2026-01-11"]])
+    transactions = pd.DataFrame([{"asset_id": "sold", "trade_date": "2026-01-01", "transaction_type": "BUY",
+                                  "quantity": 2, "unit_price": 50, "transaction_currency": "EUR",
+                                  "gross_amount_base": 100, "fees_amount_base": 0, "taxes_amount_base": 0,
+                                  "source_row": 1}])
+    prices = pd.DataFrame([{"asset_id": "sold", "price_date": day, "price_currency": "EUR", "close_price": price}
+                           for day, price in [("2026-01-01", 100), ("2026-01-02", 110)]])
+    metrics = calculate_portfolio_metrics(positions, prices, transactions=transactions,
+                                         pricing_policy="broker_snapshot_anchored")
+    rows = metrics.position_metrics
+    assert rows.market_value_base.iloc[:2].tolist() == [100, 110]
+    assert rows.valuation_status.tolist() == ["valued_trade_anchor", "valued_trade_anchor", "stale_price"]
+    assert pd.isna(rows.market_value_base.iloc[2])
+
+
+def test_cached_price_alias_uses_canonical_id_and_prefers_canonical_quote(tmp_path):
+    import json
+    from src.portfolio.metrics import load_prices_daily_from_duckdb
+    settings = load_settings(repo_root=tmp_path, env_file=tmp_path / "absent.env", env={})
+    repository = DuckDBMarketDataRepository(settings=settings)
+    repository.upsert_assets([MarketAsset(asset_id=asset_id, asset_name="Fixture", asset_type="stock", trading_currency="EUR")
+                              for asset_id in ["degiro:old", "degiro:new"]])
+    (settings.data_dir / "asset_id_aliases.json").write_text(json.dumps({"schema_version": 1, "aliases": {"degiro:old": "degiro:new"}}))
+    repository.upsert_daily_prices(asset_id="degiro:old", provider_name="yfinance", prices=[
+        DailyPriceRecord(price_date=date(2026, 1, 1), price_currency="EUR", close_price=100),
+        DailyPriceRecord(price_date=date(2026, 1, 2), price_currency="EUR", close_price=105)])
+    repository.upsert_daily_prices(asset_id="degiro:new", provider_name="yfinance", prices=[
+        DailyPriceRecord(price_date=date(2026, 1, 2), price_currency="EUR", close_price=106)])
+    frame = load_prices_daily_from_duckdb(repository=repository, asset_ids=["degiro:new"], end_date=date(2026, 1, 2))
+    assert set(frame.asset_id) == {"degiro:new"}
+    assert frame.sort_values("price_date").close_price.tolist() == [100, 106]

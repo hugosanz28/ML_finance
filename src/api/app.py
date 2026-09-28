@@ -3,6 +3,7 @@
 from typing import Annotated
 from contextlib import asynccontextmanager, nullcontext
 import asyncio
+import logging
 import re
 
 from fastapi import APIRouter, FastAPI, HTTPException, Path, Query, Request
@@ -48,9 +49,11 @@ def _error(status: int, code: str, message: str) -> JSONResponse:
     return JSONResponse(status_code=status, content={"error": {"code": code, "message": message}})
 
 
-def create_app(*, settings: Settings | None = None, workspace_mode: str | None = None) -> FastAPI:
+def create_app(*, settings: Settings | None = None, workspace_mode: str | None = None, refresh_on_start: bool = False) -> FastAPI:
     # Resolve one environment per process; HTTP input cannot switch workspaces/providers.
     resolved = get_settings() if settings is None else settings
+    if refresh_on_start and workspace_mode != "real":
+        raise ValueError("Startup refresh requires real operations")
     manager = LocalJobManager(OperationalWorkspace(resolved, workspace_mode)) if workspace_mode else None
     if manager:
         resolved = manager.workspace.settings
@@ -60,6 +63,13 @@ def create_app(*, settings: Settings | None = None, workspace_mode: str | None =
         if manager:
             await asyncio.to_thread(manager.open)
         try:
+            if manager and refresh_on_start:
+                from src.application.startup_refresh import ScheduleStartupRefreshUseCase
+                try:
+                    await asyncio.to_thread(ScheduleStartupRefreshUseCase(manager).execute)
+                except Exception:
+                    # Keep cached data accessible; never log private paths/provider errors.
+                    logging.getLogger(__name__).warning("Startup refresh could not be scheduled; use Operations to refresh.")
             yield
         finally:
             if manager:

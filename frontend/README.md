@@ -6,6 +6,9 @@ ver [migracion](../docs/react_migration.md).
 
 ## Arranque
 
+Para usar tus datos personales, sigue [Arrancar con tus datos personales](../README.md#arrancar-con-tus-datos-personales).
+Los siguientes pasos preparan la demo sintetica.
+
 Requiere Node.js 22.12 o posterior y el entorno Python instalado. Desde la
 raiz del repo, prepara la demo en una terminal PowerShell:
 

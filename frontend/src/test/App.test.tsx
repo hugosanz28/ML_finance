@@ -151,6 +151,23 @@ describe("educational components", () => {
   });
 });
 describe("read-only workspace", () => {
+  it("only sends a risk-free rate after applying it and can clear it", async () => {
+    const fetchMock = mockApi();
+    const user = userEvent.setup();
+    render(<App />);
+    await ready();
+    const field = screen.getByRole("spinbutton", { name: /Tasa libre de riesgo/ });
+    await user.type(field, "2.5");
+    expect(fetchMock.mock.calls.some(([url]) => url.includes("risk_free_rate_annual"))).toBe(false);
+    await user.click(screen.getByRole("button", { name: "Aplicar tasa" }));
+    await ready();
+    expect(fetchMock.mock.calls.some(([url]) => url.includes("risk_free_rate_annual=0.025"))).toBe(true);
+    await user.clear(field);
+    await user.click(screen.getByRole("button", { name: "Aplicar tasa" }));
+    await ready();
+    const analyticsCalls = fetchMock.mock.calls.filter(([url]) => url.includes("/analytics/summary"));
+    expect(analyticsCalls.at(-1)![0]).not.toContain("risk_free_rate_annual");
+  });
   it("shows loading then portfolio values and visible limitations", async () => {
     const fetchMock = mockApi();
     render(<App />);

@@ -23,10 +23,10 @@ const benchmarks = [
 const errorCode = (error: unknown) =>
   error instanceof ApiError ? error.code : "request_failed";
 
-async function readAnalyticsWhenReady(period: Period, benchmark: string, signal: AbortSignal) {
+async function readAnalyticsWhenReady(period: Period, benchmark: string, signal: AbortSignal, riskFreeRate?: number) {
   // An aborted local read can briefly keep the server lock while it finishes.
   for (let attempt = 0; attempt < 30; attempt++) {
-    try { return await api.analytics(period, benchmark, signal); }
+    try { return await api.analytics(period, benchmark, signal, riskFreeRate); }
     catch (error) {
       if (errorCode(error) !== "workspace_busy" || signal.aborted || attempt === 29) throw error;
       await new Promise((resolve) => setTimeout(resolve, 500));
@@ -39,10 +39,13 @@ export function App() {
   const [view, setView] = useState<View>("Resumen");
   const [period, setPeriod] = useState<Period>("since_inception");
   const [benchmark, setBenchmark] = useState("msci_world");
+  const [riskFreeRateInput, setRiskFreeRateInput] = useState("");
+  const [riskFreeRate, setRiskFreeRate] = useState<number>();
   const [reload, setReload] = useState(0);
   const [loaded, setLoaded] = useState<Loaded>();
   const [loading, setLoading] = useState(true);
   const [health, setHealth] = useState<Health>();
+  const [refreshing, setRefreshing] = useState(false);
   const operationalView = view === "Operaciones";
   const planningView = view === "Planificación";
   useEffect(() => {
@@ -57,8 +60,23 @@ export function App() {
     return () => controller.abort();
   }, [reload]);
   useEffect(() => {
-    if (operationalView || planningView) {
-      setLoading(false);
+    if (health?.mode !== "operations") return;
+    const controller = new AbortController();
+    let timer: ReturnType<typeof setTimeout>;
+    async function poll() {
+      try {
+        const result = await opsApi.jobs(controller.signal);
+        if (!controller.signal.aborted) setRefreshing(result.jobs.some((job) =>
+          ["refresh", "benchmarks"].includes(job.operation) && ["pending", "running"].includes(job.state)));
+      } catch { /* Operations remain inspectable if a status read fails. */ }
+      if (!controller.signal.aborted) timer = setTimeout(() => void poll(), 2000);
+    }
+    void poll();
+    return () => { controller.abort(); clearTimeout(timer); };
+  }, [health?.mode]);
+  useEffect(() => {
+    if (operationalView || planningView || refreshing) {
+      setLoading(refreshing);
       return;
     }
     const controller = new AbortController();
@@ -72,7 +90,7 @@ export function App() {
     async function load() {
       // The local API admits one data read at a time; avoid a spurious workspace_busy.
       const [analytics] = await Promise.allSettled([
-        readAnalyticsWhenReady(period, benchmark, controller.signal),
+        readAnalyticsWhenReady(period, benchmark, controller.signal, riskFreeRate),
       ]);
       const [definitions] = await Promise.allSettled([
         api.definitions(controller.signal),
@@ -120,7 +138,7 @@ export function App() {
       clearTimeout(timeout);
       controller.abort();
     };
-  }, [period, benchmark, reload, operationalView, planningView]);
+  }, [period, benchmark, riskFreeRate, reload, operationalView, planningView, refreshing]);
   const analytics = loaded?.analytics,
     portfolio = loaded?.portfolio,
     definitions = loaded?.definitions ?? [];
@@ -280,6 +298,17 @@ export function App() {
                 ))}
               </select>
             </label>
+            <form className="risk-free-rate" onSubmit={(event) => {
+              event.preventDefault();
+              setRiskFreeRate(riskFreeRateInput.trim() === "" ? undefined : Number(riskFreeRateInput) / 100);
+            }}>
+              <label>Tasa libre de riesgo anual (%) · opcional
+                <input type="number" min="-99.99" step="0.01" value={riskFreeRateInput}
+                  onChange={(event) => setRiskFreeRateInput(event.target.value)} placeholder="Sin definir" />
+              </label>
+              <button type="submit">Aplicar tasa</button>
+              <small>Referencia introducida por ti para Sharpe y Sortino. Vacío: sin calcular.</small>
+            </form>
             <div className="period-note">
               Periodo efectivo
               <strong>
@@ -294,10 +323,10 @@ export function App() {
           {operationalView || planningView ? null : loading ? (
             <section className="loading" role="status">
               <span className="loading-dot" />
-              <h2>Leyendo tu cartera…</h2>
+              <h2>{refreshing ? "Actualizando datos de mercado…" : "Leyendo tu cartera…"}</h2>
               <p>
-                Calculando en la API local. No se consultan proveedores
-                externos.
+                {refreshing ? "Precios, divisas y referencias se están actualizando. Puedes consultar el progreso en Operaciones → Ejecuciones. El resumen se cargará al terminar."
+                  : "Calculando en la API local con los datos guardados."}
               </p>
             </section>
           ) : (

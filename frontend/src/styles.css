@@ -306,6 +306,25 @@ label {
   font-size: 0.76rem;
   color: #bcc8cd;
 }
+.risk-free-rate {
+  display: grid;
+  gap: 8px;
+  flex: 1 1 240px;
+  min-width: 0;
+}
+.risk-free-rate input {
+  display: block;
+  width: 100%;
+  margin-top: 5px;
+  padding: 8px 11px;
+  border: 1px solid #354249;
+  border-radius: 6px;
+  background: #151d23;
+  color: inherit;
+  font: inherit;
+}
+.risk-free-rate button { justify-self: start; }
+.risk-free-rate small { color: var(--muted); }
 summary {
   font-size: 0.83rem;
   color: #c9d6d9;

@@ -267,10 +267,18 @@ def load_normalized_degiro_snapshots(
 def _apply_local_asset_aliases(frame: pd.DataFrame, *, settings: Settings | None) -> pd.DataFrame:
     if frame.empty or "asset_id" not in frame.columns:
         return frame
+    aliases = load_local_asset_aliases(settings)
+    aligned = frame.copy()
+    aligned["asset_id"] = aligned["asset_id"].map(lambda value: aliases.get(value, value))
+    return aligned
+
+
+def load_local_asset_aliases(settings: Settings | None = None) -> dict[str, str]:
+    """Read verified broker identity equivalences shared by holdings and price history."""
     resolved_settings = get_settings() if settings is None else settings
     path = resolved_settings.data_dir / "asset_id_aliases.json"
     if not path.exists():
-        return frame
+        return {}
     config = json.loads(path.read_text(encoding="utf-8"))
     if not isinstance(config, dict) or config.get("schema_version") != 1 or not isinstance(config.get("aliases"), dict):
         raise ValueError("Invalid local asset aliases")
@@ -282,9 +290,7 @@ def _apply_local_asset_aliases(frame: pd.DataFrame, *, settings: Settings | None
         for source, target in aliases.items()
     ):
         raise ValueError("Invalid local asset aliases")
-    aligned = frame.copy()
-    aligned["asset_id"] = aligned["asset_id"].map(lambda value: aliases.get(value, value))
-    return aligned
+    return aliases
 
 
 def reconcile_positions_with_snapshots(

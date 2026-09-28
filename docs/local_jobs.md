@@ -46,6 +46,27 @@ El arranque operativo crea `jobs.duckdb` y `api-worker.lock` en el directorio
 de datos. No cambia `portfolio.duckdb` hasta ejecutar una operacion que lo
 necesite. El modo de lectura no crea esos archivos.
 
+## Actualización al arrancar
+
+`scripts/run_api.py --operations real` programa FX, precios, clasificación de
+activos y benchmarks usando el mismo worker. Consulta el histórico importado
+hasta ayer; no importa nuevos CSV, ejecuta agentes ni coloca órdenes.
+`--no-refresh-on-start` desactiva las descargas. En demo y solo lectura no se
+programa nada; `create_app` también mantiene esta opción desactivada por defecto.
+
+Las claves por fecha e inicio del histórico evitan duplicar trabajos al
+reiniciar. Los intentos fallidos o interrumpidos no se repiten ese día: revisa
+Ejecuciones y utiliza una actualización manual si procede. GET solo lee la
+caché. Un fallo de red conserva los datos anteriores y queda en el resultado
+del job; las valoraciones obsoletas mantienen sus avisos. La UI espera mientras
+haya descargas pendientes o activas y recarga la analítica al terminar.
+
+El refresh completo admite `include_classifications: true` solo en real.
+Guarda tipo y sector publicados por Yahoo Finance, con fuente y fecha, en
+`src/data/local/asset_classifications.json`. No infiere sectores por nombre
+ni desglosa fondos por sus participaciones. Las categorías y objetivos de
+asignación siguen siendo decisiones del usuario.
+
 ## Enviar una operacion
 
 Las operaciones aceptan JSON, no paths, YAML libre, credenciales, snapshots de
