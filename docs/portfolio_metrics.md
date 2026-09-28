@@ -61,16 +61,16 @@ Campos principales:
 - por defecto usa `broker_snapshot_anchored`: DEGIRO fija el precio local de
   referencia por activo en cada snapshot y `yfinance` solo aporta la variacion
   relativa entre fechas,
-- si falta la cotizacion externa, el valor oficial del snapshot sigue siendo
-  utilizable en esa fecha exacta; los dias posteriores continuan sin valorar,
+- en la fecha exacta del snapshot usa el valor oficial de DEGIRO en moneda base,
+  incluso si existe cotizacion externa; los dias posteriores necesitan la serie
+  de precios del proveedor,
 - la formula de precio local es:
   `precio_DEGIRO_ancla * precio_proveedor_fecha / precio_proveedor_ancla`,
 - el valor local se ancla preferentemente al `market_value` del snapshot, no a
   `quantity * market_price`, porque algunos brokers redondean la cantidad
   visible en el CSV y conservan mas precision internamente,
-- para activos no EUR, el precio local anclado se convierte a moneda base con
-  el FX diario disponible en `fx_rates`; por eso el total EUR puede no coincidir
-  exactamente con el snapshot si DEGIRO uso otro cambio,
+- fuera de la fecha del snapshot, el precio local anclado de activos no EUR se
+  convierte a moneda base con el FX diario disponible en `fx_rates`,
 - para fechas anteriores al primer snapshot disponible usa ese primer snapshot
   como ancla hacia atras, de forma que la serie historica no queda sin valorar,
 - si `calculate_portfolio_metrics_from_normalized_degiro` se llama sin
@@ -108,7 +108,7 @@ Columnas de auditoria relevantes:
 Estados habituales de `valuation_status`:
 
 - `valued_anchored`: posicion valorada con precio DEGIRO anclado y variacion del proveedor.
-- `valued_snapshot`: valor oficial de DEGIRO en la fecha exacta del snapshot, sin cotizacion externa.
+- `valued_snapshot`: valor oficial de DEGIRO en la fecha exacta del snapshot.
 - `valued_cash`: efectivo valorado directamente.
 - `missing_anchor`: no hay snapshot DEGIRO util para anclar.
 - `missing_provider_anchor_price`: falta el precio del proveedor en la fecha de ancla.

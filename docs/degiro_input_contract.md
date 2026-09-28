@@ -171,6 +171,18 @@ debera modelarlo explicitamente si necesita conservarlo entre ejecuciones.
 Los CSV se leen como UTF-8 con BOM opcional. Las cabeceras observadas son
 espanolas, pero los parsers aceptan los aliases ingleses versionados.
 
+Los lectores de cartera eliminan operaciones repetidas entre exportaciones
+solapadas cuando coinciden el ID de orden, fecha, hora, tipo, cantidad, precio
+y efectivo neto. Si DEGIRO cambia el identificador de un activo, se puede
+guardar una equivalencia privada en `src/data/local/asset_id_aliases.json`:
+
+```json
+{"schema_version": 1, "aliases": {"degiro:isin:XX0000000001": "degiro:product:token"}}
+```
+
+La equivalencia se aplica al leer transacciones y snapshots normalizados, sin
+modificar los CSV originales. El archivo local esta ignorado por Git.
+
 ## Contrato de contenido por tipo de fichero
 
 Las siguientes estructuras ya estan validadas con exportaciones reales

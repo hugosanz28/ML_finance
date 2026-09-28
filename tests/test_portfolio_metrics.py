@@ -202,9 +202,37 @@ def test_calculate_portfolio_metrics_can_anchor_prices_to_broker_snapshots() -> 
     positions_metrics = metrics.position_metrics.copy()
     assert positions_metrics["close_price"].tolist() == [100.0, 110.0]
     assert positions_metrics["market_value_base"].tolist() == [1000.0, 1100.0]
-    assert positions_metrics["valuation_status"].tolist() == ["valued_anchored", "valued_anchored"]
+    assert positions_metrics["valuation_status"].tolist() == ["valued_snapshot", "valued_anchored"]
     assert positions_metrics["anchor_snapshot_date"].dt.date.tolist() == [date(2026, 1, 1), date(2026, 1, 1)]
-    assert positions_metrics["provider_anchor_price"].tolist() == [50.0, 50.0]
+    assert pd.isna(positions_metrics["provider_anchor_price"].iloc[0])
+    assert positions_metrics["provider_anchor_price"].iloc[1] == 50.0
+
+
+def test_calculate_portfolio_metrics_prefers_broker_eur_value_on_snapshot_day() -> None:
+    positions = pd.DataFrame([
+        {"position_date": "2026-01-01", "asset_id": "asset-a", "asset_type": "stock", "quantity": 2},
+    ])
+    prices = pd.DataFrame([
+        {"asset_id": "asset-a", "price_date": "2026-01-01", "price_currency": "USD", "close_price": 50},
+    ])
+    snapshots = pd.DataFrame([
+        {"asset_id": "asset-a", "snapshot_date": "2026-01-01", "quantity": 2,
+         "market_price": 50, "market_value": 100, "position_currency": "USD",
+         "market_value_base": 90, "base_currency": "EUR"},
+    ])
+    fx_rates = pd.DataFrame([
+        {"rate_date": "2026-01-01", "base_currency": "EUR", "quote_currency": "USD", "rate": 2},
+    ])
+
+    metrics = calculate_portfolio_metrics(
+        positions, prices, snapshots=snapshots, fx_rates=fx_rates,
+        base_currency="EUR", pricing_policy="broker_snapshot_anchored",
+    )
+
+    row = metrics.position_metrics.iloc[0]
+    assert row["market_value_base"] == 90
+    assert row["fx_rate_to_base"] == round(100 / 90, 8)
+    assert row["valuation_status"] == "valued_snapshot"
 
 
 def test_calculate_portfolio_metrics_uses_broker_market_value_anchor_when_quantity_is_rounded() -> None:

@@ -786,18 +786,19 @@ def _value_position_row_with_broker_anchor(
     if anchor_row is None:
         return _build_unvalued_row(row, valuation_status="missing_anchor", pricing_policy="broker_snapshot_anchored")
 
+    if anchor_row["snapshot_date"].date() == valuation_date and pd.notna(anchor_row["anchor_market_value"]):
+        # On the broker snapshot date, its reported value takes precedence over a provider estimate.
+        return _value_exact_snapshot_row(
+            row, anchor_row=anchor_row, cost_basis_lookup=cost_basis_lookup,
+            fx_lookup=fx_lookup, base_currency=base_currency,
+        )
+
     provider_anchor_row = _resolve_latest_row(
         price_lookup.get(asset_id),
         date_column="price_date",
         as_of_date=anchor_row["snapshot_date"].date(),
     )
     if provider_anchor_row is None:
-        if anchor_row["snapshot_date"].date() == valuation_date and pd.notna(anchor_row["anchor_market_value"]):
-            # The broker's own value is sufficient on the snapshot date; later dates still need a price series.
-            return _value_exact_snapshot_row(
-                row, anchor_row=anchor_row, cost_basis_lookup=cost_basis_lookup,
-                fx_lookup=fx_lookup, base_currency=base_currency,
-            )
         return _build_unvalued_row(
             row,
             valuation_status="missing_provider_anchor_price",
@@ -925,12 +926,21 @@ def _value_exact_snapshot_row(
     anchor_unit_value = float(anchor_row["anchor_market_value"]) / anchor_quantity
     market_value_local = round(quantity * anchor_unit_value, 8)
     price_currency = str(anchor_row["position_currency"])
-    fx_rate_to_base: float | None = 1.0 if price_currency == base_currency else _resolve_fx_rate(
-        valuation_date, from_currency=price_currency, to_currency=base_currency, fx_lookup=fx_lookup,
-    )
+    broker_value_base = anchor_row["market_value_base"]
+    if pd.notna(broker_value_base):
+        # The broker's base-currency amount includes the FX rate used for this snapshot.
+        market_value_base = round(float(broker_value_base) * quantity / anchor_quantity, 8)
+        fx_rate_to_base: float | None = (
+            1.0 if price_currency == base_currency else
+            (round(market_value_local / market_value_base, 8) if market_value_base != 0 else None)
+        )
+    else:
+        fx_rate_to_base = 1.0 if price_currency == base_currency else _resolve_fx_rate(
+            valuation_date, from_currency=price_currency, to_currency=base_currency, fx_lookup=fx_lookup,
+        )
+        market_value_base = None if fx_rate_to_base is None else round(market_value_local / fx_rate_to_base, 8)
     if fx_rate_to_base is None:
         return _build_unvalued_row(row, valuation_status="missing_fx", pricing_policy="broker_snapshot_anchored", anchor_row=anchor_row)
-    market_value_base = round(market_value_local / fx_rate_to_base, 8)
     cost_basis_row = _resolve_latest_row(cost_basis_lookup.get(asset_id), date_column="valuation_date", as_of_date=valuation_date)
     cost_basis_base = None if cost_basis_row is None else round(float(cost_basis_row["cost_basis_base"]), 8)
     unrealized_pnl_base = None if cost_basis_base is None else round(market_value_base - cost_basis_base, 8)
