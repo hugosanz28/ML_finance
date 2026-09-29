@@ -26,10 +26,12 @@ from src.portfolio.positions import (
 )
 from src.portfolio.cash_history import load_cash_movements, reconcile_cash_history
 from src.portfolio.dividend_receivables import reconcile_dividend_receivables
+from src.portfolio.reviewed_rights_prices import apply_reviewed_rights_prices
 
 _POSITION_REQUIRED_COLUMNS = ("position_date", "asset_id", "quantity")
 _POSITION_OPTIONAL_COLUMNS = ("asset_name", "asset_type", "isin", "anchor_snapshot_date", "cash_reconciled",
-                              "receivable_amount", "receivable_currency")
+                              "receivable_amount", "receivable_currency",
+                              "reviewed_rights_close", "reviewed_rights_price_date")
 _PRICE_REQUIRED_COLUMNS = ("asset_id", "price_date", "price_currency", "close_price")
 _PRICE_OPTIONAL_COLUMNS = ("adjusted_close_price", "price_provider")
 _TRANSACTION_REQUIRED_COLUMNS = (
@@ -165,6 +167,8 @@ def calculate_portfolio_metrics_from_normalized_degiro(
     cash = load_cash_movements(resolved_settings, normalized_degiro_dir)
     positions = reconcile_cash_history(reconstructed.positions, cash, snapshots)
     positions = reconcile_dividend_receivables(positions, cash)
+    if resolved_settings.price_provider != "synthetic":
+        positions = apply_reviewed_rights_prices(positions, resolved_settings.data_dir / "reviewed_rights_prices.json")
     fx_rates = load_fx_rates_from_duckdb(
         repository=resolved_repository,
         end_date=valuation_end_date,
@@ -744,6 +748,22 @@ def _value_position_row(
             "provider_price_age_days": 0,
             "provider_anchor_age_days": None,
         }
+
+    if pd.notna(row.get("reviewed_rights_close")):
+        # An exact broker snapshot still wins over a reviewed exchange closing price.
+        anchor = _resolve_anchor_row(snapshot_lookup.get(asset_id), date_column="snapshot_date", as_of_date=valuation_date)
+        if anchor is not None and anchor["snapshot_date"].date() == valuation_date and pd.notna(anchor["anchor_market_value"]):
+            return _value_exact_snapshot_row(row, anchor_row=anchor, cost_basis_lookup=cost_basis_lookup,
+                                             fx_lookup=fx_lookup, base_currency=base_currency)
+        close = float(row["reviewed_rights_close"])
+        fx = 1.0 if base_currency == "EUR" else _resolve_fx_rate(
+            valuation_date, from_currency="EUR", to_currency=base_currency, fx_lookup=fx_lookup)
+        if fx is None:
+            return _build_unvalued_row(row, valuation_status="missing_fx", pricing_policy="reviewed_exchange_close")
+        return {**_build_unvalued_row(row, valuation_status="valued_reviewed_rights", pricing_policy="reviewed_exchange_close"),
+                "price_date": row["reviewed_rights_price_date"], "price_currency": "EUR", "close_price": close,
+                "market_value_local": round(quantity * close, 8), "fx_rate_to_base": fx,
+                "market_value_base": round(quantity * close / fx, 8)}
 
     if pricing_policy == "broker_snapshot_anchored":
         return _value_position_row_with_broker_anchor(

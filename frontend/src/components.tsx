@@ -64,7 +64,7 @@ export function MetricCard({
 }
 export function Notices({ codes }: { codes: string[] }) {
   if (!codes.length) return null;
-  const informational = new Set(["valuation_price_proxy", "transaction_price_anchor", "dividend_receivable_reconstructed", "benchmark_etf_proxy", "constant_cash_not_applicable"]);
+  const informational = new Set(["valuation_price_proxy", "transaction_price_anchor", "dividend_receivable_reconstructed", "reviewed_rights_prices", "benchmark_etf_proxy", "constant_cash_not_applicable", "zero_drawdown"]);
   const unique = [...new Set(codes)];
   return (
     <aside className="notices" aria-label="Calidad y límites de los datos">

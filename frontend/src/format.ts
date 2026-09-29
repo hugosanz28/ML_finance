@@ -26,6 +26,8 @@ export function dateLabel(date: string | null | undefined): string {
     : "Sin fecha";
 }
 const reasons: Record<string, string> = {
+  reviewed_rights_prices:
+    "Los derechos usan cierres de mercado revisados con fuente y fecha guardadas en local. Durante el fin de semana se conserva el cierre del viernes; las sesiones sin cotización siguen incompletas.",
   non_positive_opening_valuation:
     "La valoración inicial es cero o no es válida. Completa efectivo, precios y divisas, o elige un periodo posterior con datos completos.",
   cash_balance_mismatch:
@@ -88,7 +90,7 @@ const reasons: Record<string, string> = {
   risk_free_rate_missing:
     "Sharpe y Sortino no están disponibles sin una tasa libre de riesgo explícita.",
   zero_drawdown:
-    "No se observa una caída; no se puede calcular un ratio que divida por ella.",
+    "En la serie afectada no se observa una caída y su ratio Calmar no se puede calcular. Puede corresponder al efectivo; no significa que toda la cartera carezca de caídas.",
   partial_exposure_coverage:
     "Parte de las posiciones no tiene valoración o clasificación completa.",
   classification_missing:
