@@ -17,7 +17,7 @@ def load_cash_movements(settings: Settings, normalized_degiro_dir: str | Path | 
         return pd.DataFrame()
     frame = pd.concat(frames, ignore_index=True)
     # Overlapping exports keep their provenance but represent the same ledger entry.
-    keys = [key for key in ("movement_date", "movement_time", "value_date", "movement_type",
+    keys = [key for key in ("account_id", "asset_id", "description", "movement_date", "movement_time", "value_date", "movement_type",
                            "amount", "movement_currency", "running_balance", "external_reference") if key in frame]
     return frame.drop_duplicates(keys).copy() if keys else frame
 

@@ -114,6 +114,8 @@ class _AnalyticsUseCase:
         ]
         if (positions_in_period.valuation_status == "valued_trade_anchor").any():
             warnings.append("transaction_price_anchor")
+        if (positions_in_period.valuation_status == "valued_dividend_receivable").any():
+            warnings.append("dividend_receivable_reconstructed")
         rows = tuple(row for row in performance.daily_returns if selected.actual_start < row.valuation_date <= selected.end_date)
         if missing_cash:
             # Missing account exports must not silently mean zero external flows.

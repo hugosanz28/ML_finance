@@ -36,6 +36,8 @@ const reasons: Record<string, string> = {
     "No aplicable: el precio del efectivo en su propia moneda es constante y su correlación no está definida.",
   transaction_price_anchor:
     "Un activo sin snapshot se valora usando su precio de compra DEGIRO y la variación del proveedor. Es una aproximación histórica identificada.",
+  dividend_receivable_reconstructed:
+    "Tras la conversión de derechos, el dividendo pendiente se reconstruye con el importe bruto que DEGIRO liquidó después. Es una reconstrucción contable retrospectiva, no una cotización histórica.",
   asset_classifications_partial:
     "No se han podido obtener todas las clasificaciones de activos. Los sectores ausentes se mantienen sin clasificar.",
   pending_portfolio_import: "Hay snapshots de cartera más recientes pendientes de importar. Revisa Operaciones → Datos.",

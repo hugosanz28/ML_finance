@@ -25,9 +25,11 @@ from src.portfolio.positions import (
     reconstruct_positions_by_date,
 )
 from src.portfolio.cash_history import load_cash_movements, reconcile_cash_history
+from src.portfolio.dividend_receivables import reconcile_dividend_receivables
 
 _POSITION_REQUIRED_COLUMNS = ("position_date", "asset_id", "quantity")
-_POSITION_OPTIONAL_COLUMNS = ("asset_name", "asset_type", "isin", "anchor_snapshot_date", "cash_reconciled")
+_POSITION_OPTIONAL_COLUMNS = ("asset_name", "asset_type", "isin", "anchor_snapshot_date", "cash_reconciled",
+                              "receivable_amount", "receivable_currency")
 _PRICE_REQUIRED_COLUMNS = ("asset_id", "price_date", "price_currency", "close_price")
 _PRICE_OPTIONAL_COLUMNS = ("adjusted_close_price", "price_provider")
 _TRANSACTION_REQUIRED_COLUMNS = (
@@ -162,6 +164,7 @@ def calculate_portfolio_metrics_from_normalized_degiro(
     )
     cash = load_cash_movements(resolved_settings, normalized_degiro_dir)
     positions = reconcile_cash_history(reconstructed.positions, cash, snapshots)
+    positions = reconcile_dividend_receivables(positions, cash)
     fx_rates = load_fx_rates_from_duckdb(
         repository=resolved_repository,
         end_date=valuation_end_date,
@@ -687,6 +690,18 @@ def _value_position_row(
         return {**_build_unvalued_row(row, valuation_status="valued_closed", pricing_policy=pricing_policy),
                 "market_value_local": 0.0, "market_value_base": 0.0, "cost_basis_base": 0.0,
                 "unrealized_pnl_base": 0.0}
+
+    if asset_type == "dividend_receivable":
+        currency = row.get("receivable_currency")
+        amount = row.get("receivable_amount")
+        fx = 1.0 if currency == base_currency else _resolve_fx_rate(
+            valuation_date, from_currency=currency, to_currency=base_currency, fx_lookup=fx_lookup)
+        if pd.isna(amount) or not currency or fx is None:
+            return _build_unvalued_row(row, valuation_status="missing_receivable_value", pricing_policy=pricing_policy)
+        # Gross receivable: withholding remains an expense on the cash booking day.
+        return {**_build_unvalued_row(row, valuation_status="valued_dividend_receivable", pricing_policy="account_settlement"),
+                "price_currency": currency, "market_value_local": float(amount),
+                "fx_rate_to_base": fx, "market_value_base": round(float(amount) / fx, 8)}
 
     if asset_type == "cash" or asset_id.startswith("degiro:cash:"):
         cash_currency = asset_id.split(":")[-1].upper()

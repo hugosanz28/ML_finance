@@ -111,3 +111,25 @@ su hueco. Para drawdown elige un periodo continuo o completa la fuente faltante.
 La correlación del efectivo constante figura como no aplicable. La UI permite
 introducir una tasa anual explícita para Sharpe/Sortino; dejarla vacía conserva
 estas métricas como no disponibles.
+
+## Derechos convertidos en dividendos pendientes
+
+La reconstrucción distingue la cotización de los derechos de su conversión
+en un dividendo pendiente. Solo reconoce esta última cuando el Estado de
+cuenta contiene una conversión completa (venta de derechos y compra del
+instrumento no negociable), su baja y un dividendo positivo con el mismo
+identificador. Cantidades distintas, pagos ambiguos o liquidaciones aún no
+registradas mantienen el hueco; no se vinculan productos por nombres parecidos.
+
+Desde la fecha de registro de la conversión hasta el día anterior al abono,
+se utiliza el importe bruto liquidado por DEGIRO como dividendo pendiente.
+Se conserva incluso si la baja de los derechos tiene una fecha valor anterior
+al abono. Al llegar el dinero se elimina el pendiente; la retención se registra
+en efectivo ese día. Así no se cuenta dos veces el ingreso ni se crea una
+pérdida seguida de una ganancia por el desfase de fechas.
+
+`valued_dividend_receivable` y el aviso `dividend_receivable_reconstructed`
+identifican esta **reconstrucción retrospectiva**, basada en el importe cobrado
+después. No representa una cotización de mercado ni una serie que se conociera
+en tiempo real. Una consulta con fecha final anterior al abono no usa ese pago
+futuro. No se rellenan los precios de los días anteriores a la conversión.

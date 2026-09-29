@@ -62,3 +62,20 @@ def test_overlapping_exports_do_not_duplicate_cash_or_external_flows(tmp_path):
     pd.DataFrame([dict(row, source_file="second")]).to_parquet(directory / "b.parquet")
     assert len(load_cash_movements(settings)) == 1
     assert len(load_normalized_degiro_cash_movements(settings=settings)) == 1
+
+
+def test_distinct_assets_and_conversion_legs_survive_cash_deduplication(tmp_path):
+    from src.config import load_settings
+    from src.portfolio.cash_history import load_cash_movements
+    settings = load_settings(repo_root=tmp_path, env_file=tmp_path / "absent.env", env={})
+    directory = settings.normalized_data_dir / "degiro" / "cash_movements"
+    directory.mkdir(parents=True)
+    rows = pd.DataFrame([
+        dict(asset_id="rights", description="Venta 10 Fixture@0 EUR"),
+        dict(asset_id="rights", description="Compra 10 Fixture - Non tradeable@0 EUR"),
+        dict(asset_id="other", description="Venta 10 Other@0 EUR"),
+    ]).assign(movement_date="2026-01-01", movement_type="CORPORATE_ACTION_SCRIP_DIVIDEND",
+              amount=0, running_balance=100, movement_currency="EUR")
+    rows.to_parquet(directory / "a.parquet")
+    rows.to_parquet(directory / "overlap.parquet")
+    assert len(load_cash_movements(settings)) == 3
