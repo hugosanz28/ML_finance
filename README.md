@@ -48,6 +48,26 @@ o `--operations real`.
 
 ## Arrancar con tus datos personales
 
+Con las dependencias instaladas, en Windows basta con:
+
+```powershell
+.\scripts\app.ps1
+```
+
+Abre la web y mantiene API/UI en segundo plano; reutiliza instancias listas del
+mismo proyecto. Estado, parada y copia privada:
+
+```powershell
+.\scripts\app.ps1 -Action Status
+.\scripts\app.ps1 -Action Stop
+.\scripts\app.ps1 -Action Backup
+```
+
+Las copias requieren API y CLI detenidos. Restauración, contenido del ZIP,
+privacidad y diagnóstico: [guía de arranque y copias](docs/local_app.md).
+
+### Arranque manual
+
 Al iniciar con `--operations real`, se encolan precios, divisas, benchmarks y
 clasificaciones disponibles en segundo plano, como máximo un intento diario
 para el mismo histórico. El avance aparece en **Operaciones → Ejecuciones**.
@@ -85,7 +105,7 @@ Las exportaciones se guardan en `src/degiro_exports/local/` y el estado privado
 en `src/data/local/`, con la configuracion local predeterminada. Ambas carpetas
 y `.env` estan ignoradas por Git. No hace falta volver a importar al reiniciar.
 
-Mantén las dos terminales abiertas; pulsa **Ctrl+C** en cada una para detener
+En el arranque manual, mantén las dos terminales abiertas; pulsa **Ctrl+C** en cada una para detener
 la aplicacion. Si ya esta funcionando, usa esa instancia: los puertos 8000 y
 5173 deben estar libres para arrancar otra. Mas detalle en la
 [guia de la interfaz](frontend/README.md) y la [API local](docs/local_api.md).

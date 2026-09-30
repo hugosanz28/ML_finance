@@ -40,6 +40,9 @@ que la interfaz no dependa de detalles internos de `src/portfolio/`,
   benchmarks y definiciones de metricas mediante read models JSON.
 - leer, previsualizar y guardar el plan personal en una base privada separada,
   sin exigir datos DEGIRO ni cambiar los casos de uso de cartera.
+- crear y restaurar copias privadas offline con manifiesto e integridad,
+  bloqueo del worker y copia previa: `BackupLocalUseCase` / `RestoreLocalUseCase`.
+  Ver [arranque y copias](../../docs/local_app.md); no se exponen por HTTP.
 
 ## Analitica avanzada
 
@@ -50,7 +53,8 @@ es `GetMetricDefinitionsUseCase`, sin configuracion ni acceso a datos.
 
 La seleccion de periodo se delega en rendimiento: `last_month`, `last_quarter`,
 `last_year` y `since_inception`. Todas las secciones usan su misma apertura
-efectiva y fecha final; no se recortan independientemente. `benchmark_id`
+efectiva y fecha final solicitadas. La comparación con benchmarks puede limitarse
+al último tramo común continuo, con fechas efectivas explícitas. `benchmark_id`
 sobrescribe la seleccion solo para esa consulta, sin escribir configuracion.
 Las formulas siguen en dominio, no en esta capa.
 
@@ -78,7 +82,7 @@ En real se lee la cache validada de #60, si existe; tambien se admite inyeccion
 de `LoadedBenchmarkProvider`. Sin fuente se devuelve `benchmark_provider_unavailable`,
 sin usar red ni sustituirlo por la demo. Ver [benchmarks](../../docs/benchmarks.md).
 
-Ver los payloads y rutas HTTP previstas en [contratos API](../../docs/api_contracts.md#9-analitica-avanzada).
+Ver los payloads y rutas HTTP en [contratos API](../../docs/api_contracts.md#9-analitica-avanzada).
 Tests: `tests/test_analytics_application.py` y `tests/test_interface_boundaries.py`.
 
 Las migraciones deben ser progresivas: primero se anade el wrapper, despues se
@@ -137,7 +141,7 @@ descargas externas.
 
 `GetPortfolioStateUseCase` compone las metricas, posiciones, historico,
 snapshot broker y aportaciones externas en tipos serializables. Es la frontera
-prevista para `GET /api/v1/portfolio/state`.
+utilizada por `GET /api/v1/portfolio/state`.
 
 `SaveDegiroUploadsUseCase` controla nombres y persistencia de archivos subidos;
 `InferFxRequirementsUseCase` devuelve requisitos FX con fechas ISO mediante

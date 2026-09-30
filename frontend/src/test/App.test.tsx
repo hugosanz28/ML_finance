@@ -88,7 +88,7 @@ describe("contracts and formatting", () => {
   });
 });
 describe("educational components", () => {
-  it("does not render unavailable numbers as zero or as available values", () => {
+  it("does not render unavailable numbers as zero and keeps their reason collapsed", async () => {
     const metric = metricSchema.parse({
       ...fixture.analytics.data.performance.period.twr,
       value: 0.8,
@@ -98,6 +98,8 @@ describe("educational components", () => {
     render(<MetricCard metric={metric} definitions={[]} />);
     expect(screen.getByText("No disponible")).toBeInTheDocument();
     expect(screen.queryByText("80 %")).not.toBeInTheDocument();
+    expect(screen.getByText(/Faltan movimientos/)).not.toBeVisible();
+    await userEvent.setup().click(screen.getByText("Ver aviso de esta métrica"));
     expect(screen.getByText(/Faltan movimientos/)).toBeVisible();
   });
   it("focuses explanations and opens definition, interpretation and formula", async () => {
@@ -168,7 +170,7 @@ describe("read-only workspace", () => {
     const analyticsCalls = fetchMock.mock.calls.filter(([url]) => url.includes("/analytics/summary"));
     expect(analyticsCalls.at(-1)![0]).not.toContain("risk_free_rate_annual");
   });
-  it("shows loading then portfolio values and visible limitations", async () => {
+  it("shows portfolio values and collapsed limitations that can be expanded", async () => {
     const fetchMock = mockApi();
     render(<App />);
     expect(screen.getByRole("status")).toBeInTheDocument();
@@ -178,9 +180,12 @@ describe("read-only workspace", () => {
       .closest("article")!;
     expect(within(card).getByText("9172,70 €")).toBeVisible();
     expect(screen.getByText(/BENCHMARK SINTÉTICO/)).toBeVisible();
-    expect(
-      screen.getByLabelText("Calidad y límites de los datos"),
-    ).toBeVisible();
+    const notices = screen.getByLabelText("Calidad y límites de los datos");
+    expect(notices).not.toHaveAttribute("open");
+    expect(within(notices).getByText(/Avisos de los datos/)).toBeVisible();
+    await userEvent.setup().click(within(notices).getByText(/Avisos de los datos/));
+    expect(notices).toHaveAttribute("open");
+    expect(within(notices).queryByText(/valuation_price_proxy/)).not.toBeInTheDocument();
     expect(
       fetchMock.mock.calls.some(([url]) =>
         url.includes("as_of_date=2026-04-30"),

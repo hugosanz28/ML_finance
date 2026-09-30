@@ -854,8 +854,10 @@ tbody th small {
   color: #decaa7;
   font-size: 0.77rem;
 }
-.notices strong {
+.notices > summary {
   font-size: 0.77rem;
+  cursor: pointer;
+  font-weight: 600;
 }
 .notices ul {
   margin: 8px 0 0;

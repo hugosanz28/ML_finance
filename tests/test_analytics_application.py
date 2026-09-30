@@ -75,6 +75,16 @@ def assert_json_tree(value):
         assert value is None or type(value) in (bool, int, float, str)
 
 
+def test_estimated_rights_warning_reaches_analytics(workspace, monkeypatch):
+    metrics = sample_metrics()
+    metrics.position_metrics.loc[10, "valuation_status"] = "valued_estimated_rights"
+    monkeypatch.setattr(application, "calculate_portfolio_metrics_from_normalized_degiro", lambda **kw: metrics)
+    result = GetAnalyticsSummaryUseCase(settings=workspace).execute()
+    assert "estimated_rights_prices" in result.warnings
+    later = GetAnalyticsSummaryUseCase(settings=workspace).execute(AnalyticsRequest(period="last_month"))
+    assert "estimated_rights_prices" not in later.warnings
+
+
 @pytest.mark.parametrize("use_case", [GetAnalyticsSummaryUseCase, GetPortfolioPerformanceUseCase, GetPortfolioRiskUseCase, GetBenchmarkComparisonUseCase])
 def test_use_cases_return_only_strict_json_and_do_not_persist(workspace, use_case):
     before = hashlib.sha256(workspace.portfolio_db_path.read_bytes()).hexdigest()

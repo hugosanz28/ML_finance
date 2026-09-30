@@ -26,7 +26,8 @@ Trata como privados, aunque no contengan contrasenas:
   metas y movimientos registrados en Planificacion;
 - capturas del dashboard o logs de ejecucion generados con datos reales;
 - `.env`, claves de OpenAI, Tavily u otros proveedores, y secretos de
-  Streamlit.
+  instalaciones antiguas de Streamlit;
+- `.local_backups/`: ZIP privados que incluyen `.env` si existe y no están cifrados.
 
 Los datos de ejemplo que se publiquen deben ser sinteticos o estar saneados de
 forma que no permitan reconstruir la cartera real, importes, fechas exactas o
@@ -82,6 +83,7 @@ Estas rutas estan disenadas para uso local y deben permanecer fuera de Git:
 ```text
 src/degiro_exports/local/
 src/data/local/
+.local_backups/
 .env
 .env.*
 *.env
@@ -107,6 +109,9 @@ git check-ignore -v src/degiro_exports/local/ src/data/local/ .env
 retirarlo del indice antes de publicar.
 
 ## Demo sintetica
+
+Las copias personales están documentadas en [arranque y copias](local_app.md).
+No se publican, no se usan para el showcase y no se envían a servicios externos.
 
 La demo publica vive en `demo/` y usa `demo/synthetic_config/.env.demo`. Ese
 archivo no contiene secretos y apunta a `demo/local_data/`, que esta ignorado

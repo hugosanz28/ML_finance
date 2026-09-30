@@ -1,5 +1,9 @@
 # API local: lectura y operaciones opcionales
 
+Para uso personal en Windows, [el lanzador único](local_app.md) inicia API y UI,
+detecta instancias y permite copias/restauración. Los comandos de este documento
+siguen disponibles para arranque manual y diagnóstico.
+
 La issue #53 incorpora FastAPI como adaptador de `src/application/`.
 React es la interfaz mantenida. El modo por defecto sigue siendo de solo lectura.
 La #54 incorpora [operaciones y jobs](local_jobs.md), que requieren activacion
@@ -126,7 +130,7 @@ comodin. El launcher desactiva access logs y confianza en headers de proxy.
 Esto no es autenticacion: otros procesos/usuarios locales pueden acceder a la
 API. No exponerla a Internet, tuneles o proxies. Una publicacion requiere otro
 modelo de seguridad. La API no renderiza HTML de informes ni ejecuta Markdown.
-La futura UI debe desactivar HTML inseguro y recursos remotos al representarlo.
+La UI React muestra informes y auditorías como texto inerte, sin HTML ni recursos remotos.
 
 Informes y auditorias siguen siendo privados. La proyeccion omite campos de
 ruta y redacta rutas configuradas y patrones comunes de credenciales, pero no

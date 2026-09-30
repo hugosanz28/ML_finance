@@ -52,7 +52,9 @@ de compra. Las fuentes reales son proxies ETF y BCE descargados explicitamente;
 GET solo lee cache. En demo las referencias son sinteticas, sin respaldo
 sintetico para una cartera real cuando falta cache. Moneda, fechas comunes,
 muestra y cobertura limitan las comparaciones. Un valor ausente sigue siendo
-`null` con motivo: no un cero ni una curva rellenada.
+`null` con motivo, sin convertirlo en cero. La excepción configurable son los
+derechos con relleno cercano autorizado: se identifican como estimación,
+conservan la fecha del precio y no modifican las series de benchmarks.
 
 Formulas y evidencia: [rendimiento](performance.md), [benchmarks](benchmarks.md),
 [riesgo](risk_analytics.md), [tests de TWR/MWR](../tests/test_portfolio_performance.py).
@@ -95,6 +97,6 @@ proveedores externos puede enviar contexto financiero. Bases, informes y
 auditorias reales no se publican. El showcase usa un workspace sintetico nuevo,
 red externa bloqueada y revision visual antes de versionar assets.
 
-Streamlit se retira tras la [migracion documentada](react_migration.md). Un servicio publico necesita un
+Streamlit se retiró tras la [migracion documentada](react_migration.md). Un servicio publico necesita un
 diseno adicional de autenticacion, aislamiento y operacion. El enfoque educativo
 todavia requiere pruebas con usuarios; no se declara validacion comercial.

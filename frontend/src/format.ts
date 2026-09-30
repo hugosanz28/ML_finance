@@ -26,8 +26,10 @@ export function dateLabel(date: string | null | undefined): string {
     : "Sin fecha";
 }
 const reasons: Record<string, string> = {
+  estimated_rights_prices:
+    "Se han rellenado huecos de los derechos con su cotización conocida más cercana, que puede ser posterior. La rentabilidad y el riesgo de ese periodo incluyen estimaciones; se conserva la fecha original del precio.",
   reviewed_rights_prices:
-    "Los derechos usan cierres de mercado revisados con fuente y fecha guardadas en local. Durante el fin de semana se conserva el cierre del viernes; las sesiones sin cotización siguen incompletas.",
+    "Los derechos usan cierres de mercado revisados con fuente y fecha guardadas en local. Durante el fin de semana se conserva el cierre del viernes.",
   non_positive_opening_valuation:
     "La valoración inicial es cero o no es válida. Completa efectivo, precios y divisas, o elige un periodo posterior con datos completos.",
   cash_balance_mismatch:

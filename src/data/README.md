@@ -19,6 +19,10 @@ El runtime crea bajo `local/` las rutas que necesita:
 Artefactos relevantes ya en uso:
 
 - `portfolio.duckdb`: base local principal del proyecto.
+- `personal_finance.duckdb`: planificación, metas, reservas y movimientos manuales.
+- `jobs.duckdb`: operaciones persistentes y sus resultados privados.
+- `benchmark_cache.json`: referencias reales con procedencia y hashes.
+- `reviewed_rights_prices.json`: evidencia local y reglas opcionales de estimación de derechos.
 - `market_data/asset_overrides.csv`: overrides manuales para tickers, proxies o exclusiones del refresh.
 - `normalized/degiro/`: salida normalizada de los parsers DEGIRO, usada tambien para bootstrap de `assets_master`.
 - `portfolio_targets.yaml`: objetivos privados de cartera, pesos objetivo,
@@ -32,6 +36,9 @@ Artefactos relevantes ya en uso:
 
 Las ubicaciones efectivas son configurables mediante `.env`. La demo usa
 `demo/local_data/` y no crea ni lee estos artefactos privados.
+
+Las [copias privadas](../../docs/local_app.md) incluyen estos datos, exports y
+`.env`; se guardan fuera de este árbol en `.local_backups/`, ignorado por Git.
 
 DDL versionado:
 

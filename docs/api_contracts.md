@@ -18,15 +18,15 @@ La regla de diseno es simple: los endpoints deben ser capas finas sobre
 
 ## Convenciones
 
-- Base path previsto: `/api/v1`.
+- Base path vigente: `/api/v1`.
 - Todas las fechas viajan como `YYYY-MM-DD`.
 - La API de lectura no expone metadata de rutas locales. Los ejemplos de
   acciones futuras que incluyen paths deben revisarse antes de implementar
   esas operaciones; no autorizan aceptar destinos arbitrarios desde HTTP.
 - Las acciones que escriben en disco son `POST` o `PUT`.
 - Las lecturas son `GET`.
-- Los endpoints de larga duracion pueden empezar sin jobs y evolucionar despues
-  a jobs locales si bloquean demasiado la UI.
+- Las operaciones de larga duración vigentes devuelven un job local; los ejemplos
+  síncronos históricos de este documento no sustituyen ese contrato.
 
 Envelope comun para acciones:
 
@@ -381,7 +381,7 @@ Notas:
   por `static/static` para añadir contexto de busqueda sintetico.
 - En ejecucion real, la API solo debe permitir providers configurados
   localmente. No debe exponer claves.
-- Una futura API deberia tratar este endpoint como candidato claro a job local.
+- La API actual ejecuta esta operación como job local; ver [contrato vigente](local_jobs.md).
 - Para ejecutar solo el monitor tematico existe
   `RunMonitorTematicoUseCase`, con los mismos nombres de providers y defaults
   `static/null`.
@@ -818,8 +818,8 @@ Notas:
   recargar antes de reintentar si el hash ha cambiado.
 - El cliente no puede elegir una ruta de escritura.
 
-Con estos casos de uso, un futuro endpoint FastAPI puede ser un adaptador fino
-sin acceder directamente al archivo ni al dominio de cartera.
+Los endpoints FastAPI actuales delegan en estos casos de uso, sin acceder
+directamente al archivo ni al dominio de cartera; las escrituras usan jobs.
 
 ## 9. Analitica avanzada
 

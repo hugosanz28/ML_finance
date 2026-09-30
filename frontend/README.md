@@ -7,6 +7,8 @@ ver [migracion](../docs/react_migration.md).
 ## Arranque
 
 Para usar tus datos personales, sigue [Arrancar con tus datos personales](../README.md#arrancar-con-tus-datos-personales).
+En Windows, `scripts/app.ps1` abre API y UI con un solo comando; consulta
+[arranque y copias](../docs/local_app.md).
 Los siguientes pasos preparan la demo sintetica.
 
 Requiere Node.js 22.12 o posterior y el entorno Python instalado. Desde la
@@ -64,8 +66,10 @@ La API fija el entorno; la UI no puede cambiarlo. Ver [jobs locales](../docs/loc
   plan. Los cambios se guardan en DuckDB privada con el modo operativo activo.
   No se leen PDF ni movimientos bancarios. Ver [reglas](../docs/personal_finance_plan.md).
 
-Las explicaciones vienen del catalogo de la API. Los avisos permanecen visibles
-y los datos ausentes nunca se convierten en cero. Los graficos SVG solo escalan
+Las explicaciones vienen del catalogo de la API. Los avisos relevantes se agrupan
+en un desplegable cerrado inicialmente; los avisos de cada metrica tambien se
+despliegan a demanda. Se omiten del bloque general las notas rutinarias de metodo.
+Los datos ausentes nunca se convierten en cero. Los graficos SVG solo escalan
 valores calculados por el servidor; tienen leyenda, fechas y tabla accesible.
 En pantallas estrechas, los graficos y tablas se desplazan horizontalmente
 dentro de su panel para mantener etiquetas legibles.
@@ -86,7 +90,8 @@ respaldo. La etiqueta de benchmark sintetico describe **la referencia**, no
 certifica que todos los datos de la cartera sean ficticios. Para capturas usa
 exclusivamente la configuracion demo documentada arriba.
 
-Sharpe/Sortino requieren tasa explicita; esta primera UI no la configura.
+Sharpe/Sortino requieren tasa explícita: se introduce en el campo anual (%) y se
+confirma con «Aplicar tasa». Vaciarlo vuelve a dejar esos ratios sin calcular.
 Las series de activos son `valuation_price_proxy`, no total return. Las
 correlaciones pueden tener muestras distintas. La analitica no ejecuta agentes;
 su ejecucion se confirma por separado en Operaciones. Nunca se

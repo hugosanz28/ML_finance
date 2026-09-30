@@ -2,6 +2,7 @@ from src.config import default_repo_root
 
 
 COMMAND_SCRIPTS = (
+    "app.ps1",
     "test.ps1",
     "refresh_market_data.ps1",
 )
@@ -12,6 +13,7 @@ def test_development_command_scripts_are_documented() -> None:
     readme = (repo_root / "README.md").read_text(encoding="utf-8")
     scripts_readme = (repo_root / "scripts" / "README.md").read_text(encoding="utf-8")
     readme_alternatives = {
+        "app.ps1": ".\\scripts\\app.ps1",
         "test.ps1": ".\\.venv\\Scripts\\python.exe -m pytest",
         "refresh_market_data.ps1": "refrescar FX/precios",
     }

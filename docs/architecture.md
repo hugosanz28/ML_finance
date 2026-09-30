@@ -126,7 +126,7 @@ La implementacion actual usa:
 - `Parquet` para datasets intermedios o exportables,
 - `Markdown` para informes generados.
 
-Entidades mínimas previstas:
+Entidades del almacén financiero:
 
 - `assets_master`
 - `transactions`
@@ -143,9 +143,11 @@ Lecturas sin escrituras ni proveedores; operaciones opt-in con confirmacion,
 idempotencia y un worker por workspace. React presenta valores del servidor,
 no calcula rentabilidad ni guarda cartera en localStorage.
 
-Entradas: `scripts/run_api.py` y `npm run dev` desde `frontend/`.
+Arranque Windows: `scripts/app.ps1`; diagnóstico manual: `scripts/run_api.py`
+y `npm run dev` desde `frontend/`. Copias privadas offline mediante
+`src/application/local_backup.py`; ver [guía](local_app.md).
 Ver [UI](../frontend/README.md), [API](local_api.md), [jobs](local_jobs.md)
-y [contratos](api_contracts.md). Streamlit y Altair se retiran en #58;
+y [contratos](api_contracts.md). Streamlit y Altair se retiraron en #58;
 [paridad, diferencias y recuperacion](react_migration.md).
 
 La exploracion de alternativas en [arquitectura v2](architecture_v2.md) es

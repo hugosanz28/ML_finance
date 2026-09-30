@@ -14,6 +14,17 @@ proyecto usa [versionado semántico](https://semver.org/lang/es/).
 
 ### Añadido
 
+- Lanzador Windows `scripts/app.ps1`: inicio conjunto API/UI, detección de
+  instancias, estado y parada. Copias/restauración privadas verificadas, con
+  bloqueo del worker y copia previa antes de restaurar.
+- Planificación personal independiente: sueldo, gastos, reservas, metas
+  bancarias configurables, una meta DEGIRO y calendario persistido.
+- Refresh real al arrancar, campo de tasa libre de riesgo y reconstrucción de
+  efectivo/dividendos pendientes. Cotizaciones revisadas de derechos y relleno
+  cercano opcional, identificado como estimación retrospectiva.
+- Avisos relevantes en desplegables cerrados inicialmente; notas rutinarias
+  retiradas del bloque general. Documentación operativa actualizada.
+
 - Evolucion por activo en React (precio de valoracion, no retorno total),
   aviso de snapshots pendientes, refresh separado FX/precios y controles
   por run de informe, brief y pesos validados para agentes.

@@ -32,7 +32,9 @@ La UI v2 de analitica (#55) vive en `frontend/`: React + TypeScript + Vite,
 tema oscuro, analitica GET y operaciones opt-in (#56). Lee `frontend/README.md` antes de cambiarla.
 No calcular rentabilidad/riesgo ni guardar cartera en localStorage; mantener
 contratos Zod, cancelacion de lecturas obsoletas, fechas alineadas y avisos
-visibles. Graficos solo escalan valores del servidor y ofrecen tabla accesible.
+consultables en desplegables cerrados inicialmente; las notas rutinarias se
+omiten del bloque general por preferencia del usuario. Conservar disponibilidad
+y cobertura de cada metrica. Graficos solo escalan valores del servidor y ofrecen tabla accesible.
 No confundir un benchmark sintetico con una cartera completamente sintetica.
 Conservar loopback API:8000 y UI:5173, sin providers, secretos ni rutas en Vite.
 Validar con `npm run lint`, `npm run typecheck`, `npm test`, `npm run build`
@@ -100,6 +102,11 @@ CLI con el worker. La demo solo modifica copias en `demo/local_data`.
 Invariantes y errores tipicos:
 
 - No asumas que `src/data/local/` existe, esta poblado o puede abrirse sin necesidad.
+- `scripts/app.ps1` gestiona arranque/estado/parada Windows y delega copias en
+  `scripts/local_backup.py` -> `src/application/local_backup.py`. Los ZIP de
+  `.local_backups/` son privados e ignorados, incluyen `.env` si existe y no
+  estan cifrados. Copiar/restaurar con API y CLI detenidos; restaurar requiere
+  confirmacion, verificacion de integridad y copia previa del estado actual.
 - No mezcles un informe mensual y un `portfolio_metrics_snapshot` con fechas distintas; el pipeline debe bloquearlo.
 - `portfolio_analytics_snapshot` se construye en application, nunca desde la
   UI ni por el LLM. Conservar su schema v1, limites, validacion antes de
@@ -231,6 +238,8 @@ no dupliques aqui el pipeline completo de CI.
 
 Comandos principales:
 
+- Arranque Windows: `.\scripts\app.ps1`; estado/parada/copias con `-Action`.
+- Guia de copias y restauracion: `docs/local_app.md`.
 - API local: `.\.venv\Scripts\python.exe scripts/run_api.py --operations real`
 - UI: `npm run dev` desde `frontend/`; demo y arranque en `README.md`
 - Refresh FX/precios: `.\scripts\refresh_market_data.ps1 -EndDate YYYY-MM-DD`

@@ -110,6 +110,10 @@ Estados habituales de `valuation_status`:
 - `valued_anchored`: posicion valorada con precio DEGIRO anclado y variacion del proveedor.
 - `valued_snapshot`: valor oficial de DEGIRO en la fecha exacta del snapshot.
 - `valued_cash`: efectivo valorado directamente.
+- `valued_trade_anchor`: precio de compra documentado como ancla histórica.
+- `valued_dividend_receivable`: dividendo pendiente reconstruido desde su liquidación.
+- `valued_reviewed_rights`: cierre revisado de derechos, con fuente local.
+- `valued_estimated_rights`: hueco estimado con un cierre cercano por autorización explícita.
 - `missing_anchor`: no hay snapshot DEGIRO util para anclar.
 - `missing_provider_anchor_price`: falta el precio del proveedor en la fecha de ancla.
 - `missing_price`: falta precio diario del proveedor para la fecha de valoracion.
@@ -130,8 +134,8 @@ Ficheros generados:
 
 - `LoadPortfolioMetricsUseCase` expone el resultado interno para consumidores
   Python existentes.
-- `GetPortfolioStateUseCase` es el read model neutral para interfaces y futura
-  API: convierte fechas y escalares a primitivas JSON y no devuelve
+- `GetPortfolioStateUseCase` es el read model usado por la API y otras
+  interfaces: convierte fechas y escalares a primitivas JSON y no devuelve
   `PortfolioMetricsResult`, `DataFrame` ni `Path`.
 - Las aportaciones netas usadas en el resumen se consultan mediante
   `src/portfolio/contributions.py`.
@@ -139,9 +143,12 @@ Ficheros generados:
 ## Alcance y limites
 
 - la rentabilidad basada en coste sigue describiendo el inventario restante;
-- TWR y MWR/XIRR existen como capa de dominio, pero aun no estan integrados en
-  UI, API ni agentes;
+- TWR y MWR/XIRR están integrados en UI, API y el snapshot analítico de agentes;
 - el TWR diario aplica la convencion documentada para flujos fechados sin
   valoracion intradia;
 - y la cobertura de divisa depende de que existan `fx_rates` o de que el activo
   ya cotice en la moneda base.
+
+La cobertura completa puede incluir estimaciones explícitas de derechos;
+no significa que todos los precios sean observaciones de mercado. Véanse las
+[políticas y límites de reconstrucción](risk_analytics.md#calidad-del-histórico-reconstruido).

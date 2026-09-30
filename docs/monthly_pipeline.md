@@ -2,6 +2,9 @@
 
 ## Orden recomendado
 
+Para uso habitual en Windows, abre la web con `scripts/app.ps1`. Los comandos
+CLI siguientes requieren detener antes la API y no ejecutar otro escritor.
+
 ```powershell
 .\.venv\Scripts\python.exe scripts\import_degiro.py
 .\.venv\Scripts\python.exe scripts\refresh_fx_rates.py --only-missing-base
@@ -34,11 +37,11 @@ monitor → analista → asistente. El runtime limita la ejecucion a 5 delegacio
 2 intentos por especialista y una reparacion de salida invalida. El asistente
 valido termina el grafo.
 
-Para una actualizacion rapida sin importar nuevos CSVs ni generar informe, usa
-`Vista general` -> `Actualizar a hoy`. Ese boton refresca FX y precios hasta la
-fecha actual, limpia la cache y mantiene el ultimo snapshot DEGIRO como ancla.
-La fecha visible de la vista pasa a ser la ultima fecha valorada disponible, no
-necesariamente la fecha del snapshot.
+Para actualizar datos sin importar CSV ni generar informe, usa
+`Operaciones` → `Datos`. El arranque real también puede encolar descargas una
+vez al día. «Actualizar lectura» vuelve a consultar los datos locales y no
+descarga precios. La fecha de valoración depende de los datos disponibles;
+ver [jobs locales](local_jobs.md).
 
 ## Entradas estables
 

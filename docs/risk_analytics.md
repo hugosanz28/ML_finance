@@ -132,7 +132,8 @@ pérdida seguida de una ganancia por el desfase de fechas.
 identifican esta **reconstrucción retrospectiva**, basada en el importe cobrado
 después. No representa una cotización de mercado ni una serie que se conociera
 en tiempo real. Una consulta con fecha final anterior al abono no usa ese pago
-futuro. No se rellenan los precios de los días anteriores a la conversión.
+futuro. Esta política no rellena precios anteriores a la conversión; el relleno
+opcional de derechos se configura por separado en el apartado siguiente.
 
 ### Cotizaciones revisadas de derechos vencidos
 
@@ -145,8 +146,28 @@ del contenido de la URL. GET solo lee; se mantiene con el worker detenido.
 Los datos sintéticos no cargan este archivo.
 
 Solo se aplica al ISIN y sesión exactos; sábado y domingo conservan el cierre
-del viernes. No se rellenan sesiones ausentes ni festivos sin evidencia.
+del viernes. Por defecto no se rellenan sesiones ausentes ni festivos sin evidencia.
 Los snapshots exactos del broker y los dividendos pendientes tienen prioridad.
 Un archivo mal formado bloquea la lectura; no se aceptan duplicados, valores
 no positivos, moneda/mercado distintos o fechas futuras. El aviso
 `reviewed_rights_prices` identifica el método y conserva las fuentes en local.
+
+Por petición explícita del usuario se pueden estimar huecos concretos añadiendo
+`nearest_price_ranges` al mismo JSON: lista de objetos con `isin`, `start_date`,
+`end_date` y `max_distance_days` (entre 1 y 31). Cada intervalo admite como máximo
+31 días de diferencia entre extremos. Solo se usan precios revisados del mismo
+ISIN; gana el más cercano y, en empate, el anterior. Un cierre exacto o el cierre
+del viernes para su fin de semana tiene prioridad. No afecta a otros activos,
+intervalos, benchmarks ni dividendos pendientes.
+
+La fecha real de la cotización se conserva en `price_date`, con estado
+`valued_estimated_rights`, política `nearest_reviewed_close` y aviso consultable
+`estimated_rights_prices`. Puede utilizar una cotización posterior al día
+valorado: es una estimación retrospectiva, incluso en consultas de ese periodo,
+no apta como información disponible en aquel momento para un backtest.
+Permite calcular rentabilidad y riesgo continuos, pero puede suavizar la
+volatilidad y las caídas. Eliminar las reglas recupera los huecos originales.
+
+La UI mantiene los avisos relevantes dentro de desplegables cerrados por defecto;
+omite del bloque general notas rutinarias de metodología. Las métricas conservan
+valor, disponibilidad y cobertura. Cobertura del 100 % puede incluir estimaciones.

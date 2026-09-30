@@ -6,6 +6,10 @@ al mismo tiempo que la API sobre el mismo entorno.
 
 ## Activacion explicita
 
+El [lanzador Windows](local_app.md) activa `real`, mantiene servidores en segundo
+plano y reutiliza instancias verificadas. Para copiar o restaurar el entorno,
+detén primero la API y los CLI; las copias adquieren el bloqueo del worker.
+
 La [UI React operativa](react_operations.md) ofrece estos flujos con confirmacion,
 polling, resultados y control de hash. `/health` identifica el entorno desde el
 servidor; el frontend no lo selecciona ni deduce de los benchmarks.

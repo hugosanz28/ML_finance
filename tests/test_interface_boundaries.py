@@ -14,6 +14,7 @@ from src.market_data import FxRefreshSummary
 
 
 USER_FACING_SCRIPTS = (
+    "local_backup.py",
     "run_api.py",
     "generate_monthly_report.py",
     "import_degiro.py",
