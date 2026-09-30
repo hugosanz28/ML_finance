@@ -7,6 +7,7 @@ pruebas.ipynb
 # Local project data
 src/degiro_exports/local/
 src/data/local/
+.local_backups/
 *.duckdb
 *.duckdb-wal
 *.duckdb-shm

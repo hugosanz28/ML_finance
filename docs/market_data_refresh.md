@@ -18,8 +18,8 @@ Alimenta `fx_rates` con pares inferidos desde los normalizados de DEGIRO, por
 ejemplo `EUR/USD` o `EUR/CAD`.
 
 Las series de referencia tienen un contrato independiente en
-`src/market_data/benchmarks.py`. Actualmente pueden cargarse desde data frames o
-generarse con el provider sintetico offline; consulta `docs/benchmarks.md`.
+`src/market_data/benchmarks.py`: en real se descargan proxies ETF y series BCE a
+caché; en demo se usa el proveedor sintético offline. Consulta [benchmarks](benchmarks.md).
 
 ## Ejecucion
 
@@ -33,8 +33,9 @@ Para actualizar hasta una fecha concreta:
 .\.venv\Scripts\python.exe scripts\refresh_market_data.py --end-date 2026-05-14
 ```
 
-Desde React, `Operaciones` -> `Datos` ejecuta el refresh de FX
-y precios hasta la fecha actual y limpia la cache del dashboard.
+Desde React, `Operaciones` → `Datos` ejecuta el refresh de FX y precios hasta la
+fecha elegida y recarga las lecturas. El arranque con operaciones reales puede
+encolar precios, FX, clasificación y benchmarks hasta ayer; ver [jobs](local_jobs.md).
 
 Opciones utiles:
 

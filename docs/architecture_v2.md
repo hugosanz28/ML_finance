@@ -1,4 +1,4 @@
-# Arquitectura v2: FastAPI + React
+# Archivo histórico: exploración de la arquitectura v2
 
 > Estado actualizado: el stack acordado es React + TypeScript + Vite con
 > FastAPI local. La API de lectura (#53), jobs opt-in (#54) y UI React

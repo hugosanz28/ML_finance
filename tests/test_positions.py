@@ -1,13 +1,20 @@
 from __future__ import annotations
 
 from datetime import date
+import json
 from pathlib import Path
 import uuid
 
 import pandas as pd
 import pytest
 
-from src.portfolio import reconstruct_positions_by_date, reconstruct_positions_from_normalized_degiro
+from src.config import load_settings
+from src.portfolio import (
+    load_normalized_degiro_snapshots,
+    load_normalized_degiro_transactions,
+    reconstruct_positions_by_date,
+    reconstruct_positions_from_normalized_degiro,
+)
 
 
 def test_reconstruct_positions_by_date_builds_daily_history_from_buys_and_sells() -> None:
@@ -124,6 +131,79 @@ def test_reconstruct_positions_by_date_uses_snapshot_anchor_for_initial_state() 
     assert positions["quantity"].tolist() == [4.0, 5.0, 5.0, 3.0]
     assert positions["anchor_snapshot_date"].dt.date.tolist() == [date(2026, 1, 2)] * 4
     assert positions["anchor_snapshot_quantity"].tolist() == [4.0, 4.0, 4.0, 4.0]
+
+
+def test_reconstruct_positions_aligns_unique_no_isin_product_across_exports() -> None:
+    transactions = pd.DataFrame([{
+        "asset_id": "degiro:product:trd:token", "asset_name": "TOKEN", "asset_type": "crypto",
+        "isin": None, "trade_date": "2026-01-01", "transaction_type": "BUY", "quantity": 2,
+    }])
+    snapshots = pd.DataFrame([{
+        "asset_id": "degiro:product:token", "asset_name": "TOKEN", "asset_type": "crypto",
+        "isin": None, "snapshot_date": "2026-01-03", "quantity": 3,
+    }])
+
+    reconstructed = reconstruct_positions_by_date(transactions, snapshots=snapshots)
+
+    current = reconstructed.positions.loc[reconstructed.positions["position_date"] == "2026-01-03"]
+    assert current["asset_id"].tolist() == ["degiro:product:token"]
+    assert current["quantity"].tolist() == [3.0]
+    assert reconstructed.snapshot_reconciliation["comparison_status"].tolist() == ["matched"]
+
+
+def test_reconstruct_positions_does_not_guess_ambiguous_no_isin_products() -> None:
+    transactions = pd.DataFrame([
+        {"asset_id": f"degiro:product:{exchange}:token", "asset_name": "TOKEN", "asset_type": "crypto",
+         "isin": None, "trade_date": "2026-01-01", "transaction_type": "BUY", "quantity": 1}
+        for exchange in ("trd", "xet")
+    ])
+    snapshots = pd.DataFrame([{
+        "asset_id": "degiro:product:token", "asset_name": "TOKEN", "asset_type": "crypto",
+        "isin": None, "snapshot_date": "2026-01-02", "quantity": 1,
+    }])
+
+    reconstructed = reconstruct_positions_by_date(transactions, snapshots=snapshots)
+
+    assert set(reconstructed.positions["asset_id"]) == {
+        "degiro:product:trd:token", "degiro:product:xet:token", "degiro:product:token",
+    }
+
+
+def test_normalized_loaders_deduplicate_orders_and_apply_private_aliases(tmp_path: Path) -> None:
+    settings = load_settings(
+        env={"DATA_DIR": "private/data", "PORTFOLIO_DB_PATH": "private/data/portfolio.duckdb"},
+        repo_root=tmp_path, env_file=tmp_path / ".env.missing",
+    )
+    old_id = "degiro:isin:XX0000000001"
+    new_id = "degiro:product:token"
+    settings.data_dir.mkdir(parents=True)
+    (settings.data_dir / "asset_id_aliases.json").write_text(
+        json.dumps({"schema_version": 1, "aliases": {old_id: new_id}}), encoding="utf-8",
+    )
+    base = settings.normalized_data_dir / "degiro"
+    (base / "transactions").mkdir(parents=True)
+    (base / "portfolio_snapshots").mkdir(parents=True)
+    order = {
+        "external_reference": "order-1", "trade_date": "2026-01-01", "trade_time": "10:00:00",
+        "transaction_type": "BUY", "quantity": 1, "unit_price": 10, "net_cash_amount_base": -10,
+        "asset_name": "TOKEN", "asset_type": "crypto",
+    }
+    pd.DataFrame([{**order, "asset_id": old_id, "isin": "XX0000000001"}]).to_parquet(
+        base / "transactions" / "transactions_old.parquet", index=False,
+    )
+    pd.DataFrame([{**order, "asset_id": "degiro:product:trd:token", "isin": None}]).to_parquet(
+        base / "transactions" / "transactions_new.parquet", index=False,
+    )
+    pd.DataFrame([
+        {"asset_id": old_id, "snapshot_date": "2026-01-01", "quantity": 1},
+        {"asset_id": new_id, "snapshot_date": "2026-01-02", "quantity": 1},
+    ]).to_parquet(base / "portfolio_snapshots" / "portfolio.parquet", index=False)
+
+    transactions = load_normalized_degiro_transactions(settings=settings)
+    snapshots = load_normalized_degiro_snapshots(settings=settings)
+
+    assert transactions["asset_id"].tolist() == [new_id]
+    assert snapshots["asset_id"].tolist() == [new_id, new_id]
 
 
 def test_reconcile_positions_with_snapshots_marks_matches_and_mismatches() -> None:

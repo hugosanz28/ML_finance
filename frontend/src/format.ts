@@ -26,6 +26,24 @@ export function dateLabel(date: string | null | undefined): string {
     : "Sin fecha";
 }
 const reasons: Record<string, string> = {
+  estimated_rights_prices:
+    "Se han rellenado huecos de los derechos con su cotización conocida más cercana, que puede ser posterior. La rentabilidad y el riesgo de ese periodo incluyen estimaciones; se conserva la fecha original del precio.",
+  reviewed_rights_prices:
+    "Los derechos usan cierres de mercado revisados con fuente y fecha guardadas en local. Durante el fin de semana se conserva el cierre del viernes.",
+  non_positive_opening_valuation:
+    "La valoración inicial es cero o no es válida. Completa efectivo, precios y divisas, o elige un periodo posterior con datos completos.",
+  cash_balance_mismatch:
+    "El efectivo reconstruido no cuadra con el saldo de DEGIRO. Revisa el Estado de cuenta y su cobertura antes de calcular rentabilidad.",
+  stale_price:
+    "La última cotización tiene más de siete días. Actualiza precios en Operaciones → Datos; ese intervalo queda sin valorar.",
+  constant_cash_not_applicable:
+    "No aplicable: el precio del efectivo en su propia moneda es constante y su correlación no está definida.",
+  transaction_price_anchor:
+    "Un activo sin snapshot se valora usando su precio de compra DEGIRO y la variación del proveedor. Es una aproximación histórica identificada.",
+  dividend_receivable_reconstructed:
+    "Tras la conversión de derechos, el dividendo pendiente se reconstruye con el importe bruto que DEGIRO liquidó después. Es una reconstrucción contable retrospectiva, no una cotización histórica.",
+  asset_classifications_partial:
+    "No se han podido obtener todas las clasificaciones de activos. Los sectores ausentes se mantienen sin clasificar.",
   pending_portfolio_import: "Hay snapshots de cartera más recientes pendientes de importar. Revisa Operaciones → Datos.",
   benchmark_etf_proxy:
     "La referencia usa un ETF de acumulación como aproximación, no el índice oficial. Incluye costes del fondo, tracking difference y precios de mercado.",
@@ -41,8 +59,16 @@ const reasons: Record<string, string> = {
     "El proveedor ha devuelto cotizaciones ausentes. Se conservan como huecos, no como retornos cero.",
   benchmark_common_window_truncated:
     "La comparación empieza después del último hueco: solo usa el tramo común continuo indicado, no todo el periodo solicitado.",
+  partial_benchmark_coverage:
+    "La referencia no cubre todas las fechas solicitadas. La comparación muestra su cobertura y usa únicamente observaciones disponibles.",
+  incomplete_calendar_alignment:
+    "La cartera y la referencia no tienen datos coincidentes en todos los días. Las métricas comparativas usan las fechas comunes indicadas.",
+  partial_portfolio_coverage:
+    "La comparación dispone de valoraciones de cartera incompletas en parte del periodo.",
+  partial_portfolio_returns:
+    "Algunos retornos de cartera de la comparación son parciales. Consulta la cobertura de cada métrica.",
   portfolio_data_unavailable:
-    "Todavía no hay una cartera importada. Prepara la demo o importa tus datos desde Streamlit.",
+    "Todavía no hay una cartera importada. Prepara la demo o importa tus datos desde Operaciones → Datos.",
   connection_failed:
     "No se puede conectar con la API local. Arráncala en el puerto 8000 y vuelve a intentar.",
   workspace_busy:
@@ -51,22 +77,28 @@ const reasons: Record<string, string> = {
     "La API ha devuelto un formato inesperado. No se mostrarán datos sin validar.",
   benchmark_provider_unavailable:
     "Falta descargar el histórico real de benchmarks. Usa la actualización explícita; no se sustituye por datos ficticios.",
+  benchmark_not_selected:
+    "No hay una referencia seleccionada para comparar la cartera.",
   cash_flow_data_missing:
     "Faltan movimientos de efectivo: no podemos separar aportaciones y rentabilidad.",
   valuation_price_proxy:
     "El riesgo por activo usa precios de valoración aproximados, no rentabilidad total con dividendos.",
+  partial_valuation_coverage:
+    "Faltan valoraciones completas en parte del histórico. Esos intervalos se excluyen de la rentabilidad; actualiza precios y divisas en Operaciones → Datos.",
+  incomplete_position_valuation:
+    "Falta valorar alguna posición para calcular la diversificación completa.",
   risk_free_rate_required:
     "Esta métrica necesita una tasa libre de riesgo explícita.",
   risk_free_rate_missing:
     "Sharpe y Sortino no están disponibles sin una tasa libre de riesgo explícita.",
   zero_drawdown:
-    "No se observa una caída; no se puede calcular un ratio que divida por ella.",
+    "En la serie afectada no se observa una caída y su ratio Calmar no se puede calcular. Puede corresponder al efectivo; no significa que toda la cartera carezca de caídas.",
   partial_exposure_coverage:
     "Parte de las posiciones no tiene valoración o clasificación completa.",
   classification_missing:
-    "Faltan clasificaciones: la concentración de esas categorías no está disponible.",
+    "Faltan categorías o sectores. Las categorías se definen en Operaciones → Configuración; los fondos no tienen desglose automático por sector.",
   incomplete_return_path:
-    "Hay huecos en la serie; no se unen para calcular caídas desde máximos.",
+    "Hay intervalos sin valoración completa. El drawdown necesita una trayectoria continua; completa los datos o selecciona un periodo más corto.",
   partial_return_coverage:
     "Algunas estadísticas usan solo una parte del histórico.",
   request_timeout:
@@ -79,10 +111,17 @@ const reasons: Record<string, string> = {
     "La lectura ha fallado. Comprueba el servidor local y vuelve a intentar.",
   insufficient_observations:
     "No hay suficientes observaciones para calcular esta métrica.",
+  zero_return_variance:
+    "No se puede calcular esta correlación porque al menos una serie no varía.",
   incomplete_coverage:
     "La cobertura es incompleta; interpreta este resultado con cautela.",
 };
 export function reason(code: string): string {
+  const missingPrices = /^missing_price_positions:(\d+)$/.exec(code);
+  if (missingPrices) {
+    const count = Number(missingPrices[1]);
+    return `${count} ${count === 1 ? "posición" : "posiciones"} sin precio o ancla de valoración.`;
+  }
   return (
     reasons[code] ??
     "El servidor informa de una limitación adicional. Revisa el código de diagnóstico."

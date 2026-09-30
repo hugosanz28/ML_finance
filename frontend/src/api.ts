@@ -53,9 +53,11 @@ export const api = {
       portfolioSchema,
       signal,
     ),
-  analytics: (period: Period, benchmark: string, signal: AbortSignal) =>
+  portfolioSummary: (signal: AbortSignal) =>
+    get("/portfolio/state?include_history=false", portfolioSchema, signal),
+  analytics: (period: Period, benchmark: string, signal: AbortSignal, riskFreeRate?: number) =>
     get(
-      `/analytics/summary?${new URLSearchParams({ period, benchmark_id: benchmark })}`,
+      `/analytics/summary?${new URLSearchParams({ period, benchmark_id: benchmark, ...(riskFreeRate === undefined ? {} : { risk_free_rate_annual: String(riskFreeRate) }) })}`,
       analyticsSchema,
       signal,
     ),

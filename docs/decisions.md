@@ -54,7 +54,8 @@ Consecuencias:
 
 ## ADR-004: Empezar con Streamlit como interfaz
 
-Estado: aceptada
+Estado: sustituida por React/FastAPI en #58; se conserva la decisión histórica.
+Ver [migración](react_migration.md) y [arquitectura actual](architecture.md).
 
 Contexto:
 
@@ -92,7 +93,7 @@ Estado: aceptada
 
 Contexto:
 
-Streamlit, los scripts y una futura API necesitan reutilizar los mismos flujos
+Los scripts y la API FastAPI consumida por React necesitan reutilizar los mismos flujos
 sin acoplarse a parsers, repositorios, DataFrames o detalles de agentes.
 
 Decision:
@@ -105,8 +106,8 @@ reutilizables permanecen en dominio/repositorios.
 
 Consecuencias:
 
-- Streamlit y los scripts comparten validaciones y defaults.
-- FastAPI puede ser un adaptador fino si se implementa mas adelante.
+- FastAPI y los scripts comparten validaciones y defaults.
+- FastAPI actúa como un adaptador fino de los casos de uso.
 - Cada nuevo flujo de interfaz requiere primero un caso de uso estable.
 
 ## ADR-007: Mantener providers offline explicitos para demo y tests

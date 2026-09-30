@@ -61,14 +61,16 @@ Campos principales:
 - por defecto usa `broker_snapshot_anchored`: DEGIRO fija el precio local de
   referencia por activo en cada snapshot y `yfinance` solo aporta la variacion
   relativa entre fechas,
+- en la fecha exacta del snapshot usa el valor oficial de DEGIRO en moneda base,
+  incluso si existe cotizacion externa; los dias posteriores necesitan la serie
+  de precios del proveedor,
 - la formula de precio local es:
   `precio_DEGIRO_ancla * precio_proveedor_fecha / precio_proveedor_ancla`,
 - el valor local se ancla preferentemente al `market_value` del snapshot, no a
   `quantity * market_price`, porque algunos brokers redondean la cantidad
   visible en el CSV y conservan mas precision internamente,
-- para activos no EUR, el precio local anclado se convierte a moneda base con
-  el FX diario disponible en `fx_rates`; por eso el total EUR puede no coincidir
-  exactamente con el snapshot si DEGIRO uso otro cambio,
+- fuera de la fecha del snapshot, el precio local anclado de activos no EUR se
+  convierte a moneda base con el FX diario disponible en `fx_rates`,
 - para fechas anteriores al primer snapshot disponible usa ese primer snapshot
   como ancla hacia atras, de forma que la serie historica no queda sin valorar,
 - si `calculate_portfolio_metrics_from_normalized_degiro` se llama sin
@@ -78,6 +80,8 @@ Campos principales:
   precios absolutos del proveedor,
 - usa precio disponible mas reciente en o antes de cada fecha de valoracion,
 - recalibra cantidades cuando aparece un snapshot posterior del broker,
+- concilia IDs de producto sin ISIN entre transacciones y snapshots solo cuando
+  la coincidencia de nombre, tipo e identificador es unica,
 - soporta coste base con media ponderada movil para `BUY` y `SELL`,
 - marca `missing_price`, `missing_anchor`, `missing_provider_anchor_price` o
   `missing_fx` cuando no puede valorar una posicion,
@@ -104,7 +108,12 @@ Columnas de auditoria relevantes:
 Estados habituales de `valuation_status`:
 
 - `valued_anchored`: posicion valorada con precio DEGIRO anclado y variacion del proveedor.
+- `valued_snapshot`: valor oficial de DEGIRO en la fecha exacta del snapshot.
 - `valued_cash`: efectivo valorado directamente.
+- `valued_trade_anchor`: precio de compra documentado como ancla histórica.
+- `valued_dividend_receivable`: dividendo pendiente reconstruido desde su liquidación.
+- `valued_reviewed_rights`: cierre revisado de derechos, con fuente local.
+- `valued_estimated_rights`: hueco estimado con un cierre cercano por autorización explícita.
 - `missing_anchor`: no hay snapshot DEGIRO util para anclar.
 - `missing_provider_anchor_price`: falta el precio del proveedor en la fecha de ancla.
 - `missing_price`: falta precio diario del proveedor para la fecha de valoracion.
@@ -125,8 +134,8 @@ Ficheros generados:
 
 - `LoadPortfolioMetricsUseCase` expone el resultado interno para consumidores
   Python existentes.
-- `GetPortfolioStateUseCase` es el read model neutral para interfaces y futura
-  API: convierte fechas y escalares a primitivas JSON y no devuelve
+- `GetPortfolioStateUseCase` es el read model usado por la API y otras
+  interfaces: convierte fechas y escalares a primitivas JSON y no devuelve
   `PortfolioMetricsResult`, `DataFrame` ni `Path`.
 - Las aportaciones netas usadas en el resumen se consultan mediante
   `src/portfolio/contributions.py`.
@@ -134,9 +143,12 @@ Ficheros generados:
 ## Alcance y limites
 
 - la rentabilidad basada en coste sigue describiendo el inventario restante;
-- TWR y MWR/XIRR existen como capa de dominio, pero aun no estan integrados en
-  UI, API ni agentes;
+- TWR y MWR/XIRR están integrados en UI, API y el snapshot analítico de agentes;
 - el TWR diario aplica la convencion documentada para flujos fechados sin
   valoracion intradia;
 - y la cobertura de divisa depende de que existan `fx_rates` o de que el activo
   ya cotice en la moneda base.
+
+La cobertura completa puede incluir estimaciones explícitas de derechos;
+no significa que todos los precios sean observaciones de mercado. Véanse las
+[políticas y límites de reconstrucción](risk_analytics.md#calidad-del-histórico-reconstruido).

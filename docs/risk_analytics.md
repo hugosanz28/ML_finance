@@ -88,3 +88,86 @@ sus anualizaciones con las de las series de dias naturales de este modulo.
 Incluye resultados de referencia calculables, series constantes, poca muestra,
 huecos, duracion de drawdowns, exposiciones sin clasificar y contribuciones con
 correlacion perfecta. Todo se ejecuta sin red ni datos reales.
+
+## Calidad del histórico reconstruido
+
+El efectivo se reconstruye desde el Estado de cuenta: depósitos y retiradas
+usan fecha valor, compras/ventas y otros movimientos usan fecha de movimiento.
+Las transferencias internas entre subcuentas no se cuentan dos veces. Los
+snapshots verifican el saldo con tolerancia de 0,02 unidades de la divisa; una
+diferencia mayor invalida la valoración de caja desde ese punto. Los exports
+solapados se deduplican para la caja y para los flujos de rentabilidad.
+
+Un intervalo con alguna posición sin valorar no genera retorno. No se calcula
+volatilidad usando cambios de un total parcial; los días válidos restantes
+siguen señalados como muestra parcial. Precios y FX de más de siete días se
+rechazan en la reconstrucción anclada. Una posición cerrada vale cero sin
+necesitar precio, pero un saldo desconocido no se convierte en cero.
+
+Un activo vendido sin snapshot puede usar el precio documentado de su primera
+compra y la variación relativa del proveedor: `transaction_price_anchor`
+identifica esta aproximación. Los derechos sin precio ni ancla válida conservan
+su hueco. Para drawdown elige un periodo continuo o completa la fuente faltante.
+La correlación del efectivo constante figura como no aplicable. La UI permite
+introducir una tasa anual explícita para Sharpe/Sortino; dejarla vacía conserva
+estas métricas como no disponibles.
+
+## Derechos convertidos en dividendos pendientes
+
+La reconstrucción distingue la cotización de los derechos de su conversión
+en un dividendo pendiente. Solo reconoce esta última cuando el Estado de
+cuenta contiene una conversión completa (venta de derechos y compra del
+instrumento no negociable), su baja y un dividendo positivo con el mismo
+identificador. Cantidades distintas, pagos ambiguos o liquidaciones aún no
+registradas mantienen el hueco; no se vinculan productos por nombres parecidos.
+
+Desde la fecha de registro de la conversión hasta el día anterior al abono,
+se utiliza el importe bruto liquidado por DEGIRO como dividendo pendiente.
+Se conserva incluso si la baja de los derechos tiene una fecha valor anterior
+al abono. Al llegar el dinero se elimina el pendiente; la retención se registra
+en efectivo ese día. Así no se cuenta dos veces el ingreso ni se crea una
+pérdida seguida de una ganancia por el desfase de fechas.
+
+`valued_dividend_receivable` y el aviso `dividend_receivable_reconstructed`
+identifican esta **reconstrucción retrospectiva**, basada en el importe cobrado
+después. No representa una cotización de mercado ni una serie que se conociera
+en tiempo real. Una consulta con fecha final anterior al abono no usa ese pago
+futuro. Esta política no rellena precios anteriores a la conversión; el relleno
+opcional de derechos se configura por separado en el apartado siguiente.
+
+### Cotizaciones revisadas de derechos vencidos
+
+En real se admite `DATA_DIR/reviewed_rights_prices.json`, privado e ignorado.
+Contiene `schema_version: 1` y una lista `prices` con `isin`, `date`, `close`,
+`currency: "EUR"`, `exchange_mic: "XMAD"`, `instrument_type: "subscription_right"`,
+`source_url` HTTPS y `source_note` con el documento y columna verificados.
+Es evidencia revisada manualmente, no una descarga ni una validación automática
+del contenido de la URL. GET solo lee; se mantiene con el worker detenido.
+Los datos sintéticos no cargan este archivo.
+
+Solo se aplica al ISIN y sesión exactos; sábado y domingo conservan el cierre
+del viernes. Por defecto no se rellenan sesiones ausentes ni festivos sin evidencia.
+Los snapshots exactos del broker y los dividendos pendientes tienen prioridad.
+Un archivo mal formado bloquea la lectura; no se aceptan duplicados, valores
+no positivos, moneda/mercado distintos o fechas futuras. El aviso
+`reviewed_rights_prices` identifica el método y conserva las fuentes en local.
+
+Por petición explícita del usuario se pueden estimar huecos concretos añadiendo
+`nearest_price_ranges` al mismo JSON: lista de objetos con `isin`, `start_date`,
+`end_date` y `max_distance_days` (entre 1 y 31). Cada intervalo admite como máximo
+31 días de diferencia entre extremos. Solo se usan precios revisados del mismo
+ISIN; gana el más cercano y, en empate, el anterior. Un cierre exacto o el cierre
+del viernes para su fin de semana tiene prioridad. No afecta a otros activos,
+intervalos, benchmarks ni dividendos pendientes.
+
+La fecha real de la cotización se conserva en `price_date`, con estado
+`valued_estimated_rights`, política `nearest_reviewed_close` y aviso consultable
+`estimated_rights_prices`. Puede utilizar una cotización posterior al día
+valorado: es una estimación retrospectiva, incluso en consultas de ese periodo,
+no apta como información disponible en aquel momento para un backtest.
+Permite calcular rentabilidad y riesgo continuos, pero puede suavizar la
+volatilidad y las caídas. Eliminar las reglas recupera los huecos originales.
+
+La UI mantiene los avisos relevantes dentro de desplegables cerrados por defecto;
+omite del bloque general notas rutinarias de metodología. Las métricas conservan
+valor, disponibilidad y cobertura. Cobertura del 100 % puede incluir estimaciones.

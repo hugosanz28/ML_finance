@@ -6,6 +6,10 @@ al mismo tiempo que la API sobre el mismo entorno.
 
 ## Activacion explicita
 
+El [lanzador Windows](local_app.md) activa `real`, mantiene servidores en segundo
+plano y reutiliza instancias verificadas. Para copiar o restaurar el entorno,
+detén primero la API y los CLI; las copias adquieren el bloqueo del worker.
+
 La [UI React operativa](react_operations.md) ofrece estos flujos con confirmacion,
 polling, resultados y control de hash. `/health` identifica el entorno desde el
 servidor; el frontend no lo selecciona ni deduce de los benchmarks.
@@ -45,6 +49,27 @@ CLI simultaneamente. El bloqueo de la API no coordina esos programas legacy.
 El arranque operativo crea `jobs.duckdb` y `api-worker.lock` en el directorio
 de datos. No cambia `portfolio.duckdb` hasta ejecutar una operacion que lo
 necesite. El modo de lectura no crea esos archivos.
+
+## Actualización al arrancar
+
+`scripts/run_api.py --operations real` programa FX, precios, clasificación de
+activos y benchmarks usando el mismo worker. Consulta el histórico importado
+hasta ayer; no importa nuevos CSV, ejecuta agentes ni coloca órdenes.
+`--no-refresh-on-start` desactiva las descargas. En demo y solo lectura no se
+programa nada; `create_app` también mantiene esta opción desactivada por defecto.
+
+Las claves por fecha e inicio del histórico evitan duplicar trabajos al
+reiniciar. Los intentos fallidos o interrumpidos no se repiten ese día: revisa
+Ejecuciones y utiliza una actualización manual si procede. GET solo lee la
+caché. Un fallo de red conserva los datos anteriores y queda en el resultado
+del job; las valoraciones obsoletas mantienen sus avisos. La UI espera mientras
+haya descargas pendientes o activas y recarga la analítica al terminar.
+
+El refresh completo admite `include_classifications: true` solo en real.
+Guarda tipo y sector publicados por Yahoo Finance, con fuente y fecha, en
+`src/data/local/asset_classifications.json`. No infiere sectores por nombre
+ni desglosa fondos por sus participaciones. Las categorías y objetivos de
+asignación siguen siendo decisiones del usuario.
 
 ## Enviar una operacion
 
@@ -97,6 +122,7 @@ financiero final. Consultar `/jobs/{job_id}` hasta un estado terminal.
 | POST `/agents/monthly-runs` | `llm_provider=static`, `search_provider=null`, presupuesto `monthly_budget`, interes `user_satellite_interest`, `report_id`, `investment_brief_text` y `target_weights` opcionales |
 | PUT `/settings/investment-brief` | `content` y `expected_previous_hash` obligatorios |
 | PUT `/settings/portfolio-targets` | `portfolio_targets` como objeto y `expected_previous_hash` obligatorios |
+| PUT `/planning/plan` | Plan personal estructurado y `expected_previous_hash` obligatorios |
 | GET `/settings/investment-brief` | Texto, existencia y hash; sin path |
 | GET `/settings/portfolio-targets` | Contrato, existencia y hash; sin path |
 | GET `/jobs` | Query `limit`, default 20, entre 1 y 100 |

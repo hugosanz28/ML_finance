@@ -12,6 +12,7 @@ import pandas as pd
 from src.analytics import calculate_risk, metric_catalog
 from src.analytics.portfolio import analyze_positions
 from src.application.portfolio_targets import ReadPortfolioTargetsUseCase
+from src.application.asset_classifications import classified_positions
 from src.application.serialization import json_ready_value
 from src.config import Settings, get_settings
 from src.market_data.benchmarks import BenchmarkProvider, SyntheticBenchmarkProvider, selectable_benchmarks
@@ -108,6 +109,17 @@ class _AnalyticsUseCase:
             metrics.portfolio_daily_metrics, cash, base_currency=metrics.base_currency, as_of_date=requested_date,
         )
         selected = next(item for item in performance.periods if item.period_id == request.period)
+        positions_in_period = metrics.position_metrics.loc[
+            pd.to_datetime(metrics.position_metrics.valuation_date).dt.date.between(selected.actual_start, selected.end_date)
+        ]
+        if (positions_in_period.valuation_status == "valued_trade_anchor").any():
+            warnings.append("transaction_price_anchor")
+        if (positions_in_period.valuation_status == "valued_dividend_receivable").any():
+            warnings.append("dividend_receivable_reconstructed")
+        if (positions_in_period.valuation_status == "valued_reviewed_rights").any():
+            warnings.append("reviewed_rights_prices")
+        if (positions_in_period.valuation_status == "valued_estimated_rights").any():
+            warnings.append("estimated_rights_prices")
         rows = tuple(row for row in performance.daily_returns if selected.actual_start < row.valuation_date <= selected.end_date)
         if missing_cash:
             # Missing account exports must not silently mean zero external flows.
@@ -140,7 +152,7 @@ class _AnalyticsUseCase:
                 warnings.append("invalid_portfolio_targets")
             mapping = (targets.portfolio_targets or {}).get("asset_bucket_mapping", {})
             positions = analyze_positions(
-                metrics.position_metrics, start_date=selected.actual_start, end_date=selected.end_date,
+                classified_positions(metrics.position_metrics, self.settings), start_date=selected.actual_start, end_date=selected.end_date,
                 bucket_mapping=mapping, risk_free_rate_annual=request.risk_free_rate_annual,
             )
             data["risk"] = {

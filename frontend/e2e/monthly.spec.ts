@@ -136,9 +136,9 @@ test("monthly workflow uses the real local API, only synthetic copies and no ext
   await page.reload();
   await page.getByRole("button", { name: "Operaciones", exact: true }).click();
   await page.getByRole("button", { name: "Ejecuciones", exact: true }).click();
-  await expect(page.getByRole("button", { name: /Ver resultado/ })).toHaveCount(
-    8,
-  );
+  await expect(page.getByRole("row").filter({
+    has: page.getByRole("cell", { name: /^(uploads|import|refresh|report|simulation|brief|targets|agents)$/ }),
+  }).getByRole("button", { name: /Ver resultado/ })).toHaveCount(8);
   expect(digest()).toEqual(before);
   expect(external).toEqual([]);
   await page.getByRole("button", { name: "Datos", exact: true }).click();

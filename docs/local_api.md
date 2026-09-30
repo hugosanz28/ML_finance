@@ -1,5 +1,9 @@
 # API local: lectura y operaciones opcionales
 
+Para uso personal en Windows, [el lanzador único](local_app.md) inicia API y UI,
+detecta instancias y permite copias/restauración. Los comandos de este documento
+siguen disponibles para arranque manual y diagnóstico.
+
 La issue #53 incorpora FastAPI como adaptador de `src/application/`.
 React es la interfaz mantenida. El modo por defecto sigue siendo de solo lectura.
 La #54 incorpora [operaciones y jobs](local_jobs.md), que requieren activacion
@@ -56,6 +60,7 @@ Todas las rutas siguientes llevan el prefijo `/api/v1` y usan GET:
 | Ruta | Respuesta |
 | --- | --- |
 | `/health` | Salud, version API, modo `read_only`/`operations` y entorno `demo`/`real` |
+| `/planning/plan` | Planificacion personal guardada, revision y calculo actual; sin crear base al leer |
 | `/portfolio/state` | Resumen, posiciones, historico opcional y avisos |
 | `/analytics/summary` | Resumen analitico completo |
 | `/analytics/performance` | Rendimiento, TWR/MWR y flujos |
@@ -67,6 +72,13 @@ Todas las rutas siguientes llevan el prefijo `/api/v1` y usan GET:
 | `/reports/{report_id}` | ID y contenido Markdown como texto JSON |
 | `/agents/runs` | Runs persistidos, `limit` entre 1 y 100 |
 | `/agents/runs/{run_id}` | Auditoria compatible con legacy, sin metadata de rutas |
+
+`POST /planning/preview` calcula un plan proporcionado por el usuario sin
+persistirlo. Si hay una meta vinculada a DEGIRO, consulta su valoración local
+en modo lectura. Esta disponible tambien con la API en modo
+solo lectura. `PUT /planning/plan` requiere modo operativo, confirmacion,
+Idempotency-Key y revision previa; ver [jobs](local_jobs.md). No hay rutas para
+conectar bancos o importar extractos.
 
 Los IDs de informe son los nombres sin `.md` de archivos legacy `monthly_*.md`
 o actuales `YYYY-MM-DD-monthly-YYYYMMDDTHHMMSSffffff.md` en
@@ -118,7 +130,7 @@ comodin. El launcher desactiva access logs y confianza en headers de proxy.
 Esto no es autenticacion: otros procesos/usuarios locales pueden acceder a la
 API. No exponerla a Internet, tuneles o proxies. Una publicacion requiere otro
 modelo de seguridad. La API no renderiza HTML de informes ni ejecuta Markdown.
-La futura UI debe desactivar HTML inseguro y recursos remotos al representarlo.
+La UI React muestra informes y auditorías como texto inerte, sin HTML ni recursos remotos.
 
 Informes y auditorias siguen siendo privados. La proyeccion omite campos de
 ruta y redacta rutas configuradas y patrones comunes de credenciales, pero no

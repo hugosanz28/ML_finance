@@ -4,9 +4,10 @@ import type { Analytics, Definition, Period, Portfolio } from "./contracts";
 import { Explanation, LineChart, MetricCard, Notices } from "./components";
 import { dateLabel, format, reason } from "./format";
 import { Operations } from "./Operations";
+import { Planning } from "./Planning";
 import { opsApi, type Health } from "./operations-api";
 
-type View = "Resumen" | "Rentabilidad" | "Riesgo y activos" | "Operaciones";
+type View = "Resumen" | "Rentabilidad" | "Riesgo y activos" | "Operaciones" | "Planificación";
 type Loaded = {
   analytics?: Analytics;
   portfolio?: Portfolio;
@@ -22,15 +23,31 @@ const benchmarks = [
 const errorCode = (error: unknown) =>
   error instanceof ApiError ? error.code : "request_failed";
 
+async function readAnalyticsWhenReady(period: Period, benchmark: string, signal: AbortSignal, riskFreeRate?: number) {
+  // An aborted local read can briefly keep the server lock while it finishes.
+  for (let attempt = 0; attempt < 30; attempt++) {
+    try { return await api.analytics(period, benchmark, signal, riskFreeRate); }
+    catch (error) {
+      if (errorCode(error) !== "workspace_busy" || signal.aborted || attempt === 29) throw error;
+      await new Promise((resolve) => setTimeout(resolve, 500));
+    }
+  }
+  throw new ApiError("workspace_busy");
+}
+
 export function App() {
   const [view, setView] = useState<View>("Resumen");
   const [period, setPeriod] = useState<Period>("since_inception");
   const [benchmark, setBenchmark] = useState("msci_world");
+  const [riskFreeRateInput, setRiskFreeRateInput] = useState("");
+  const [riskFreeRate, setRiskFreeRate] = useState<number>();
   const [reload, setReload] = useState(0);
   const [loaded, setLoaded] = useState<Loaded>();
   const [loading, setLoading] = useState(true);
   const [health, setHealth] = useState<Health>();
+  const [refreshing, setRefreshing] = useState(false);
   const operationalView = view === "Operaciones";
+  const planningView = view === "Planificación";
   useEffect(() => {
     const controller = new AbortController();
     setHealth(undefined);
@@ -43,8 +60,23 @@ export function App() {
     return () => controller.abort();
   }, [reload]);
   useEffect(() => {
-    if (operationalView) {
-      setLoading(false);
+    if (health?.mode !== "operations") return;
+    const controller = new AbortController();
+    let timer: ReturnType<typeof setTimeout>;
+    async function poll() {
+      try {
+        const result = await opsApi.jobs(controller.signal);
+        if (!controller.signal.aborted) setRefreshing(result.jobs.some((job) =>
+          ["refresh", "benchmarks"].includes(job.operation) && ["pending", "running"].includes(job.state)));
+      } catch { /* Operations remain inspectable if a status read fails. */ }
+      if (!controller.signal.aborted) timer = setTimeout(() => void poll(), 2000);
+    }
+    void poll();
+    return () => { controller.abort(); clearTimeout(timer); };
+  }, [health?.mode]);
+  useEffect(() => {
+    if (operationalView || planningView || refreshing) {
+      setLoading(refreshing);
       return;
     }
     const controller = new AbortController();
@@ -56,8 +88,11 @@ export function App() {
     setLoading(true);
     setLoaded(undefined);
     async function load() {
-      const [analytics, definitions] = await Promise.allSettled([
-        api.analytics(period, benchmark, controller.signal),
+      // The local API admits one data read at a time; avoid a spurious workspace_busy.
+      const [analytics] = await Promise.allSettled([
+        readAnalyticsWhenReady(period, benchmark, controller.signal, riskFreeRate),
+      ]);
+      const [definitions] = await Promise.allSettled([
         api.definitions(controller.signal),
       ]);
       if (controller.signal.aborted) return;
@@ -95,13 +130,15 @@ export function App() {
       });
       setLoading(false);
     }
-    void load();
+    // Defer the request so StrictMode's first setup can cancel before starting it.
+    const start = setTimeout(() => void load(), 0);
     // Abort also discards obsolete filter responses; no automatic retries or persistent cache.
     return () => {
+      clearTimeout(start);
       clearTimeout(timeout);
       controller.abort();
     };
-  }, [period, benchmark, reload, operationalView]);
+  }, [period, benchmark, riskFreeRate, reload, operationalView, planningView, refreshing]);
   const analytics = loaded?.analytics,
     portfolio = loaded?.portfolio,
     definitions = loaded?.definitions ?? [];
@@ -133,7 +170,7 @@ export function App() {
             <small>PORTFOLIO WORKSPACE</small>
           </span>
         </a>
-        <p className="nav-label">TU CARTERA</p>
+        <p className="nav-label">INVERSIONES</p>
         <nav aria-label="Navegación principal">
           {(
             [
@@ -152,6 +189,12 @@ export function App() {
               {item}
             </button>
           ))}
+        </nav>
+        <p className="nav-label">FINANZAS PERSONALES</p>
+        <nav aria-label="Navegación de planificación">
+          <button aria-current={planningView ? "page" : undefined} onClick={() => setView("Planificación")}>
+            <span aria-hidden="true">▦</span>Planificación
+          </button>
         </nav>
         <div className="sidebar-note">
           <span className="status-dot" /> Entorno local
@@ -193,7 +236,9 @@ export function App() {
             <div>
               <p className="eyebrow">PERSPECTIVA, NO PREDICCIONES</p>
               <h1>
-                {operationalView
+                {planningView
+                  ? "Planifica sueldo, gastos y metas"
+                  : operationalView
                   ? "Tu revisión mensual"
                   : view === "Resumen"
                     ? "Tu cartera, de un vistazo"
@@ -202,7 +247,9 @@ export function App() {
                       : "Entiende dónde está el riesgo"}
               </h1>
               <p className="subtitle">
-                {operationalView
+                {planningView
+                  ? "Ajusta plazos y cantidades; tus datos se guardan solo en el entorno local."
+                  : operationalView
                   ? "Datos, aportaciones y agentes. Tú confirmas cada paso."
                   : view === "Resumen"
                     ? "Separa lo que aportas de lo que genera tu inversión."
@@ -213,13 +260,14 @@ export function App() {
             </div>
             <button
               className="refresh"
+              hidden={planningView}
               disabled={loading}
               onClick={() => setReload((value) => value + 1)}
             >
               ↻ Actualizar lectura
             </button>
           </div>
-          <div className="toolbar" hidden={operationalView}>
+          <div className="toolbar" hidden={operationalView || planningView}>
             <label>
               Periodo de análisis
               <select
@@ -250,6 +298,17 @@ export function App() {
                 ))}
               </select>
             </label>
+            <form className="risk-free-rate" onSubmit={(event) => {
+              event.preventDefault();
+              setRiskFreeRate(riskFreeRateInput.trim() === "" ? undefined : Number(riskFreeRateInput) / 100);
+            }}>
+              <label>Tasa libre de riesgo anual (%) · opcional
+                <input type="number" min="-99.99" step="0.01" value={riskFreeRateInput}
+                  onChange={(event) => setRiskFreeRateInput(event.target.value)} placeholder="Sin definir" />
+              </label>
+              <button type="submit">Aplicar tasa</button>
+              <small>Referencia introducida por ti para Sharpe y Sortino. Vacío: sin calcular.</small>
+            </form>
             <div className="period-note">
               Periodo efectivo
               <strong>
@@ -260,13 +319,14 @@ export function App() {
             </div>
           </div>
           <Operations health={health} visible={operationalView} />
-          {operationalView ? null : loading ? (
+          <Planning health={health} visible={planningView} />
+          {operationalView || planningView ? null : loading ? (
             <section className="loading" role="status">
               <span className="loading-dot" />
-              <h2>Leyendo tu cartera…</h2>
+              <h2>{refreshing ? "Actualizando datos de mercado…" : "Leyendo tu cartera…"}</h2>
               <p>
-                Calculando en la API local. No se consultan proveedores
-                externos.
+                {refreshing ? "Precios, divisas y referencias se están actualizando. Puedes consultar el progreso en Operaciones → Ejecuciones. El resumen se cargará al terminar."
+                  : "Calculando en la API local con los datos guardados."}
               </p>
             </section>
           ) : (
@@ -354,7 +414,7 @@ function Overview({
       </div>
       <div className="summary-grid">
         <article className="summary-card featured">
-          <h3>Valor de las posiciones</h3>
+          <h3>Valor total de la cuenta</h3>
           <strong>
             {format(
               portfolio?.summary.total_market_value_base,
@@ -362,7 +422,7 @@ function Overview({
               currency,
             )}
           </strong>
-          <p>Valoración de activos; no equivale a saldo de efectivo.</p>
+          <p>Incluye las posiciones valoradas y el efectivo registrado en DEGIRO.</p>
           <span className="coverage">
             Cobertura {format(portfolio?.summary.valuation_coverage_ratio)}
           </span>

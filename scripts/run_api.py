@@ -15,12 +15,15 @@ def main() -> None:
     parser.add_argument("--env-file", help="Server-side environment file, e.g. demo/synthetic_config/.env.demo")
     parser.add_argument("--port", type=int, default=8000)
     parser.add_argument("--operations", choices=("demo", "real"), help="Enable the persistent local worker and writes")
+    parser.add_argument("--refresh-on-start", action=argparse.BooleanOptionalAction, default=True,
+                        help="In real operations, queue prices, FX and benchmarks once per day; --no-refresh-on-start disables downloads")
     args = parser.parse_args()
     if not 1 <= args.port <= 65535:
         parser.error("port must be between 1 and 65535")
     import uvicorn
 
-    app = create_app(settings=load_settings(env_file=args.env_file), workspace_mode=args.operations)
+    app = create_app(settings=load_settings(env_file=args.env_file), workspace_mode=args.operations,
+                     refresh_on_start=args.operations == "real" and args.refresh_on_start)
     # No public bind option or access logs containing user queries.
     uvicorn.run(app, host="127.0.0.1", port=args.port, access_log=False, proxy_headers=False)
 

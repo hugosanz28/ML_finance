@@ -61,12 +61,15 @@ export const operationRoutes = {
   agents: ["POST", "/agents/monthly-runs"],
   brief: ["PUT", "/settings/investment-brief"],
   targets: ["PUT", "/settings/portfolio-targets"],
+  personal_plan: ["PUT", "/planning/plan"],
 } as const;
 export type Operation = keyof typeof operationRoutes;
 export const opsApi = {
   health: (signal: AbortSignal) => get("/health", healthSchema, signal),
   jobs: (signal: AbortSignal) =>
     get("/jobs?limit=100", z.object({ jobs: z.array(jobSchema) }), signal),
+  job: (id: string, signal: AbortSignal) =>
+    get(`/jobs/${encodeURIComponent(id)}`, jobSchema, signal),
   brief: (signal: AbortSignal) =>
     get("/settings/investment-brief", briefSchema, signal),
   targets: (signal: AbortSignal) =>

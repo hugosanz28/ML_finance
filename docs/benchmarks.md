@@ -128,7 +128,11 @@ Para carteras USD, GBP, CHF o JPY se descarga ademas el FX diario oficial BCE
 `EXR.D.<MONEDA>.EUR.SP00.A`. EUR no necesita conversion. No se rellenan extremos
 FX ausentes ni observaciones nulas. Otras monedas se rechazan antes de descargar.
 
-### Actualizacion explicita
+### Actualización manual y al arrancar
+
+El servidor operativo real también puede programar esta descarga al arrancar;
+ver [actualización al arrancar](local_jobs.md#actualización-al-arrancar).
+GET sigue siendo offline y la demo no utiliza proveedores externos.
 
 Con la configuracion real habitual y sin el worker operativo ni otro escritor
 CLI activo, ejecuta (ajusta las fechas a todo el historial necesario):
@@ -147,6 +151,9 @@ Alternativamente, con API `--operations real`, usa POST
 `start_date`, `end_date` e `Idempotency-Key`; devuelve un job. Ver
 [jobs locales](local_jobs.md). La CLI comparte el bloqueo del worker. El refresh
 general de precios no descarga benchmarks y no hay reintentos automaticos.
+El arranque con `--operations real` sí puede encolar un job independiente de
+benchmarks una vez al día. Se desactiva con `--no-refresh-on-start`; los GET
+siguen siendo solo lecturas. Ver [actualización al arrancar](local_jobs.md#actualización-al-arrancar).
 La UI muestra el resultado y ofrece el refresh en Operaciones → Datos (#56),
 con seleccion explicita de fuente, fechas y confirmacion; ver [UI operativa](react_operations.md).
 

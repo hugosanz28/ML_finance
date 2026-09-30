@@ -361,21 +361,10 @@ def load_normalized_degiro_cash_movements(
 ) -> pd.DataFrame:
     """Load normalized DEGIRO cash movement datasets from parquet."""
     resolved_settings = get_settings() if settings is None else settings
-    base_dir = (
-        resolved_settings.normalized_data_dir / "degiro"
-        if normalized_degiro_dir is None
-        else Path(normalized_degiro_dir).expanduser().resolve()
-    )
-    frames: list[pd.DataFrame] = []
-    cash_dir = base_dir / "cash_movements"
-    for parquet_path in sorted(cash_dir.glob("*.parquet")) if cash_dir.exists() else []:
-        frame = pd.read_parquet(parquet_path)
-        if frame.empty:
-            continue
-        frames.append(frame)
-    if not frames:
-        return pd.DataFrame()
-    return pd.concat(frames, ignore_index=True, sort=False)
+    # Cash valuation and external flows must share overlapping-export deduplication.
+    from src.portfolio.cash_history import load_cash_movements
+    return load_cash_movements(resolved_settings, normalized_degiro_dir)
+
 
 
 def _prepare_position_metrics_frame(frame: pd.DataFrame) -> pd.DataFrame:

@@ -15,12 +15,21 @@ Para desarrollar o ejecutar la suite usa `requirements-dev.txt`; consulta
 ## Comandos principales
 
 ```powershell
+.\scripts\app.ps1
+.\scripts\app.ps1 -Action Status
+.\scripts\app.ps1 -Action Stop
+.\scripts\app.ps1 -Action Backup
 .\scripts\test.ps1
 .\.venv\Scripts\python.exe scripts/run_api.py
 .\scripts\refresh_market_data.ps1 -EndDate 2026-05-14
 ```
 
 ## Flujos
+
+- `app.ps1`: arranque único Windows, reutilización de instancias verificadas,
+  estado, parada y copias/restauración privadas. Ver [guía](../docs/local_app.md).
+- `local_backup.py`: CLI offline de copias verificadas, mediante
+  `BackupLocalUseCase` y `RestoreLocalUseCase`. No es un endpoint HTTP.
 
 - `run_frontend_e2e_api.py`: servidor exclusivo de tests Playwright, con copia
   sintetica temporal y red externa bloqueada. No acepta configuracion real.
@@ -42,7 +51,7 @@ Para desarrollar o ejecutar la suite usa `requirements-dev.txt`; consulta
 - `refresh_market_data.ps1`: refresca FX y precios hasta `-EndDate`.
 - `test.ps1`: ejecuta la suite pytest con `.venv`.
 
-Para la UI usa `npm run dev` desde `frontend/` en otra terminal.
+Con arranque manual, para la UI usa `npm run dev` desde `frontend/` en otra terminal.
 Ambos servidores permanecen activos hasta Ctrl+C. Para validar la demo sin servidores:
 
 ```powershell

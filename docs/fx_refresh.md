@@ -26,7 +26,7 @@ Solo se refrescan pares donde la moneda del evento o posicion es distinta de
 `base_currency`. Con los datos actuales aparecen pares como `EUR/USD` y
 `EUR/CAD`.
 
-La inferencia serializable para scripts y futuras interfaces la expone
+La inferencia serializable para scripts y API la expone
 `InferFxRequirementsUseCase`. El refresh se ejecuta mediante
 `RefreshFxUseCase`; las interfaces no llaman directamente al repositorio ni a
 `FxRefreshService`.

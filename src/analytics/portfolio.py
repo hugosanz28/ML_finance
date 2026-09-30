@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import date
 from math import isfinite
 from typing import Mapping
@@ -40,6 +40,8 @@ def analyze_positions(
     current = frame.loc[frame["valuation_date"] == end_date] if not frame.empty else frame
     exposures = []
     for row in current.to_dict("records"):
+        if _number(row.get("quantity")) == 0:
+            continue
         asset_id = str(row["asset_id"])
         asset_bucket = bucket_mapping.get(asset_id)
         isin_bucket = bucket_mapping.get(_text(row.get("isin")))
@@ -82,6 +84,12 @@ def analyze_positions(
             asset_returns, {item.asset_id: item.market_value_base / total for item in exposures},
             start_date=start_date, end_date=end_date,
         )
+        cash_ids = {item.asset_id for item in exposures if item.asset_type == "cash"}
+        diversification = replace(diversification, correlations=tuple(
+            replace(cell, metric=replace(cell.metric, reason_code="constant_cash_not_applicable"))
+            if cell.metric.reason_code == "zero_return_variance" and {cell.left_asset_id, cell.right_asset_id} & cash_ids
+            else cell for cell in diversification.correlations
+        ))
         reason = "valuation_price_proxy"
     elif start_date == end_date:
         reason = "insufficient_observations"

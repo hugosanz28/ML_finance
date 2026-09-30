@@ -39,6 +39,10 @@ la v2 React/FastAPI local, sin dependencia de Streamlit. Ya estan disponibles:
   bootstrap demo offline, auditoria de dependencias y build de wheel.
 - [Showcase v2](showcase.md) (#57): README visual, capturas, video y portada
   sinteticos, regeneracion offline y [caso de estudio](case_study.md).
+- Planificación independiente, reservas, metas configurables y calendario.
+- [Arranque único Windows y copias/restauración privadas](local_app.md).
+- Actualización de datos al arrancar en real, reconstrucción de efectivo y
+  dividendos pendientes, y estimación opcional de huecos de derechos.
 
 Las prioridades de mantenimiento son:
 
@@ -81,9 +85,10 @@ Criterios para implementar y revisar la
   los datos lo permitan; formulas, fuentes y analitica avanzada opcionales.
 - Reutilizar el catalogo de metricas y los casos de uso existentes. No exigir
   conocer siglas como TWR/MWR ni duplicar calculos financieros en el frontend.
-- Mantener visibles las advertencias relevantes de cobertura, datos ausentes
-  e incertidumbre, aunque el detalle avanzado este cerrado. No presentar una
-  metrica no disponible como cero ni ocultar limitaciones para simplificar.
+- Mostrar cobertura y disponibilidad junto a las cifras. A petición del usuario,
+  agrupar los avisos relevantes en desplegables cerrados inicialmente y omitir
+  del bloque general las notas rutinarias de método. Los motivos siguen
+  accesibles; una métrica no disponible no se convierte en cero.
 - Presentar la IA como apoyo para explicar y explorar escenarios; distinguir
   hechos calculados, interpretaciones e informacion que falta. No presentarla
   como autoridad para comprar ni prometer resultados de inversion.

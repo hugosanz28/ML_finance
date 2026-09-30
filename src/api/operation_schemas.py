@@ -6,6 +6,7 @@ from typing import Literal
 from pydantic import Field, JsonValue, model_validator
 
 from src.api.schemas import DateQuery, Schema
+from src.personal_finance.model import PersonalPlan
 
 
 class OperationBody(Schema):
@@ -32,6 +33,7 @@ class UploadsBody(OperationBody):
 class RefreshBody(OperationBody):
     scope: Literal["both", "fx", "prices"] = "both"
     only_missing_base: bool = False
+    include_classifications: bool = False
     fx_provider: Literal["synthetic", "yfinance"]
     price_provider: Literal["synthetic", "yfinance"]
     start_date: str | None = Field(default=None, pattern=r"^\d{4}-\d{2}-\d{2}$")
@@ -102,6 +104,11 @@ class BriefBody(OperationBody):
 
 class TargetsBody(OperationBody):
     portfolio_targets: dict[str, JsonValue]
+    expected_previous_hash: str = Field(pattern=r"^sha256:[a-f0-9]{64}$")
+
+
+class PersonalPlanBody(OperationBody):
+    plan: PersonalPlan
     expected_previous_hash: str = Field(pattern=r"^sha256:[a-f0-9]{64}$")
 
 

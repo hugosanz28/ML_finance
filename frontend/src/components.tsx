@@ -49,32 +49,39 @@ export function MetricCard({
       )}
       {metric &&
         (metric.reason_code !== "ok" || metric.status !== "available") && (
-          <p className="metric-warning">
-            {metric.status === "partial" ? "Parcial. " : ""}
-            {reason(
-              metric.reason_code === "ok"
-                ? "incomplete_coverage"
-                : metric.reason_code,
-            )}
-          </p>
+          <details className="metric-warning">
+            <summary>Ver aviso de esta métrica</summary>
+            <p>
+              {metric.status === "partial" ? "Parcial. " : ""}
+              {reason(
+                metric.reason_code === "ok"
+                  ? "incomplete_coverage"
+                  : metric.reason_code,
+              )}
+            </p>
+          </details>
         )}
       <Explanation definition={definition} />
     </article>
   );
 }
 export function Notices({ codes }: { codes: string[] }) {
-  if (!codes.length) return null;
+  // Routine methodology stays out of the warning list; unknown codes remain visible on expansion.
+  const informational = new Set(["valuation_price_proxy", "transaction_price_anchor", "dividend_receivable_reconstructed", "reviewed_rights_prices", "benchmark_etf_proxy", "constant_cash_not_applicable", "zero_drawdown"]);
+  const unique = [...new Set(codes)].filter((code) => !informational.has(code));
+  if (!unique.length) return null;
   return (
-    <aside className="notices" aria-label="Calidad y límites de los datos">
-      <strong>Antes de interpretar los resultados</strong>
+    <details className="notices" aria-label="Calidad y límites de los datos">
+      <summary>Avisos de los datos ({unique.length})</summary>
+      <p>Los avisos pueden afectar a una métrica, activo o comparación concretos. Consulta la cobertura de cada resultado.</p>
       <ul>
-        {[...new Set(codes)].map((code) => (
+        {unique.map((code) => (
           <li key={code}>
             {reason(code)} <small>({code})</small>
           </li>
         ))}
       </ul>
-    </aside>
+    </details>
   );
 }
 export type ChartPoint = { date: string; values: (number | null)[] };

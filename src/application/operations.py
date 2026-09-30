@@ -1,11 +1,13 @@
 """Adapt validated operations to existing use cases; no financial rules here."""
 
 import base64
+import re
 from dataclasses import asdict, dataclass
 from datetime import date
 from typing import Any
 
 from src.application.agents import RunMonthlyAgentsRequest, RunMonthlyAgentsUseCase
+from src.application.asset_classifications import RefreshAssetClassificationsUseCase
 from src.application.benchmarks import RefreshBenchmarksRequest, RefreshBenchmarksUseCase
 from src.application.artifact_reads import _safe_payload, resolve_report_path
 from src.application.contribution_lab import SimulateContributionRequest, SimulateContributionUseCase
@@ -13,14 +15,18 @@ from src.application.degiro import ImportDegiroRequest, ImportDegiroUseCase
 from src.application.market_data import RefreshFxRequest, RefreshFxUseCase, RefreshMarketDataRequest, RefreshMarketDataUseCase
 from src.application.operational_workspace import OperationalWorkspace, OperationError
 from src.application.portfolio_targets import ReadPortfolioTargetsUseCase, UpdatePortfolioTargetsRequest, UpdatePortfolioTargetsUseCase
+from src.application.personal_plan import UpdatePersonalPlanRequest, UpdatePersonalPlanUseCase
 from src.application.reports import GenerateMonthlyReportRequest, GenerateMonthlyReportUseCase
 from src.application.settings import ReadInvestmentBriefUseCase, UpdateInvestmentBriefRequest, UpdateInvestmentBriefUseCase
 from src.application.uploads import DegiroUpload, SaveDegiroUploadsRequest, SaveDegiroUploadsUseCase, canonical_degiro_upload_name
+from src.personal_finance.model import PersonalPlan
+from src.personal_finance.store import PlanConflictError
+from pydantic import ValidationError
 
 
 MAX_UPLOAD_BYTES = 5 * 1024 * 1024
 MAX_TOTAL_UPLOAD_BYTES = 10 * 1024 * 1024
-OPERATIONS = {"uploads", "import", "refresh", "benchmarks", "report", "simulation", "agents", "brief", "targets"}
+OPERATIONS = {"uploads", "import", "refresh", "benchmarks", "report", "simulation", "agents", "brief", "targets", "personal_plan"}
 
 
 @dataclass(frozen=True)
@@ -43,6 +49,10 @@ def validate_operation(request: ExecuteOperationRequest, workspace: OperationalW
         if values.get("provider") != "yfinance_ecb":
             raise OperationError("provider_required", 422)
     if request.operation == "refresh":
+        if values.get("include_classifications") and workspace.mode != "real":
+            raise OperationError("external_provider_forbidden_in_demo", 422)
+        if values.get("include_classifications") and values.get("scope", "both") != "both":
+            raise OperationError("classifications_require_full_refresh", 422)
         for field in ("fx_provider", "price_provider"):
             if values[field] not in {"synthetic", "yfinance"}:
                 raise OperationError("provider_required", 422)
@@ -56,6 +66,13 @@ def validate_operation(request: ExecuteOperationRequest, workspace: OperationalW
             raise OperationError("external_provider_forbidden_in_demo", 422)
     if request.operation == "uploads":
         decode_uploads(values)
+    if request.operation == "personal_plan":
+        try:
+            PersonalPlan.model_validate(values["plan"])
+            if not re.fullmatch(r"sha256:[a-f0-9]{64}", values["expected_previous_hash"]):
+                raise ValueError("Invalid revision")
+        except (KeyError, ValueError, ValidationError) as exc:
+            raise OperationError("invalid_personal_plan", 422) from exc
 
 
 def decode_uploads(values):
@@ -127,9 +144,16 @@ class ExecuteOperationUseCase:
             ))
             payload = self._result(prices.result)
             payload["steps"] = {"fx": self._result(fx.result), "prices": self._result(prices.result)}
-            if any(item.result.status in {"partial", "skipped"} for item in (fx, prices)):
+            if any(item.result.status != "succeeded" for item in (fx, prices)):
                 payload["status"] = "partial"
             payload["warnings"] = list(dict.fromkeys([*payload["warnings"], *fx.result.warnings]))
+            if values.get("include_classifications"):
+                progress(80, "refresh_classifications")
+                classifications = RefreshAssetClassificationsUseCase(settings=self.settings).execute()
+                payload["steps"]["classifications"] = self._result(classifications)
+                payload["warnings"].extend(classifications.warnings)
+                if classifications.status != "succeeded":
+                    payload["status"] = "partial"
             return payload
         elif operation == "benchmarks":
             output = RefreshBenchmarksUseCase(settings=self.settings).execute(RefreshBenchmarksRequest(
@@ -159,6 +183,14 @@ class ExecuteOperationUseCase:
                 raise OperationError("content_conflict")
             output = UpdateInvestmentBriefUseCase(settings=self.settings).execute(UpdateInvestmentBriefRequest(**values))
             extra["content_hash"] = output.content_hash
+        elif operation == "personal_plan":
+            try:
+                return UpdatePersonalPlanUseCase(settings=self.settings).execute(UpdatePersonalPlanRequest(
+                    plan=PersonalPlan.model_validate(values["plan"]),
+                    expected_previous_hash=values["expected_previous_hash"],
+                ))
+            except PlanConflictError as exc:
+                raise OperationError("content_conflict") from exc
         else:
             current = ReadPortfolioTargetsUseCase(settings=self.settings).execute()
             if current.content_hash != values["expected_previous_hash"]:

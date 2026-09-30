@@ -202,9 +202,37 @@ def test_calculate_portfolio_metrics_can_anchor_prices_to_broker_snapshots() -> 
     positions_metrics = metrics.position_metrics.copy()
     assert positions_metrics["close_price"].tolist() == [100.0, 110.0]
     assert positions_metrics["market_value_base"].tolist() == [1000.0, 1100.0]
-    assert positions_metrics["valuation_status"].tolist() == ["valued_anchored", "valued_anchored"]
+    assert positions_metrics["valuation_status"].tolist() == ["valued_snapshot", "valued_anchored"]
     assert positions_metrics["anchor_snapshot_date"].dt.date.tolist() == [date(2026, 1, 1), date(2026, 1, 1)]
-    assert positions_metrics["provider_anchor_price"].tolist() == [50.0, 50.0]
+    assert pd.isna(positions_metrics["provider_anchor_price"].iloc[0])
+    assert positions_metrics["provider_anchor_price"].iloc[1] == 50.0
+
+
+def test_calculate_portfolio_metrics_prefers_broker_eur_value_on_snapshot_day() -> None:
+    positions = pd.DataFrame([
+        {"position_date": "2026-01-01", "asset_id": "asset-a", "asset_type": "stock", "quantity": 2},
+    ])
+    prices = pd.DataFrame([
+        {"asset_id": "asset-a", "price_date": "2026-01-01", "price_currency": "USD", "close_price": 50},
+    ])
+    snapshots = pd.DataFrame([
+        {"asset_id": "asset-a", "snapshot_date": "2026-01-01", "quantity": 2,
+         "market_price": 50, "market_value": 100, "position_currency": "USD",
+         "market_value_base": 90, "base_currency": "EUR"},
+    ])
+    fx_rates = pd.DataFrame([
+        {"rate_date": "2026-01-01", "base_currency": "EUR", "quote_currency": "USD", "rate": 2},
+    ])
+
+    metrics = calculate_portfolio_metrics(
+        positions, prices, snapshots=snapshots, fx_rates=fx_rates,
+        base_currency="EUR", pricing_policy="broker_snapshot_anchored",
+    )
+
+    row = metrics.position_metrics.iloc[0]
+    assert row["market_value_base"] == 90
+    assert row["fx_rate_to_base"] == round(100 / 90, 8)
+    assert row["valuation_status"] == "valued_snapshot"
 
 
 def test_calculate_portfolio_metrics_uses_broker_market_value_anchor_when_quantity_is_rounded() -> None:
@@ -244,6 +272,35 @@ def test_calculate_portfolio_metrics_uses_broker_market_value_anchor_when_quanti
     positions_metrics = metrics.position_metrics.copy()
     assert positions_metrics["close_price"].round(8).tolist() == [49_152.54237288, 54_067.79661017]
     assert positions_metrics["market_value_base"].tolist() == [290.0, 319.0]
+
+
+def test_broker_snapshot_values_exact_date_without_provider_price() -> None:
+    positions = pd.DataFrame([
+        {"position_date": day, "asset_id": "degiro:product:token", "asset_name": "TOKEN",
+         "asset_type": "crypto", "quantity": 2}
+        for day in ("2026-01-01", "2026-01-02")
+    ])
+    transactions = pd.DataFrame([{
+        "asset_id": "degiro:product:trd:token", "asset_name": "TOKEN", "asset_type": "crypto",
+        "isin": None, "trade_date": "2026-01-01", "transaction_type": "BUY", "quantity": 2,
+        "gross_amount_base": 80, "fees_amount_base": 0, "taxes_amount_base": 0,
+    }])
+    snapshots = pd.DataFrame([{
+        "asset_id": "degiro:product:token", "asset_name": "TOKEN", "asset_type": "crypto",
+        "isin": None, "snapshot_date": "2026-01-01", "quantity": 2,
+        "market_price": 50, "market_value": 100, "position_currency": "EUR",
+    }])
+
+    metrics = calculate_portfolio_metrics(
+        positions, pd.DataFrame(), transactions=transactions, snapshots=snapshots,
+        base_currency="EUR", pricing_policy="broker_snapshot_anchored",
+    )
+
+    rows = metrics.position_metrics
+    assert rows["valuation_status"].tolist() == ["valued_snapshot", "missing_provider_anchor_price"]
+    assert rows["market_value_base"].iloc[0] == 100
+    assert rows["cost_basis_base"].iloc[0] == 80
+    assert pd.isna(rows["market_value_base"].iloc[1])
 
 
 def test_calculate_portfolio_metrics_scales_broker_value_anchor_by_current_quantity() -> None:
@@ -416,3 +473,38 @@ def test_calculate_portfolio_metrics_from_normalized_degiro_loads_duckdb_prices(
     assert metrics.end_date == date(2026, 1, 6)
     assert daily["total_market_value_base"].tolist() == [100.0, 100.0, 180.0, 210.0]
     assert daily["total_cost_basis_base"].tolist() == [100.0, 100.0, 160.0, 160.0]
+
+
+def test_trade_anchor_values_sold_asset_and_rejects_stale_quote():
+    positions = pd.DataFrame([{"position_date": day, "asset_id": "sold", "quantity": 2}
+                              for day in ["2026-01-01", "2026-01-02", "2026-01-11"]])
+    transactions = pd.DataFrame([{"asset_id": "sold", "trade_date": "2026-01-01", "transaction_type": "BUY",
+                                  "quantity": 2, "unit_price": 50, "transaction_currency": "EUR",
+                                  "gross_amount_base": 100, "fees_amount_base": 0, "taxes_amount_base": 0,
+                                  "source_row": 1}])
+    prices = pd.DataFrame([{"asset_id": "sold", "price_date": day, "price_currency": "EUR", "close_price": price}
+                           for day, price in [("2026-01-01", 100), ("2026-01-02", 110)]])
+    metrics = calculate_portfolio_metrics(positions, prices, transactions=transactions,
+                                         pricing_policy="broker_snapshot_anchored")
+    rows = metrics.position_metrics
+    assert rows.market_value_base.iloc[:2].tolist() == [100, 110]
+    assert rows.valuation_status.tolist() == ["valued_trade_anchor", "valued_trade_anchor", "stale_price"]
+    assert pd.isna(rows.market_value_base.iloc[2])
+
+
+def test_cached_price_alias_uses_canonical_id_and_prefers_canonical_quote(tmp_path):
+    import json
+    from src.portfolio.metrics import load_prices_daily_from_duckdb
+    settings = load_settings(repo_root=tmp_path, env_file=tmp_path / "absent.env", env={})
+    repository = DuckDBMarketDataRepository(settings=settings)
+    repository.upsert_assets([MarketAsset(asset_id=asset_id, asset_name="Fixture", asset_type="stock", trading_currency="EUR")
+                              for asset_id in ["degiro:old", "degiro:new"]])
+    (settings.data_dir / "asset_id_aliases.json").write_text(json.dumps({"schema_version": 1, "aliases": {"degiro:old": "degiro:new"}}))
+    repository.upsert_daily_prices(asset_id="degiro:old", provider_name="yfinance", prices=[
+        DailyPriceRecord(price_date=date(2026, 1, 1), price_currency="EUR", close_price=100),
+        DailyPriceRecord(price_date=date(2026, 1, 2), price_currency="EUR", close_price=105)])
+    repository.upsert_daily_prices(asset_id="degiro:new", provider_name="yfinance", prices=[
+        DailyPriceRecord(price_date=date(2026, 1, 2), price_currency="EUR", close_price=106)])
+    frame = load_prices_daily_from_duckdb(repository=repository, asset_ids=["degiro:new"], end_date=date(2026, 1, 2))
+    assert set(frame.asset_id) == {"degiro:new"}
+    assert frame.sort_values("price_date").close_price.tolist() == [100, 106]

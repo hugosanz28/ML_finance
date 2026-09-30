@@ -7,6 +7,7 @@ from fastapi import APIRouter, Header, Path, Query
 from src.api.operation_schemas import (
     AgentsBody, BenchmarkRefreshBody, BriefBody, BriefResponse, JobResponse, JobsResponse, OperationBody,
     RefreshBody, ReportBody, SimulationBody, TargetsBody, TargetsResponse, UploadsBody,
+    PersonalPlanBody,
 )
 from src.api.schemas import ErrorResponse, ListQuery
 from src.application.local_jobs import (
@@ -26,7 +27,7 @@ def operation_router(manager):
     })
 
     def submit(operation, body, key):
-        return SubmitJobUseCase(manager).execute(SubmitJobRequest(operation, body.model_dump(), key))
+        return SubmitJobUseCase(manager).execute(SubmitJobRequest(operation, body.model_dump(mode="json"), key))
 
     @router.post("/degiro/uploads", response_model=JobResponse, status_code=202)
     def uploads(body: UploadsBody, key: Key):
@@ -63,6 +64,10 @@ def operation_router(manager):
     @router.put("/settings/portfolio-targets", response_model=JobResponse, status_code=202)
     def targets(body: TargetsBody, key: Key):
         return submit("targets", body, key)
+
+    @router.put("/planning/plan", response_model=JobResponse, status_code=202)
+    def personal_plan(body: PersonalPlanBody, key: Key):
+        return submit("personal_plan", body, key)
 
     @router.get("/settings/investment-brief", response_model=BriefResponse)
     def read_brief():
