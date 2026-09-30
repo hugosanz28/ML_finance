@@ -140,6 +140,8 @@ def test_restore_rejects_link_destinations(workspace):
         destination.symlink_to(outside)
     except OSError:
         pytest.skip("Symlink creation requires Windows privileges")
-    with pytest.raises(ValueError):
+    # Workspace validation rejects the escaping link before archive restoration starts.
+    with pytest.raises(OperationError, match="workspace_link_not_allowed"):
         RestoreLocalUseCase(settings=workspace).execute(RestoreLocalRequest(source, True))
+    assert destination.is_symlink()
     assert outside.read_text() == "keep"
